@@ -82,6 +82,9 @@
                 <TextBlock Grid.Column="4" Text="{Binding MemoryUsage}"
                            FontSize="11" VerticalAlignment="Center" Margin="12,0"
                            Foreground="#888888" />
+                <TextBlock Grid.Column="5" Text="{Binding CanvasZoomText}"
+                           FontSize="11" VerticalAlignment="Center" Margin="12,0"
+                           Foreground="#888888" />
             </Grid>
         </Border>
 

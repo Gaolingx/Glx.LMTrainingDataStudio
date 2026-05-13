@@ -4,6 +4,7 @@ using Avalonia.Controls.Shapes;
 using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Threading;
+using LMTrainingDataStudio2.Commands;
 using LMTrainingDataStudio2.Models;
 using LMTrainingDataStudio2.ViewModels;
 using Path = Avalonia.Controls.Shapes.Path;
@@ -13,6 +14,9 @@ namespace LMTrainingDataStudio2.Views;
 public partial class RecipeCanvasView : UserControl
 {
     private const string DragBlockFormat = "application/x-lmtds-block-type";
+    private const double MinCanvasScale = 0.25;
+    private const double MaxCanvasScale = 2.5;
+    private const double CanvasScaleStep = 0.1;
 
     private Canvas? _canvas;
     private Border? _marquee;
@@ -33,12 +37,14 @@ public partial class RecipeCanvasView : UserControl
     private double _canvasOffsetY;
     private double _panOffsetX;
     private double _panOffsetY;
+    private double _canvasScale = 1.0;
     private BlockNodeViewModel? _draggedBlock;
     private Border? _draggedBorder;
     private BlockNodeViewModel? _connectionSourceBlock;
     private PortViewModel? _connectionSourcePort;
     private Point _lastCanvasMenuPosition = new(300, 200);
     private readonly List<BlockNodeViewModel> _clipboard = new();
+    private readonly Dictionary<string, (BlockNodeViewModel Block, double X, double Y)> _dragInitialPositions = new();
 
     public RecipeCanvasView()
     {
@@ -58,6 +64,7 @@ public partial class RecipeCanvasView : UserControl
             _canvas.PointerPressed += OnCanvasPointerPressed;
             _canvas.PointerMoved += OnCanvasPointerMoved;
             _canvas.PointerReleased += OnCanvasPointerReleased;
+            _canvas.PointerWheelChanged += OnCanvasPointerWheelChanged;
             _canvas.AddHandler(DragDrop.DragOverEvent, OnCanvasDragOver);
             _canvas.AddHandler(DragDrop.DropEvent, OnCanvasDrop);
         }
@@ -72,6 +79,8 @@ public partial class RecipeCanvasView : UserControl
         {
             vm.Blocks.CollectionChanged += (_, _) => Dispatcher.UIThread.Post(RenderBlocks);
             vm.Edges.CollectionChanged += (_, _) => Dispatcher.UIThread.Post(RenderBlocks);
+            vm.CommandHistory.HistoryChanged += (_, _) => Dispatcher.UIThread.Post(RenderBlocks);
+            UpdateCanvasZoomText(vm);
             RenderBlocks();
         }
     }
@@ -103,6 +112,7 @@ public partial class RecipeCanvasView : UserControl
             _lastCanvasMenuPosition = point;
             var (block, _) = HitTestBlock(point);
             if (block != null) ShowNodeContextMenu(block);
+            else if (HitTestEdge(point) is { } hitEdge) ShowEdgeContextMenu(hitEdge);
             else ShowCanvasContextMenu(point);
             e.Handled = true;
             return;
@@ -157,6 +167,11 @@ public partial class RecipeCanvasView : UserControl
             _dragStartPoint = point;
             _dragStartX = hitBlock.X;
             _dragStartY = hitBlock.Y;
+            _dragInitialPositions.Clear();
+            foreach (var block in GetSelectedBlocks())
+            {
+                _dragInitialPositions[block.Id] = (block, block.X, block.Y);
+            }
             e.Pointer.Capture(_canvas);
             RenderBlocks();
             e.Handled = true;
@@ -226,7 +241,7 @@ public partial class RecipeCanvasView : UserControl
             var dy = point.Y - _panStartPoint.Y;
             _canvasOffsetX = _panOffsetX + dx;
             _canvasOffsetY = _panOffsetY + dy;
-            _canvas.RenderTransform = new TranslateTransform(_canvasOffsetX, _canvasOffsetY);
+            ApplyCanvasTransform();
             e.Handled = true;
         }
     }
@@ -241,14 +256,14 @@ public partial class RecipeCanvasView : UserControl
             var target = HitTestInputPort(point);
             if (_connectionSourceBlock != null && _connectionSourcePort != null && target != null && target.Value.Block != _connectionSourceBlock)
             {
-                vm.Edges.Add(new EdgeViewModel
+                vm.CommandHistory.Execute(new AddEdgeCommand(vm, new EdgeViewModel
                 {
                     SourceBlockId = _connectionSourceBlock.Id,
                     SourcePortId = _connectionSourcePort.Id,
                     TargetBlockId = target.Value.Block.Id,
                     TargetPortId = target.Value.Port.Id,
                     Label = _connectionSourcePort.DataType
-                });
+                }));
             }
             _isConnecting = false;
             _connectionSourceBlock = null;
@@ -263,11 +278,28 @@ public partial class RecipeCanvasView : UserControl
             _isSelecting = false;
         }
 
+        if (_isDraggingNode)
+        {
+            CommitMoveCommand(vm);
+        }
+
         _isDraggingNode = false;
         _draggedBlock = null;
         _draggedBorder = null;
         _isPanning = false;
         e.Pointer.Capture(null);
+        e.Handled = true;
+    }
+
+    private void OnCanvasPointerWheelChanged(object? sender, PointerWheelEventArgs e)
+    {
+        if (_canvas == null || DataContext is not MainWindowViewModel vm) return;
+        var oldScale = _canvasScale;
+        _canvasScale = Math.Clamp(_canvasScale + (e.Delta.Y > 0 ? CanvasScaleStep : -CanvasScaleStep), MinCanvasScale, MaxCanvasScale);
+        if (Math.Abs(oldScale - _canvasScale) < 0.001) return;
+
+        ApplyCanvasTransform();
+        UpdateCanvasZoomText(vm);
         e.Handled = true;
     }
 
@@ -303,6 +335,20 @@ public partial class RecipeCanvasView : UserControl
         if (e.Key == Key.Delete)
         {
             DeleteSelection(vm);
+            e.Handled = true;
+            return;
+        }
+
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && e.Key == Key.Z)
+        {
+            vm.CommandHistory.Undo();
+            e.Handled = true;
+            return;
+        }
+
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && e.Key == Key.Y)
+        {
+            vm.CommandHistory.Redo();
             e.Handled = true;
             return;
         }
@@ -392,6 +438,33 @@ public partial class RecipeCanvasView : UserControl
         menu.Items.Add(duplicateItem);
         menu.Items.Add(renameItem);
         menu.Items.Add(new Separator());
+        menu.Items.Add(deleteItem);
+        _contextMenu = menu;
+        menu.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(_contextMenu, menu)) _contextMenu = null;
+        };
+        menu.Open(this);
+    }
+
+    private void ShowEdgeContextMenu(EdgeViewModel edge)
+    {
+        if (DataContext is not MainWindowViewModel vm) return;
+        CloseContextMenu();
+        foreach (var b in vm.Blocks) b.IsSelected = false;
+        vm.SelectedBlock = null;
+        foreach (var e in vm.Edges)
+        {
+            e.IsSelected = false;
+            e.IsHighlighted = false;
+        }
+        edge.IsSelected = true;
+        edge.IsHighlighted = true;
+        RenderBlocks();
+
+        var menu = new ContextMenu();
+        var deleteItem = new MenuItem { Header = "Delete" };
+        deleteItem.Click += (_, _) => DeleteEdge(vm, edge);
         menu.Items.Add(deleteItem);
         _contextMenu = menu;
         menu.Closed += (_, _) =>
@@ -526,16 +599,53 @@ public partial class RecipeCanvasView : UserControl
     private void DeleteSelection(MainWindowViewModel vm)
     {
         var selectedEdges = vm.Edges.Where(e => e.IsSelected || e.IsHighlighted).ToList();
-        foreach (var edge in selectedEdges) vm.Edges.Remove(edge);
-
         var selectedBlocks = vm.Blocks.Where(b => b.IsSelected).ToList();
         foreach (var block in selectedBlocks)
         {
-            foreach (var edge in vm.Edges.Where(e => e.SourceBlockId == block.Id || e.TargetBlockId == block.Id).ToList()) vm.Edges.Remove(edge);
-            vm.Blocks.Remove(block);
+            selectedEdges.AddRange(vm.Edges.Where(e => e.SourceBlockId == block.Id || e.TargetBlockId == block.Id));
         }
+
+        selectedEdges = selectedEdges.DistinctBy(e => e.Id).ToList();
+        if (selectedBlocks.Count == 0 && selectedEdges.Count == 0) return;
+
+        vm.CommandHistory.Execute(new DeleteSelectionCommand(vm, selectedBlocks, selectedEdges));
         vm.SelectedBlock = null;
         RenderBlocks();
+    }
+
+    private void CommitMoveCommand(MainWindowViewModel vm)
+    {
+        var moves = _dragInitialPositions.Values
+            .Where(start => Math.Abs(start.Block.X - start.X) > 0.1 || Math.Abs(start.Block.Y - start.Y) > 0.1)
+            .Select(start => (start.Block, start.X, start.Y, start.Block.X, start.Block.Y))
+            .ToList();
+
+        if (moves.Count > 0)
+        {
+            vm.CommandHistory.Execute(new MoveBlocksCommand(moves));
+        }
+
+        _dragInitialPositions.Clear();
+    }
+
+    private void DeleteEdge(MainWindowViewModel vm, EdgeViewModel edge)
+    {
+        vm.CommandHistory.Execute(new DeleteEdgeCommand(vm, edge));
+        RenderBlocks();
+    }
+
+    private void ApplyCanvasTransform()
+    {
+        if (_canvas == null) return;
+        var transform = new TransformGroup();
+        transform.Children.Add(new ScaleTransform(_canvasScale, _canvasScale));
+        transform.Children.Add(new TranslateTransform(_canvasOffsetX, _canvasOffsetY));
+        _canvas.RenderTransform = transform;
+    }
+
+    private void UpdateCanvasZoomText(MainWindowViewModel vm)
+    {
+        vm.CanvasZoomText = $"Zoom: {_canvasScale:P0}";
     }
 
     private IEnumerable<BlockNodeViewModel> GetSelectedBlocks()
@@ -554,7 +664,10 @@ public partial class RecipeCanvasView : UserControl
         if (blocks.Count == 0) return;
         var minX = blocks.Min(b => b.X);
         var minY = blocks.Min(b => b.Y);
-        foreach (var b in vm.Blocks) b.IsSelected = false;
+        foreach (var block in vm.Blocks)
+        {
+            block.IsSelected = false;
+        }
         foreach (var block in blocks)
         {
             block.Id = Guid.NewGuid().ToString("N");
@@ -562,8 +675,8 @@ public partial class RecipeCanvasView : UserControl
             block.X = position.X + (block.X - minX);
             block.Y = position.Y + (block.Y - minY);
             block.IsSelected = true;
-            vm.Blocks.Add(block);
         }
+        vm.CommandHistory.Execute(new CompositeCommand("Paste blocks", blocks.Select(block => new AddBlockCommand(vm, block))));
         vm.SelectedBlock = blocks.LastOrDefault();
     }
 
@@ -608,7 +721,7 @@ public partial class RecipeCanvasView : UserControl
         };
         block.InputPorts.Add(new PortViewModel { Name = "input", DataType = "any" });
         block.OutputPorts.Add(new PortViewModel { Name = "output", DataType = "any" });
-        vm.Blocks.Add(block);
+        vm.CommandHistory.Execute(new AddBlockCommand(vm, block));
         vm.SelectedBlock = block;
     }
 

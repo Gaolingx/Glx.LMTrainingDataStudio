@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using LMTrainingDataStudio2.Commands;
 using LMTrainingDataStudio2.Models;
 using LMTrainingDataStudio2.Services;
 using System.Collections.ObjectModel;
@@ -47,6 +48,9 @@ public partial class MainWindowViewModel : ObservableObject
     private string _memoryUsage = "0 MB";
 
     [ObservableProperty]
+    private string _canvasZoomText = "Zoom: 100%";
+
+    [ObservableProperty]
     private BlockNodeViewModel? _selectedBlock;
 
     [ObservableProperty]
@@ -74,6 +78,7 @@ public partial class MainWindowViewModel : ObservableObject
     public ObservableCollection<EdgeViewModel> Edges { get; } = new();
     public ObservableCollection<BlockTemplateViewModel> BlockTemplates { get; } = new();
     public ObservableCollection<string> LogMessages { get; } = new();
+    public CommandHistory CommandHistory { get; } = new();
 
     public MainWindowViewModel()
     {
@@ -81,6 +86,10 @@ public partial class MainWindowViewModel : ObservableObject
         InitializeBlockTemplates();
         LoadSampleRecipe();
         UpdateMemoryUsage();
+        CommandHistory.HistoryChanged += (_, _) =>
+        {
+            StatusText = CommandHistory.CanUndo || CommandHistory.CanRedo ? "Recipe history updated" : "Ready";
+        };
     }
 
     private void LoadSettingsSnapshot()
