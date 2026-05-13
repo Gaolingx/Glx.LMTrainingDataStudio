@@ -17,6 +17,7 @@ public partial class RecipeCanvasView : UserControl
     private Canvas? _canvas;
     private Border? _marquee;
     private Border? _nodeMenu;
+    private ContextMenu? _contextMenu;
     private Path? _previewEdge;
 
     private bool _isDraggingNode;
@@ -81,6 +82,7 @@ public partial class RecipeCanvasView : UserControl
 
         Focus();
         HideNodeMenu();
+        CloseContextMenu();
 
         var point = e.GetPosition(_canvas);
         var props = e.GetCurrentPoint(_canvas).Properties;
@@ -374,6 +376,7 @@ public partial class RecipeCanvasView : UserControl
     private void ShowNodeContextMenu(BlockNodeViewModel block)
     {
         if (DataContext is not MainWindowViewModel vm) return;
+        CloseContextMenu();
         foreach (var b in vm.Blocks) b.IsSelected = false;
         block.IsSelected = true;
         vm.SelectedBlock = block;
@@ -390,15 +393,26 @@ public partial class RecipeCanvasView : UserControl
         menu.Items.Add(renameItem);
         menu.Items.Add(new Separator());
         menu.Items.Add(deleteItem);
+        _contextMenu = menu;
+        menu.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(_contextMenu, menu)) _contextMenu = null;
+        };
         menu.Open(this);
     }
 
     private void ShowCanvasContextMenu(Point position)
     {
+        CloseContextMenu();
         var menu = new ContextMenu();
         var addItem = new MenuItem { Header = "Add item" };
         addItem.Click += (_, _) => ShowSearchableNodeMenu(position);
         menu.Items.Add(addItem);
+        _contextMenu = menu;
+        menu.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(_contextMenu, menu)) _contextMenu = null;
+        };
         menu.Open(this);
     }
 
@@ -463,6 +477,15 @@ public partial class RecipeCanvasView : UserControl
     {
         if (_canvas != null && _nodeMenu != null) _canvas.Children.Remove(_nodeMenu);
         _nodeMenu = null;
+    }
+
+    private void CloseContextMenu()
+    {
+        if (_contextMenu != null)
+        {
+            _contextMenu.Close();
+            _contextMenu = null;
+        }
     }
 
     private void ShowMarquee(Point start, Point end)

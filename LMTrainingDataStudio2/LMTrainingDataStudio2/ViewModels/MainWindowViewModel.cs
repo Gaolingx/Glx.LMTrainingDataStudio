@@ -14,6 +14,7 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly RecipeValidationService _recipeValidation = new();
     private readonly DatasetValidationService _datasetValidation = new();
     private readonly DatasetFormatConverter _formatConverter = new();
+    private readonly AppSettings _settings = new();
 
     [ObservableProperty]
     private string _recipeName = "Untitled Recipe";
@@ -48,6 +49,27 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private BlockNodeViewModel? _selectedBlock;
 
+    [ObservableProperty]
+    private bool _isSettingsVisible;
+
+    [ObservableProperty]
+    private long _maxCacheSizeMb;
+
+    [ObservableProperty]
+    private string _cacheDirectory = string.Empty;
+
+    [ObservableProperty]
+    private bool _enableGridSnap;
+
+    [ObservableProperty]
+    private int _gridSnapSize;
+
+    [ObservableProperty]
+    private bool _isDarkTheme;
+
+    [ObservableProperty]
+    private string _cacheSizeText = "0 MB";
+
     public ObservableCollection<BlockNodeViewModel> Blocks { get; } = new();
     public ObservableCollection<EdgeViewModel> Edges { get; } = new();
     public ObservableCollection<BlockTemplateViewModel> BlockTemplates { get; } = new();
@@ -55,9 +77,20 @@ public partial class MainWindowViewModel : ObservableObject
 
     public MainWindowViewModel()
     {
+        LoadSettingsSnapshot();
         InitializeBlockTemplates();
         LoadSampleRecipe();
         UpdateMemoryUsage();
+    }
+
+    private void LoadSettingsSnapshot()
+    {
+        MaxCacheSizeMb = _settings.MaxCacheSizeMb;
+        CacheDirectory = _settings.CacheDirectory;
+        EnableGridSnap = _settings.EnableGridSnap;
+        GridSnapSize = _settings.GridSnapSize;
+        IsDarkTheme = _settings.IsDarkTheme;
+        UpdateCacheSizeText();
     }
 
     private void InitializeBlockTemplates()
@@ -245,6 +278,46 @@ public partial class MainWindowViewModel : ObservableObject
         IsEditorView = false;
     }
 
+    [RelayCommand]
+    private void OpenSettings()
+    {
+        LoadSettingsSnapshot();
+        IsSettingsVisible = true;
+    }
+
+    [RelayCommand]
+    private void CloseSettings()
+    {
+        IsSettingsVisible = false;
+    }
+
+    [RelayCommand]
+    private void ApplySettings()
+    {
+        _settings.MaxCacheSizeMb = Math.Max(16, MaxCacheSizeMb);
+        _settings.CacheDirectory = string.IsNullOrWhiteSpace(CacheDirectory)
+            ? Path.Combine(Path.GetTempPath(), "LMTrainingDataStudio", "index-cache")
+            : CacheDirectory.Trim();
+        _settings.EnableGridSnap = EnableGridSnap;
+        _settings.GridSnapSize = Math.Max(1, GridSnapSize);
+        _settings.IsDarkTheme = IsDarkTheme;
+
+        LoadSettingsSnapshot();
+        StatusText = "Settings applied ✓";
+        LogMessages.Add("[Info] Settings applied for this session.");
+        IsSettingsVisible = false;
+    }
+
+    [RelayCommand]
+    private void CleanIndexCache()
+    {
+        var service = new IndexCacheService(_settings);
+        service.CleanCache();
+        UpdateCacheSizeText();
+        StatusText = "Index cache cleaned ✓";
+        LogMessages.Add("[Info] Index cache cleaned.");
+    }
+
     private Recipe BuildRecipeFromViewModel()
     {
         var recipe = new Recipe { Name = RecipeName };
@@ -297,5 +370,19 @@ public partial class MainWindowViewModel : ObservableObject
         var process = System.Diagnostics.Process.GetCurrentProcess();
         var mb = process.WorkingSet64 / (1024.0 * 1024.0);
         MemoryUsage = $"{mb:F0} MB";
+    }
+
+    private void UpdateCacheSizeText()
+    {
+        try
+        {
+            using var service = new IndexCacheService(_settings);
+            var mb = service.GetTotalCacheSize() / (1024.0 * 1024.0);
+            CacheSizeText = $"{mb:F1} MB";
+        }
+        catch
+        {
+            CacheSizeText = "Unavailable";
+        }
     }
 }

@@ -18,6 +18,7 @@
         </Style>
     </Window.Styles>
 
+    <Grid>
     <DockPanel>
         <!-- Recipe Header (48px) -->
         <Border DockPanel.Dock="Top" Height="48"
@@ -50,6 +51,7 @@
 
                 <!-- Settings -->
                 <Button Grid.Column="3" Content="⚙" FontSize="16"
+                    Command="{Binding OpenSettingsCommand}"
                         Background="Transparent" Foreground="#AAAAAA"
                         VerticalAlignment="Center" Margin="0,0,12,0"
                         Padding="8,4" />
@@ -238,4 +240,107 @@
             </Grid>
         </Grid>
     </DockPanel>
+
+    <!-- Settings overlay -->
+    <Border IsVisible="{Binding IsSettingsVisible}"
+            Background="#99000000"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Stretch"
+            ZIndex="1000">
+        <Grid HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+            <Border Width="560"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Background="#252538"
+                    BorderBrush="#4A90D9"
+                    BorderThickness="1"
+                    CornerRadius="12"
+                    BoxShadow="0 18 42 0 #66000000">
+                <DockPanel>
+                    <Border DockPanel.Dock="Top"
+                            Height="56"
+                            Background="#2D2D44"
+                            CornerRadius="12,12,0,0"
+                            BorderBrush="#3A3A4E"
+                            BorderThickness="0,0,0,1">
+                        <Grid ColumnDefinitions="*,Auto" Margin="18,0,12,0">
+                            <StackPanel VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Text="Settings" FontSize="18" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                <TextBlock Text="Cache, theme and canvas interaction preferences" FontSize="11" Foreground="#9A9AAD" />
+                            </StackPanel>
+                            <Button Grid.Column="1"
+                                    Content="✕"
+                                    Command="{Binding CloseSettingsCommand}"
+                                    Background="Transparent"
+                                    Foreground="#AAAAAA"
+                                    FontSize="14"
+                                    Padding="8,4"
+                                    VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+
+                    <StackPanel Margin="22" Spacing="18">
+                        <Border Background="#1E1E2E" BorderBrush="#3A3A4E" BorderThickness="1" CornerRadius="8" Padding="16">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="Index Cache" FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                <TextBlock Text="SQLite cache for large JSONL line offsets. Keep this on a fast local disk." FontSize="11" Foreground="#9A9AAD" TextWrapping="Wrap" />
+
+                                <Grid ColumnDefinitions="180,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="12">
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Max cache size (MB)" VerticalAlignment="Center" Foreground="#CCCCCC" />
+                                    <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding MaxCacheSizeMb, Mode=TwoWay}" Watermark="512" />
+
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Cache directory" VerticalAlignment="Center" Foreground="#CCCCCC" />
+                                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding CacheDirectory, Mode=TwoWay}" Watermark="tmp/index-cache" />
+
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Current cache size" VerticalAlignment="Center" Foreground="#CCCCCC" />
+                                    <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                                        <TextBlock Text="{Binding CacheSizeText}" VerticalAlignment="Center" Foreground="#AAAAAA" />
+                                        <Button Content="Clean Cache"
+                                                Command="{Binding CleanIndexCacheCommand}"
+                                                Padding="10,5"
+                                                Background="#3A3A4E"
+                                                Foreground="#FFFFFF" />
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="#1E1E2E" BorderBrush="#3A3A4E" BorderThickness="1" CornerRadius="8" Padding="16">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="Canvas" FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                <Grid ColumnDefinitions="180,*" RowDefinitions="Auto,Auto" RowSpacing="10" ColumnSpacing="12">
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Enable grid snap" VerticalAlignment="Center" Foreground="#CCCCCC" />
+                                    <CheckBox Grid.Row="0" Grid.Column="1" IsChecked="{Binding EnableGridSnap, Mode=TwoWay}" />
+
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Grid snap size (px)" VerticalAlignment="Center" Foreground="#CCCCCC" />
+                                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding GridSnapSize, Mode=TwoWay}" Watermark="16" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="#1E1E2E" BorderBrush="#3A3A4E" BorderThickness="1" CornerRadius="8" Padding="16">
+                            <Grid ColumnDefinitions="180,*" ColumnSpacing="12">
+                                <TextBlock Grid.Column="0" Text="Dark theme" VerticalAlignment="Center" Foreground="#CCCCCC" />
+                                <CheckBox Grid.Column="1" IsChecked="{Binding IsDarkTheme, Mode=TwoWay}" />
+                            </Grid>
+                        </Border>
+
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+                            <Button Content="Cancel"
+                                    Command="{Binding CloseSettingsCommand}"
+                                    Padding="14,7"
+                                    Background="#3A3A4E"
+                                    Foreground="#FFFFFF" />
+                            <Button Content="Apply"
+                                    Command="{Binding ApplySettingsCommand}"
+                                    Padding="16,7"
+                                    Background="#4A90D9"
+                                    Foreground="#FFFFFF" />
+                        </StackPanel>
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+        </Grid>
+    </Border>
+    </Grid>
 </Window>
