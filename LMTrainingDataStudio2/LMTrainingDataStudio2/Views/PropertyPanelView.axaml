@@ -1,0 +1,142 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:LMTrainingDataStudio2.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="320" d:DesignHeight="600"
+             x:Class="LMTrainingDataStudio2.Views.PropertyPanelView"
+             x:DataType="vm:MainWindowViewModel">
+
+    <StackPanel Margin="12" Spacing="12">
+
+        <!-- No Selection State -->
+        <StackPanel IsVisible="{Binding SelectedBlock, Converter={x:Static ObjectConverters.IsNull}}"
+                    Spacing="8" Margin="0,20">
+            <TextBlock Text="No block selected" FontSize="13"
+                       Foreground="#888888" HorizontalAlignment="Center" />
+            <TextBlock Text="Click a block on the canvas to view its properties."
+                       FontSize="11" Foreground="#666666"
+                       TextWrapping="Wrap" HorizontalAlignment="Center"
+                       TextAlignment="Center" />
+        </StackPanel>
+
+        <!-- Selected Block Properties -->
+        <StackPanel IsVisible="{Binding SelectedBlock, Converter={x:Static ObjectConverters.IsNotNull}}"
+                    Spacing="12">
+
+            <!-- Block Info Header -->
+            <Border Background="#2A2A3E" CornerRadius="6" Padding="12,8">
+                <StackPanel Spacing="6">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="{Binding SelectedBlock.IconText}" FontSize="16" />
+                        <TextBlock Text="{Binding SelectedBlock.DisplayName}"
+                                   FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                    </StackPanel>
+                    <TextBlock FontSize="11" Foreground="#AAAAAA">
+                        <Run Text="Type: " />
+                        <Run Text="{Binding SelectedBlock.Type}" />
+                    </TextBlock>
+                </StackPanel>
+            </Border>
+
+            <!-- Jinja Reference Name -->
+            <StackPanel Spacing="4">
+                <TextBlock Text="Jinja Reference Name" FontSize="11" Foreground="#AAAAAA" />
+                <TextBox Text="{Binding SelectedBlock.Name, Mode=TwoWay}"
+                         FontSize="12" Padding="8,6"
+                         Watermark="e.g. seed_data" />
+            </StackPanel>
+
+            <!-- Display Name -->
+            <StackPanel Spacing="4">
+                <TextBlock Text="Display Name" FontSize="11" Foreground="#AAAAAA" />
+                <TextBox Text="{Binding SelectedBlock.DisplayName, Mode=TwoWay}"
+                         FontSize="12" Padding="8,6"
+                         Watermark="Block display name" />
+            </StackPanel>
+
+            <!-- Position -->
+            <StackPanel Spacing="4">
+                <TextBlock Text="Position" FontSize="11" Foreground="#AAAAAA" />
+                <Grid ColumnDefinitions="*,8,*">
+                    <TextBox Grid.Column="0" Text="{Binding SelectedBlock.X, Mode=TwoWay}"
+                             FontSize="11" Padding="6,4" Watermark="X" />
+                    <TextBox Grid.Column="2" Text="{Binding SelectedBlock.Y, Mode=TwoWay}"
+                             FontSize="11" Padding="6,4" Watermark="Y" />
+                </Grid>
+            </StackPanel>
+
+            <!-- Separator -->
+            <Border Height="1" Background="#3A3A4E" />
+
+            <!-- Output Ports -->
+            <StackPanel Spacing="4">
+                <TextBlock Text="Output Ports" FontSize="11" Foreground="#AAAAAA" FontWeight="SemiBold" />
+                <ItemsControl ItemsSource="{Binding SelectedBlock.OutputPorts}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:PortViewModel">
+                            <Border Background="#2A2A3E" CornerRadius="4" Padding="8,4" Margin="0,2">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Text="{Binding Name}" FontSize="11" Foreground="#CCCCCC" />
+                                    <TextBlock Grid.Column="1" Text="{Binding DataType}" FontSize="10"
+                                               Foreground="#888888" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+
+            <!-- Input Ports -->
+            <StackPanel Spacing="4">
+                <TextBlock Text="Input Ports" FontSize="11" Foreground="#AAAAAA" FontWeight="SemiBold" />
+                <ItemsControl ItemsSource="{Binding SelectedBlock.InputPorts}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:PortViewModel">
+                            <Border Background="#2A2A3E" CornerRadius="4" Padding="8,4" Margin="0,2">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Text="{Binding Name}" FontSize="11" Foreground="#CCCCCC" />
+                                    <TextBlock Grid.Column="1" Text="{Binding DataType}" FontSize="10"
+                                               Foreground="#888888" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+
+            <!-- Separator -->
+            <Border Height="1" Background="#3A3A4E" />
+
+            <!-- Actions -->
+            <StackPanel Spacing="6">
+                <Button Content="🗑 Delete Block" Command="{Binding DeleteSelectedBlockCommand}"
+                        HorizontalAlignment="Stretch"
+                        Padding="8,6" FontSize="11"
+                        Background="#3A2020" Foreground="#FF6666"
+                        HorizontalContentAlignment="Center" />
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Separator -->
+        <Border Height="1" Background="#3A3A4E" Margin="0,8" />
+
+        <!-- Log Messages -->
+        <StackPanel Spacing="4">
+            <TextBlock Text="Logs" FontSize="11" Foreground="#AAAAAA" FontWeight="SemiBold" />
+            <Border Background="#1A1A2A" CornerRadius="4" Padding="8" MinHeight="80" MaxHeight="200">
+                <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding LogMessages}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}" FontSize="10"
+                                           Foreground="#AAAAAA" TextWrapping="Wrap"
+                                           Margin="0,1" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Border>
+        </StackPanel>
+    </StackPanel>
+</UserControl>

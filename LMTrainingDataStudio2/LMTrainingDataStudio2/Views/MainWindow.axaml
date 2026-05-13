@@ -1,0 +1,208 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:LMTrainingDataStudio2.ViewModels"
+        xmlns:views="using:LMTrainingDataStudio2.Views"
+        mc:Ignorable="d" d:DesignWidth="1440" d:DesignHeight="900"
+        x:Class="LMTrainingDataStudio2.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="LLM Training Data Studio"
+        MinWidth="1280" MinHeight="720"
+        Width="1440" Height="900"
+        Background="{StaticResource CanvasBackgroundBrush}">
+
+    <Window.Styles>
+        <Style Selector="TextBlock">
+            <Setter Property="Foreground" Value="#E0E0E0" />
+        </Style>
+    </Window.Styles>
+
+    <DockPanel>
+        <!-- Recipe Header (48px) -->
+        <Border DockPanel.Dock="Top" Height="48"
+                Background="{StaticResource HeaderBackgroundBrush}"
+                BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="0,0,0,1">
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
+                <!-- App Icon / Title -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0">
+                    <TextBlock Text="⚗️" FontSize="18" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <TextBox Text="{Binding RecipeName, Mode=TwoWay}"
+                             FontSize="14" FontWeight="SemiBold"
+                             Background="Transparent" BorderThickness="0"
+                             Foreground="#FFFFFF"
+                             VerticalAlignment="Center"
+                             MinWidth="200" />
+                </StackPanel>
+
+                <!-- Spacer -->
+                <Border Grid.Column="1" />
+
+                <!-- Editor / Executions Toggle -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Spacing="2" Margin="0,0,12,0">
+                    <Button Content="Editor" Command="{Binding SwitchToEditorCommand}"
+                            Classes.accent="{Binding IsEditorView}"
+                            Padding="12,6" FontSize="12" />
+                    <Button Content="Executions" Command="{Binding SwitchToExecutionsCommand}"
+                            Classes.accent="{Binding !IsEditorView}"
+                            Padding="12,6" FontSize="12" />
+                </StackPanel>
+
+                <!-- Settings -->
+                <Button Grid.Column="3" Content="⚙" FontSize="16"
+                        Background="Transparent" Foreground="#AAAAAA"
+                        VerticalAlignment="Center" Margin="0,0,12,0"
+                        Padding="8,4" />
+            </Grid>
+        </Border>
+
+        <!-- Status Bar (28px) -->
+        <Border DockPanel.Dock="Bottom" Height="28"
+                Background="{StaticResource StatusBarBackgroundBrush}"
+                BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="0,1,0,0">
+            <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto">
+                <TextBlock Grid.Column="0" Text="{Binding StatusText}"
+                           FontSize="11" VerticalAlignment="Center" Margin="12,0"
+                           Foreground="#AAAAAA" />
+                <TextBlock Grid.Column="1"
+                           Text="{Binding TotalLines, StringFormat='Lines: {0}'}"
+                           FontSize="11" VerticalAlignment="Center" Margin="12,0"
+                           Foreground="#888888" />
+                <ProgressBar Grid.Column="2" Value="{Binding Progress}"
+                             Minimum="0" Maximum="1"
+                             Height="3" VerticalAlignment="Center"
+                             Margin="12,0"
+                             IsVisible="{Binding IsRunning}" />
+                <TextBlock Grid.Column="3" Text="{Binding CurrentFilePath}"
+                           FontSize="11" VerticalAlignment="Center" Margin="12,0"
+                           Foreground="#888888" MaxWidth="300"
+                           TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Column="4" Text="{Binding MemoryUsage}"
+                           FontSize="11" VerticalAlignment="Center" Margin="12,0"
+                           Foreground="#888888" />
+            </Grid>
+        </Border>
+
+        <!-- Main Content: Three-Column Layout -->
+        <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto">
+
+            <!-- Block Sheet Panel (200px) -->
+            <Border Grid.Column="0" Width="200"
+                    Background="{StaticResource PanelBackgroundBrush}"
+                    BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="0,0,1,0"
+                    IsVisible="{Binding IsBlockSheetVisible}">
+                <DockPanel>
+                    <Border DockPanel.Dock="Top" Height="36"
+                            Background="{StaticResource HeaderBackgroundBrush}"
+                            BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="0,0,0,1">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="Blocks" FontSize="12" FontWeight="SemiBold"
+                                       VerticalAlignment="Center" Margin="12,0"
+                                       Foreground="#CCCCCC" />
+                            <Button Grid.Column="1" Content="◀" FontSize="10"
+                                    Command="{Binding ToggleBlockSheetCommand}"
+                                    Background="Transparent" Foreground="#888888"
+                                    Padding="6,2" Margin="0,0,4,0" />
+                        </Grid>
+                    </Border>
+
+                    <ScrollViewer>
+                        <ItemsControl ItemsSource="{Binding BlockTemplates}" Margin="8">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:BlockTemplateViewModel">
+                                    <Border Margin="0,4" Padding="10,8"
+                                            CornerRadius="6"
+                                            Background="#2A2A3E"
+                                            BorderBrush="#3A3A4E" BorderThickness="1"
+                                            Cursor="Hand">
+                                        <StackPanel Spacing="4">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <TextBlock Text="{Binding IconText}" FontSize="14" />
+                                                <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold"
+                                                           Foreground="#E0E0E0" />
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding Description}" FontSize="10"
+                                                       Foreground="#888888" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+
+            <!-- Left GridSplitter -->
+            <GridSplitter Grid.Column="1" Width="4"
+                          Background="Transparent"
+                          IsVisible="{Binding IsBlockSheetVisible}" />
+
+            <!-- Canvas Area (Center) -->
+            <Grid Grid.Column="2">
+                <!-- Canvas Background -->
+                <Border Background="{StaticResource CanvasBackgroundBrush}">
+                    <views:RecipeCanvasView DataContext="{Binding}" />
+                </Border>
+
+                <!-- Floating Controls (Run / Validate) - Bottom Right -->
+                <StackPanel HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                            Orientation="Horizontal" Spacing="8"
+                            Margin="0,0,16,16">
+                    <Button Content="✓ Validate" Command="{Binding ValidateRecipeCommand}"
+                            Padding="14,8" FontSize="12"
+                            Background="#2D5A2D" Foreground="#FFFFFF"
+                            CornerRadius="6"
+                            IsEnabled="{Binding !IsRunning}" />
+                    <Button Content="▶ Run" Command="{Binding RunRecipeCommand}"
+                            Padding="14,8" FontSize="12"
+                            Background="#4A90D9" Foreground="#FFFFFF"
+                            CornerRadius="6"
+                            IsEnabled="{Binding !IsRunning}" />
+                </StackPanel>
+
+                <!-- Mini-map placeholder (Bottom Right, above floating controls) -->
+                <Border HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                        Width="160" Height="100"
+                        Margin="0,0,16,60"
+                        Background="#1A1A2A" CornerRadius="4"
+                        BorderBrush="#3A3A4E" BorderThickness="1"
+                        Opacity="0.85">
+                    <TextBlock Text="Mini-map" FontSize="10"
+                               Foreground="#666666"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+            </Grid>
+
+            <!-- Right GridSplitter -->
+            <GridSplitter Grid.Column="3" Width="4"
+                          Background="Transparent"
+                          IsVisible="{Binding IsPropertyPanelVisible}" />
+
+            <!-- Property Panel (320px) -->
+            <Border Grid.Column="4" Width="320"
+                    Background="{StaticResource PanelBackgroundBrush}"
+                    BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="1,0,0,0"
+                    IsVisible="{Binding IsPropertyPanelVisible}">
+                <DockPanel>
+                    <Border DockPanel.Dock="Top" Height="36"
+                            Background="{StaticResource HeaderBackgroundBrush}"
+                            BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="0,0,0,1">
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                            <Button Grid.Column="0" Content="▶" FontSize="10"
+                                    Command="{Binding TogglePropertyPanelCommand}"
+                                    Background="Transparent" Foreground="#888888"
+                                    Padding="6,2" Margin="4,0,0,0" />
+                            <TextBlock Grid.Column="1" Text="Properties" FontSize="12" FontWeight="SemiBold"
+                                       VerticalAlignment="Center" Margin="8,0"
+                                       Foreground="#CCCCCC" />
+                        </Grid>
+                    </Border>
+
+                    <ScrollViewer>
+                        <views:PropertyPanelView DataContext="{Binding}" />
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+        </Grid>
+    </DockPanel>
+</Window>

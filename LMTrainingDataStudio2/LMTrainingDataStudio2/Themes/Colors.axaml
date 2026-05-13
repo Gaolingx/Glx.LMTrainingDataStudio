@@ -1,0 +1,45 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Block Type Header Colors -->
+    <Color x:Key="SeedBlockColor">#4A90D9</Color>
+    <Color x:Key="LlmBlockColor">#7B61FF</Color>
+    <Color x:Key="ExpressionBlockColor">#F5A623</Color>
+    <Color x:Key="ValidatorBlockColor">#D0021B</Color>
+    <Color x:Key="SamplerBlockColor">#417505</Color>
+    <Color x:Key="ToolProfileBlockColor">#9B9B9B</Color>
+
+    <!-- Edge Colors -->
+    <Color x:Key="EdgeDefaultColor">#AAAAAA</Color>
+    <Color x:Key="EdgeHoverColor">#4A90D9</Color>
+    <Color x:Key="EdgeSelectedColor">#4A90D9</Color>
+
+    <!-- Canvas Colors -->
+    <Color x:Key="CanvasBackgroundColor">#1E1E2E</Color>
+    <Color x:Key="CanvasGridColor">#2A2A3E</Color>
+
+    <!-- Panel Colors -->
+    <Color x:Key="PanelBackgroundColor">#252535</Color>
+    <Color x:Key="PanelBorderColor">#3A3A4E</Color>
+    <Color x:Key="HeaderBackgroundColor">#2D2D3D</Color>
+
+    <!-- Status Bar -->
+    <Color x:Key="StatusBarBackgroundColor">#1A1A2A</Color>
+
+    <!-- Brushes -->
+    <SolidColorBrush x:Key="SeedBlockBrush" Color="{StaticResource SeedBlockColor}" />
+    <SolidColorBrush x:Key="LlmBlockBrush" Color="{StaticResource LlmBlockColor}" />
+    <SolidColorBrush x:Key="ExpressionBlockBrush" Color="{StaticResource ExpressionBlockColor}" />
+    <SolidColorBrush x:Key="ValidatorBlockBrush" Color="{StaticResource ValidatorBlockColor}" />
+    <SolidColorBrush x:Key="SamplerBlockBrush" Color="{StaticResource SamplerBlockColor}" />
+    <SolidColorBrush x:Key="ToolProfileBlockBrush" Color="{StaticResource ToolProfileBlockColor}" />
+    <SolidColorBrush x:Key="EdgeDefaultBrush" Color="{StaticResource EdgeDefaultColor}" />
+    <SolidColorBrush x:Key="EdgeHoverBrush" Color="{StaticResource EdgeHoverColor}" />
+    <SolidColorBrush x:Key="CanvasBackgroundBrush" Color="{StaticResource CanvasBackgroundColor}" />
+    <SolidColorBrush x:Key="CanvasGridBrush" Color="{StaticResource CanvasGridColor}" />
+    <SolidColorBrush x:Key="PanelBackgroundBrush" Color="{StaticResource PanelBackgroundColor}" />
+    <SolidColorBrush x:Key="PanelBorderBrush" Color="{StaticResource PanelBorderColor}" />
+    <SolidColorBrush x:Key="HeaderBackgroundBrush" Color="{StaticResource HeaderBackgroundColor}" />
+    <SolidColorBrush x:Key="StatusBarBackgroundBrush" Color="{StaticResource StatusBarBackgroundColor}" />
+
+</ResourceDictionary>
