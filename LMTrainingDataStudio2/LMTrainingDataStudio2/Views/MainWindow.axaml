@@ -129,7 +129,8 @@
                                                 CornerRadius="6"
                                                 Background="#2A2A3E"
                                                 BorderBrush="#3A3A4E" BorderThickness="1"
-                                                Cursor="Hand">
+                                                Cursor="Hand"
+                                                PointerPressed="OnBlockTemplatePointerPressed">
                                             <StackPanel Spacing="4">
                                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                                     <TextBlock Text="{Binding IconText}" FontSize="14" />
