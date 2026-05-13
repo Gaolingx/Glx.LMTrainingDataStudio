@@ -17,8 +17,12 @@ public partial class RecipeCanvasView : UserControl
     private const double MinCanvasScale = 0.25;
     private const double MaxCanvasScale = 2.5;
     private const double CanvasScaleStep = 0.1;
+    private const double MiniMapWidth = 160;
+    private const double MiniMapHeight = 100;
+    private const double MiniMapPadding = 8;
 
     private Canvas? _canvas;
+    private Canvas? _miniMapCanvas;
     private Border? _marquee;
     private Border? _nodeMenu;
     private ContextMenu? _contextMenu;
@@ -57,6 +61,7 @@ public partial class RecipeCanvasView : UserControl
     {
         base.OnLoaded(e);
         _canvas = this.FindControl<Canvas>("CanvasArea");
+        _miniMapCanvas = this.FindControl<Canvas>("MiniMapCanvas");
 
         if (_canvas != null)
         {
@@ -181,6 +186,8 @@ public partial class RecipeCanvasView : UserControl
         ClearEdgeSelection(vm);
         foreach (var b in vm.Blocks) b.IsSelected = false;
         vm.SelectedBlock = null;
+        UpdateBlockSelectionVisuals();
+        RenderMiniMap();
         _isSelecting = true;
         _selectionStartPoint = point;
         ShowMarquee(point, point);
@@ -231,6 +238,8 @@ public partial class RecipeCanvasView : UserControl
         {
             ShowMarquee(_selectionStartPoint, point);
             SelectBlocksInRectangle(_selectionStartPoint, point);
+            UpdateBlockSelectionVisuals();
+            RenderMiniMap();
             e.Handled = true;
             return;
         }
@@ -594,6 +603,7 @@ public partial class RecipeCanvasView : UserControl
         {
             block.IsSelected = block.X < right && block.X + block.Width > left && block.Y < bottom && block.Y + block.Height > top;
         }
+        vm.SelectedBlock = vm.Blocks.LastOrDefault(b => b.IsSelected);
     }
 
     private void DeleteSelection(MainWindowViewModel vm)
@@ -746,7 +756,86 @@ public partial class RecipeCanvasView : UserControl
             Canvas.SetTop(node, block.Y);
             _canvas.Children.Add(node);
         }
+        RenderMiniMap();
     }
+
+    private void UpdateBlockSelectionVisuals()
+    {
+        if (_canvas == null) return;
+        foreach (var child in _canvas.Children)
+        {
+            if (child is Border { Tag: BlockNodeViewModel block } border)
+            {
+                border.BorderBrush = new SolidColorBrush(Color.Parse(block.IsSelected ? "#4A90D9" : "#3A3A4E"));
+                border.BorderThickness = new Thickness(block.IsSelected ? 2 : 1);
+            }
+        }
+    }
+
+    private void RenderMiniMap()
+    {
+        if (_miniMapCanvas == null || DataContext is not MainWindowViewModel vm) return;
+
+        _miniMapCanvas.Children.Clear();
+
+        if (vm.Blocks.Count == 0)
+        {
+            var hint = new TextBlock
+            {
+                Text = "Mini-map",
+                FontSize = 10,
+                Foreground = new SolidColorBrush(Color.Parse("#666666"))
+            };
+            Canvas.SetLeft(hint, 58);
+            Canvas.SetTop(hint, 42);
+            _miniMapCanvas.Children.Add(hint);
+            return;
+        }
+
+        var minX = vm.Blocks.Min(b => b.X);
+        var minY = vm.Blocks.Min(b => b.Y);
+        var maxX = vm.Blocks.Max(b => b.X + b.Width);
+        var maxY = vm.Blocks.Max(b => b.Y + Math.Max(b.Height, 80));
+        var spanX = Math.Max(1, maxX - minX);
+        var spanY = Math.Max(1, maxY - minY);
+        var scale = Math.Min((MiniMapWidth - MiniMapPadding * 2) / spanX, (MiniMapHeight - MiniMapPadding * 2) / spanY);
+
+        foreach (var edge in vm.Edges)
+        {
+            var sourceBlock = vm.Blocks.FirstOrDefault(b => b.Id == edge.SourceBlockId);
+            var targetBlock = vm.Blocks.FirstOrDefault(b => b.Id == edge.TargetBlockId);
+            if (sourceBlock == null || targetBlock == null) continue;
+
+            var line = new Line
+            {
+                StartPoint = ToMiniMapPoint(GetOutputPortCenter(sourceBlock, sourceBlock.OutputPorts.FirstOrDefault(p => p.Id == edge.SourcePortId)), minX, minY, scale),
+                EndPoint = ToMiniMapPoint(GetInputPortCenter(targetBlock, targetBlock.InputPorts.FirstOrDefault(p => p.Id == edge.TargetPortId)), minX, minY, scale),
+                Stroke = new SolidColorBrush(Color.Parse(edge.IsSelected || edge.IsHighlighted ? "#4A90D9" : "#55556A")),
+                StrokeThickness = edge.IsSelected || edge.IsHighlighted ? 1.5 : 1
+            };
+            _miniMapCanvas.Children.Add(line);
+        }
+
+        foreach (var block in vm.Blocks)
+        {
+            var rect = new Rectangle
+            {
+                Width = Math.Max(5, block.Width * scale),
+                Height = Math.Max(4, Math.Max(block.Height, 80) * scale),
+                Fill = new SolidColorBrush(Color.Parse(GetBlockHeaderColor(block.Type))),
+                Stroke = new SolidColorBrush(Color.Parse(block.IsSelected ? "#FFFFFF" : "#3A3A4E")),
+                StrokeThickness = block.IsSelected ? 1.5 : 1,
+                RadiusX = 2,
+                RadiusY = 2
+            };
+            Canvas.SetLeft(rect, MiniMapPadding + (block.X - minX) * scale);
+            Canvas.SetTop(rect, MiniMapPadding + (block.Y - minY) * scale);
+            _miniMapCanvas.Children.Add(rect);
+        }
+    }
+
+    private static Point ToMiniMapPoint(Point point, double minX, double minY, double scale)
+        => new(MiniMapPadding + (point.X - minX) * scale, MiniMapPadding + (point.Y - minY) * scale);
 
     private void RenderEdge(EdgeViewModel edge)
     {
@@ -802,16 +891,7 @@ public partial class RecipeCanvasView : UserControl
 
     private Border CreateBlockNode(BlockNodeViewModel block)
     {
-        var headerColor = block.Type switch
-        {
-            BlockType.Seed => "#4A90D9",
-            BlockType.Llm => "#7B61FF",
-            BlockType.Expression => "#F5A623",
-            BlockType.Validator => "#D0021B",
-            BlockType.Sampler => "#417505",
-            BlockType.ToolProfile => "#9B9B9B",
-            _ => "#4A90D9"
-        };
+        var headerColor = GetBlockHeaderColor(block.Type);
 
         var body = new StackPanel
         {
@@ -891,6 +971,18 @@ public partial class RecipeCanvasView : UserControl
             Stroke = new SolidColorBrush(Color.Parse(tag == "output-port" ? "#6AB0F9" : "#FFD080")),
             StrokeThickness = 1,
             Tag = tag
+        };
+
+    private static string GetBlockHeaderColor(BlockType type)
+        => type switch
+        {
+            BlockType.Seed => "#4A90D9",
+            BlockType.Llm => "#7B61FF",
+            BlockType.Expression => "#F5A623",
+            BlockType.Validator => "#D0021B",
+            BlockType.Sampler => "#417505",
+            BlockType.ToolProfile => "#9B9B9B",
+            _ => "#4A90D9"
         };
 
     private static Point GetOutputPortCenter(BlockNodeViewModel block, PortViewModel? port)
