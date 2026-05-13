@@ -87,50 +87,66 @@
         <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto">
 
             <!-- Block Sheet Panel (200px) -->
-            <Border Grid.Column="0" Width="200"
-                    Background="{StaticResource PanelBackgroundBrush}"
-                    BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="0,0,1,0"
-                    IsVisible="{Binding IsBlockSheetVisible}">
-                <DockPanel>
-                    <Border DockPanel.Dock="Top" Height="36"
-                            Background="{StaticResource HeaderBackgroundBrush}"
-                            BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="0,0,0,1">
-                        <Grid ColumnDefinitions="*,Auto">
-                            <TextBlock Text="Blocks" FontSize="12" FontWeight="SemiBold"
-                                       VerticalAlignment="Center" Margin="12,0"
-                                       Foreground="#CCCCCC" />
-                            <Button Grid.Column="1" Content="◀" FontSize="10"
-                                    Command="{Binding ToggleBlockSheetCommand}"
-                                    Background="Transparent" Foreground="#888888"
-                                    Padding="6,2" Margin="0,0,4,0" />
-                        </Grid>
-                    </Border>
+            <Grid Grid.Column="0">
+                <!-- Collapsed state: show expand button -->
+                <Border Width="24"
+                        Background="{StaticResource PanelBackgroundBrush}"
+                        BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="0,0,1,0"
+                        IsVisible="{Binding !IsBlockSheetVisible}">
+                    <Button Content="▶" FontSize="10"
+                            Command="{Binding ToggleBlockSheetCommand}"
+                            Background="Transparent" Foreground="#888888"
+                            Padding="4,2" VerticalAlignment="Top" Margin="0,8,0,0"
+                            ToolTip.Tip="Show Blocks" />
+                </Border>
 
-                    <ScrollViewer>
-                        <ItemsControl ItemsSource="{Binding BlockTemplates}" Margin="8">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="vm:BlockTemplateViewModel">
-                                    <Border Margin="0,4" Padding="10,8"
-                                            CornerRadius="6"
-                                            Background="#2A2A3E"
-                                            BorderBrush="#3A3A4E" BorderThickness="1"
-                                            Cursor="Hand">
-                                        <StackPanel Spacing="4">
-                                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                                <TextBlock Text="{Binding IconText}" FontSize="14" />
-                                                <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold"
-                                                           Foreground="#E0E0E0" />
+                <!-- Expanded state: full panel -->
+                <Border Width="200"
+                        Background="{StaticResource PanelBackgroundBrush}"
+                        BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="0,0,1,0"
+                        IsVisible="{Binding IsBlockSheetVisible}">
+                    <DockPanel>
+                        <Border DockPanel.Dock="Top" Height="36"
+                                Background="{StaticResource HeaderBackgroundBrush}"
+                                BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="0,0,0,1">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Text="Blocks" FontSize="12" FontWeight="SemiBold"
+                                           VerticalAlignment="Center" Margin="12,0"
+                                           Foreground="#CCCCCC" />
+                                <Button Grid.Column="1" Content="◀" FontSize="10"
+                                        Command="{Binding ToggleBlockSheetCommand}"
+                                        Background="Transparent" Foreground="#888888"
+                                        Padding="6,2" Margin="0,0,4,0"
+                                        ToolTip.Tip="Hide Blocks" />
+                            </Grid>
+                        </Border>
+
+                        <ScrollViewer>
+                            <ItemsControl ItemsSource="{Binding BlockTemplates}" Margin="8">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:BlockTemplateViewModel">
+                                        <Border Margin="0,4" Padding="10,8"
+                                                CornerRadius="6"
+                                                Background="#2A2A3E"
+                                                BorderBrush="#3A3A4E" BorderThickness="1"
+                                                Cursor="Hand">
+                                            <StackPanel Spacing="4">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <TextBlock Text="{Binding IconText}" FontSize="14" />
+                                                    <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold"
+                                                               Foreground="#E0E0E0" />
+                                                </StackPanel>
+                                                <TextBlock Text="{Binding Description}" FontSize="10"
+                                                           Foreground="#888888" TextWrapping="Wrap" />
                                             </StackPanel>
-                                            <TextBlock Text="{Binding Description}" FontSize="10"
-                                                       Foreground="#888888" TextWrapping="Wrap" />
-                                        </StackPanel>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
-                </DockPanel>
-            </Border>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </DockPanel>
+                </Border>
+            </Grid>
 
             <!-- Left GridSplitter -->
             <GridSplitter Grid.Column="1" Width="4"
@@ -179,30 +195,46 @@
                           IsVisible="{Binding IsPropertyPanelVisible}" />
 
             <!-- Property Panel (320px) -->
-            <Border Grid.Column="4" Width="320"
-                    Background="{StaticResource PanelBackgroundBrush}"
-                    BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="1,0,0,0"
-                    IsVisible="{Binding IsPropertyPanelVisible}">
-                <DockPanel>
-                    <Border DockPanel.Dock="Top" Height="36"
-                            Background="{StaticResource HeaderBackgroundBrush}"
-                            BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="0,0,0,1">
-                        <Grid ColumnDefinitions="Auto,*,Auto">
-                            <Button Grid.Column="0" Content="▶" FontSize="10"
-                                    Command="{Binding TogglePropertyPanelCommand}"
-                                    Background="Transparent" Foreground="#888888"
-                                    Padding="6,2" Margin="4,0,0,0" />
-                            <TextBlock Grid.Column="1" Text="Properties" FontSize="12" FontWeight="SemiBold"
-                                       VerticalAlignment="Center" Margin="8,0"
-                                       Foreground="#CCCCCC" />
-                        </Grid>
-                    </Border>
+            <Grid Grid.Column="4">
+                <!-- Collapsed state: show expand button -->
+                <Border Width="24"
+                        Background="{StaticResource PanelBackgroundBrush}"
+                        BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="1,0,0,0"
+                        IsVisible="{Binding !IsPropertyPanelVisible}">
+                    <Button Content="◀" FontSize="10"
+                            Command="{Binding TogglePropertyPanelCommand}"
+                            Background="Transparent" Foreground="#888888"
+                            Padding="4,2" VerticalAlignment="Top" Margin="0,8,0,0"
+                            ToolTip.Tip="Show Properties" />
+                </Border>
 
-                    <ScrollViewer>
-                        <views:PropertyPanelView DataContext="{Binding}" />
-                    </ScrollViewer>
-                </DockPanel>
-            </Border>
+                <!-- Expanded state: full panel -->
+                <Border Width="320"
+                        Background="{StaticResource PanelBackgroundBrush}"
+                        BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="1,0,0,0"
+                        IsVisible="{Binding IsPropertyPanelVisible}">
+                    <DockPanel>
+                        <Border DockPanel.Dock="Top" Height="36"
+                                Background="{StaticResource HeaderBackgroundBrush}"
+                                BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="0,0,0,1">
+                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                <Button Grid.Column="0" Content="▶" FontSize="10"
+                                        Command="{Binding TogglePropertyPanelCommand}"
+                                        Background="Transparent" Foreground="#888888"
+                                        Padding="6,2" Margin="4,0,0,0"
+                                        ToolTip.Tip="Hide Properties" />
+                                <TextBlock Grid.Column="1" Text="Properties" FontSize="12" FontWeight="SemiBold"
+                                           VerticalAlignment="Center" Margin="8,0"
+                                           Foreground="#CCCCCC" />
+                            </Grid>
+                        </Border>
+
+                        <ScrollViewer>
+                            <views:PropertyPanelView DataContext="{Binding}" />
+                        </ScrollViewer>
+                    </DockPanel>
+                </Border>
+            </Grid>
         </Grid>
     </DockPanel>
 </Window>
