@@ -49,6 +49,36 @@
 
 ---
 
+## 附七：Round 13 执行与 IO 韧性（2026-11-17）
+
+### 7.1 本轮做了什么
+
+- [x] 节点间溢写：新增 `RowSpillBuffer`，每个节点输出先驻留内存，超过 `SpillThresholdRows` 后溢写磁盘（保留原始行号），下游按流读取；`SpillThresholdRows` 与 `RunTempDirectory` 可在设置面板配置并持久化。
+- [x] 临时目录清理：每次运行使用独立溢写目录，成功/失败/取消均在 `finally` 中释放缓冲并删除溢写目录。
+- [x] 节点级检查点：运行输出目录新增 `nodes/`，节点成功后原子保存其输出；失败/取消运行保留检查点，成功运行后自动清理。
+- [x] 中断恢复：`RecipeRunner.RunAsync(..., resumeFrom)` 复用已完成节点输出，从首个未完成节点继续；Executions 视图新增“恢复执行”，仅对失败/取消且存在输出目录的运行可用。
+- [x] 取消硬化：溢写、检查点与执行链路均响应取消；测试断言取消后 1 秒内停止且溢写目录为空。
+- [x] SFT Export 收尾：属性面板新增输出文件选择器、运行前覆盖确认、可选顶层字段白名单（如 `messages, tools`）、写出行数与首行预览日志。
+- [x] 新增 17 个测试：溢写缓冲 5、Runner 溢写/恢复/重试清理/取消 5、SFT 字段/预览/非对象 3、设置往返与回退 2、Executions 恢复可用性 1、Headless SFT 编辑器 1。
+
+### 7.2 验证结果
+
+| 项目 | 命令 | 结果 |
+| --- | --- | --- |
+| 构建 | `dotnet build LMTrainingDataStudio2/LMTrainingDataStudio2.slnx` | 成功，0 警告，0 错误 |
+| 测试 | `dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx` | 437 通过，0 失败，5 跳过（2 provider + 3 性能 gated） |
+| 取消验收 | `RunAsync_Cancel_StopsWithinOneSecondAndCleansSpillFiles` | 取消后 <1s 返回，溢写目录为空 |
+| 恢复一致性 | `RunAsync_FailedRun_KeepsCheckpointsAndResumeReusesCompletedBlock` | 已完成节点不重跑，恢复后行数与内容一致 |
+| 1M 行链路 | `LMTDS_PERF_TESTS=1 dotnet test --filter PipelinePerformanceTests` | Seed → Expression → SFT Export 17.2s，托管内存增量 1MB，输出 1,000,000 行 |
+
+### 7.3 本轮未做
+
+- 恢复结果与不中断运行的逐字节/哈希比对（当前验证行数、内容与节点复用次数）。
+- 溢写阈值按行数计，未提供按字节阈值；检查点磁盘占用无自动配额。
+- 取消 1s 断言依赖本机调度，CI 上未单独设置性能门禁。
+
+---
+
 ## 一、Round 12 进展（历史）
 
 ### 1.1 本轮做了什么
@@ -1247,9 +1277,9 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 - [x] 状态栏 `CurrentFilePath`、缩放、总行数等实时数据。
 - [x] 运行日志持久化与历史记录（`ExecutionStore` + Executions UI）。
 - [x] 输出目录、命名、结果摘要（`run-summary.json`，Round 12）。
-- [ ] 中断恢复：从上次失败/中断节点继续。
-- [ ] 全链路临时文件清理验收；取消 1s 内停止的定量验收。
-- [ ] 节点间输出当前在内存物化，需改为流式或溢写磁盘。
+- [x] 中断恢复：从上次失败/中断节点继续（Round 13）。
+- [x] 全链路临时文件清理验收；取消 1s 内停止的定量验收（Round 13）。
+- [x] 节点间输出改为溢写磁盘 + 流式读取（Round 13）。
 - [x] 模拟 API 多轮执行（确定性模型 + 模拟工具）与四节点 SFT 轨迹流水线（Round 6）。
 - [x] 真实模型 tool-calling 与真实工具执行（Round 7）。
 
@@ -1318,7 +1348,9 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 - [部分] 性能基准：NUnit gated 1M 行测试已有；BenchmarkDotNet 专项基准未做。
 - [x] 本地化/节点目录/预设：语言切换、10 类节点文案与端口摘要、6 个预设合法性与加载（16 个，Round 附六）。
 - [x] 自定义预设：单文件存储、保存/导入/删除、原子写入、坏文件告警、快照隔离与 VM 加载（18 个）。
-- [x] 当前测试总数：420 通过 + 4 gated（2026-11-17 复核）。
+- [x] 溢写缓冲/节点检查点/恢复/重试清理/取消清理（Round 13，10 个）。
+- [x] SFT 字段白名单/预览、运行溢写设置往返与回退（Round 13，7 个）。
+- [x] 当前测试总数：437 通过 + 5 gated（2026-11-17 复核）。
 
 ### 4.9 工程化与发布
 
@@ -1339,13 +1371,13 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 
 > 历史 P0（Phase 1 持久化、Phase 2 执行引擎、Round 6/7 模拟与真实 provider/沙箱、Round 8–12）已完成，见 [STATUS.md](STATUS.md)。
 
-### P0 — Round 13：执行与 IO 韧性
+### P0 — Round 13：执行与 IO 韧性（已完成，见附七）
 
-1. [ ] 节点间输出流式/溢写磁盘，内存阈值与临时目录可配置，运行结束/取消/失败统一清理。
-2. [ ] 节点级中断恢复：保存已完成节点输出，从上次失败/中断节点继续。
-3. [ ] 取消 1s 内停止与全链路临时文件清理的定量测试。
-4. [ ] SFT Export：文件选择器、覆盖确认、可选字段白名单、写出行数/预览摘要。
-5. [ ] 1M 行 Seed → Expression → SFT Export 链路内存 ≤ 300MB 验收。
+1. [x] 节点间输出流式/溢写磁盘，内存阈值与临时目录可配置，运行结束/取消/失败统一清理。
+2. [x] 节点级中断恢复：保存已完成节点输出，从上次失败/中断节点继续。
+3. [x] 取消 1s 内停止与全链路临时文件清理的定量测试。
+4. [x] SFT Export：文件选择器、覆盖确认、可选字段白名单、写出行数/预览摘要。
+5. [x] 1M 行 Seed → Expression → SFT Export 链路内存 ≤ 300MB 验收。
 
 ### P1 — Round 14：数据工作台编辑与预览
 
@@ -1404,7 +1436,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 | 15 | 节点能力收紧 | P1 | LLM tools/结构化输出/多轮/并发/成本；Validator 代码规则/超时/双端口；Sampler 多端口/分层；Simulation 可视化配置 | 请求体与结构化输出可验证；端口行数守恒；分层比例在容差内 |
 | 16 | 发布与体验 | P2 | 画布 polish、完整浅色主题、MSIX/文件关联/单实例、10M 基线、README 截图、分析器 | 500 节点逐帧 <100ms；浅色无残留；安装/双击打开可用；10M 基线记录 |
 
-**执行顺序**：Round 13 → 14 → 15 → 16；每轮结束按第七节收尾模板更新勾选状态、README 与提交记录。
+**执行顺序**：Round 13 → 14 → 15 → 16；Round 13 已完成（见附七），下一轮为 Round 14；每轮结束按第七节收尾模板更新勾选状态、README 与提交记录。
 
 ---
 

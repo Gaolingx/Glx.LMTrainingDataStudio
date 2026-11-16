@@ -118,6 +118,36 @@ public sealed class HeadlessUiTests
     }
 
     [AvaloniaTest]
+    public void SftExportEditor_UpdatesFieldWhitelist()
+    {
+        var vm = new MainWindowViewModel(new SettingsStore(Path.Combine(_directory, "settings.json")));
+        var window = new MainWindow { DataContext = vm };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        try
+        {
+            vm.AddBlockCommand.Execute(BlockType.SftExport);
+            Dispatcher.UIThread.RunJobs();
+
+            var editor = vm.SelectedBlock?.SftExportEditor;
+            Assert.That(editor, Is.Not.Null);
+
+            editor!.FieldsText = "messages, tools";
+            Assert.That(vm.SelectedBlock!.Config, Is.TypeOf<SftExportBlockConfig>());
+            Assert.That(((SftExportBlockConfig)vm.SelectedBlock.Config).Fields,
+                Is.EqualTo(new[] { "messages", "tools" }));
+
+            editor.FieldsText = string.Empty;
+            Assert.That(((SftExportBlockConfig)vm.SelectedBlock.Config).Fields, Is.Null);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaTest]
     public void ThemeManager_LightAndDark_AppliesRequestedVariant()
     {
         ThemeManager.Apply(dark: false);

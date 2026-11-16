@@ -376,6 +376,7 @@
                         </Grid>
                     </Border>
 
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="22" Spacing="18">
                         <Border Background="#1E1E2E" BorderBrush="#3A3A4E" BorderThickness="1" CornerRadius="8" Padding="16">
                             <StackPanel Spacing="12">
@@ -423,7 +424,7 @@
                         <Border Background="#1E1E2E" BorderBrush="#3A3A4E" BorderThickness="1" CornerRadius="8" Padding="16">
                             <StackPanel Spacing="12">
                                 <TextBlock Text="{loc:Loc main.execution}" FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF" />
-                                <Grid ColumnDefinitions="180,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="12">
+                                <Grid ColumnDefinitions="180,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="12">
                                     <TextBlock Grid.Row="0" Grid.Column="0" Text="{loc:Loc main.layer_parallelism}" VerticalAlignment="Center" Foreground="#CCCCCC" />
                                     <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding MaxParallelism, Mode=TwoWay}" Watermark="4" />
 
@@ -432,6 +433,12 @@
 
                                     <TextBlock Grid.Row="2" Grid.Column="0" Text="{loc:Loc main.run_summary_directory}" VerticalAlignment="Center" Foreground="#CCCCCC" />
                                     <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding RunOutputDirectory, Mode=TwoWay}" Watermark="%TEMP%\LMTrainingDataStudio\runs" />
+
+                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="{loc:Loc main.spill_threshold_rows}" VerticalAlignment="Center" Foreground="#CCCCCC" />
+                                    <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding SpillThresholdRows, Mode=TwoWay}" Watermark="10000" />
+
+                                    <TextBlock Grid.Row="4" Grid.Column="0" Text="{loc:Loc main.run_temp_directory}" VerticalAlignment="Center" Foreground="#CCCCCC" />
+                                    <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding RunTempDirectory, Mode=TwoWay}" Watermark="%TEMP%\LMTrainingDataStudio\run-temp" />
                                 </Grid>
                             </StackPanel>
                         </Border>
@@ -486,6 +493,7 @@
                                     Foreground="#FFFFFF" />
                         </StackPanel>
                     </StackPanel>
+                    </ScrollViewer>
                 </DockPanel>
             </Border>
         </Grid>

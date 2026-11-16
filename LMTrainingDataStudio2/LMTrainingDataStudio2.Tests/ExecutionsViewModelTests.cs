@@ -27,6 +27,31 @@ public sealed class ExecutionsViewModelTests
     }
 
     [Test]
+    public void CanResumeSelectedRun_RequiresFailedOrCancelledRunWithOutputDirectory()
+    {
+        _viewModel.SelectedRun = new ExecutionRun
+        {
+            Status = RunStatus.Failed,
+            OutputDirectory = Path.Combine(_directory, "run")
+        };
+        Assert.That(_viewModel.CanResumeSelectedRun, Is.True);
+
+        _viewModel.SelectedRun = new ExecutionRun
+        {
+            Status = RunStatus.Succeeded,
+            OutputDirectory = Path.Combine(_directory, "run")
+        };
+        Assert.That(_viewModel.CanResumeSelectedRun, Is.False);
+
+        _viewModel.SelectedRun = new ExecutionRun
+        {
+            Status = RunStatus.Cancelled,
+            OutputDirectory = null
+        };
+        Assert.That(_viewModel.CanResumeSelectedRun, Is.False);
+    }
+
+    [Test]
     public async Task RefreshAsync_LoadsRunsNewestFirst()
     {
         var start = new DateTimeOffset(2026, 11, 16, 8, 0, 0, TimeSpan.Zero);

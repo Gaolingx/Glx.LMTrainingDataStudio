@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using LMTrainingDataStudio2.Models;
 using LMTrainingDataStudio2.Services;
 using LMTrainingDataStudio2.Services.Executors;
@@ -197,6 +198,123 @@ public async Task RunAsync_WritesOutputDirectorySummary()
     Assert.That(await File.ReadAllTextAsync(summaryPath), Does.Contain("\"Status\": \"Succeeded\""));
 }
 
+    [Test]
+    public async Task RunAsync_LowSpillThreshold_SpillsRowsAndCleansTempDirectory()
+    {
+        await WriteRowsAsync(25);
+        var spillDirectory = Path.Combine(_directory, "spill");
+        var (recipe, seed, _, _) = CreatePipeline(sampleCount: 5);
+        var runner = CreateRunner(new RecipeRunOptions(
+            SpillThresholdRows: 4,
+            SpillDirectory: spillDirectory));
+
+        var run = await runner.RunAsync(recipe);
+
+        Assert.That(run.Status, Is.EqualTo(RunStatus.Succeeded));
+        Assert.That(Node(run, seed).OutputRows, Is.EqualTo(25));
+        Assert.That(GetFiles(spillDirectory), Is.Empty);
+    }
+
+    [Test]
+    public async Task RunAsync_FailedRun_KeepsCheckpointsAndResumeReusesCompletedBlock()
+    {
+        var (recipe, seed, expression) = CreateTwoBlockRecipe();
+        var seedExecutor = new CountingRowSourceExecutor(BlockType.Seed, rows: 4);
+        var expressionExecutor = new FailThenSucceedExecutor(BlockType.Expression) { Fail = true };
+        var options = new RecipeRunOptions(
+            SpillThresholdRows: 1,
+            SpillDirectory: Path.Combine(_directory, "spill"),
+            OutputDirectory: Path.Combine(_directory, "runs"));
+
+        var firstRunner = new RecipeRunner(
+            new RecipeValidationService(),
+            new IBlockExecutor[] { seedExecutor, expressionExecutor },
+            options: options);
+        var firstRun = await firstRunner.RunAsync(recipe);
+
+        Assert.That(firstRun.Status, Is.EqualTo(RunStatus.Failed));
+        Assert.That(Node(firstRun, seed).Status, Is.EqualTo(ExecutionStatus.Succeeded));
+        Assert.That(Node(firstRun, expression).Status, Is.EqualTo(ExecutionStatus.Failed));
+        var checkpointDirectory = Path.Combine(firstRun.OutputDirectory!, "nodes");
+        Assert.That(Directory.Exists(checkpointDirectory), Is.True);
+        Assert.That(GetFiles(checkpointDirectory), Has.Length.EqualTo(1));
+
+        expressionExecutor.Fail = false;
+        var resumeRunner = new RecipeRunner(
+            new RecipeValidationService(),
+            new IBlockExecutor[] { seedExecutor, expressionExecutor },
+            options: options);
+        var resumed = await resumeRunner.RunAsync(recipe, resumeFrom: firstRun);
+
+        Assert.That(resumed.Status, Is.EqualTo(RunStatus.Succeeded), string.Join('\n', resumed.Logs));
+        Assert.That(Node(resumed, seed).Status, Is.EqualTo(ExecutionStatus.Succeeded));
+        Assert.That(Node(resumed, expression).Status, Is.EqualTo(ExecutionStatus.Succeeded));
+        Assert.That(seedExecutor.Attempts, Is.EqualTo(1));
+        Assert.That(expressionExecutor.Attempts, Is.EqualTo(2));
+        Assert.That(Node(resumed, expression).OutputRows, Is.EqualTo(4));
+        Assert.That(resumed.Logs.Any(log => log.Contains("reusing 1 completed block output")), Is.True);
+        Assert.That(Directory.Exists(checkpointDirectory), Is.False);
+    }
+
+    [Test]
+    public void RunAsync_ResumeWithDifferentRecipe_Throws()
+    {
+        var run = new ExecutionRun { RecipeId = "recipe-a" };
+        var recipe = new Recipe { Id = "recipe-b", Name = "other" };
+
+        Assert.ThrowsAsync<ArgumentException>(
+            () => CreateRunner().RunAsync(recipe, resumeFrom: run));
+    }
+
+    [Test]
+    public async Task RunAsync_RetryAfterSpilledAttempt_CleansAbandonedBuffer()
+    {
+        var spillDirectory = Path.Combine(_directory, "spill");
+        var recipe = CreateSingleSeedRecipe();
+        var executor = new SpillThenFailOnceExecutor(BlockType.Seed);
+        var runner = new RecipeRunner(
+            new RecipeValidationService(),
+            new IBlockExecutor[] { executor },
+            options: new RecipeRunOptions(
+                NodeRetryCount: 1,
+                SpillThresholdRows: 1,
+                SpillDirectory: spillDirectory));
+
+        var run = await runner.RunAsync(recipe);
+
+        Assert.That(run.Status, Is.EqualTo(RunStatus.Succeeded), string.Join('\n', run.Logs));
+        Assert.That(executor.Attempts, Is.EqualTo(2));
+        Assert.That(run.Nodes.Single().OutputRows, Is.EqualTo(3));
+        Assert.That(GetFiles(spillDirectory), Is.Empty);
+    }
+
+    [Test]
+    public async Task RunAsync_Cancel_StopsWithinOneSecondAndCleansSpillFiles()
+    {
+        var spillDirectory = Path.Combine(_directory, "spill");
+        var recipe = CreateSingleSeedRecipe();
+        var runner = new RecipeRunner(
+            new RecipeValidationService(),
+            new IBlockExecutor[] { new SlowExecutor(BlockType.Seed) },
+            options: new RecipeRunOptions(
+                SpillThresholdRows: 1,
+                SpillDirectory: spillDirectory));
+        using var cts = new CancellationTokenSource();
+
+        var runTask = runner.RunAsync(recipe, cancellationToken: cts.Token);
+        await Task.Delay(120);
+
+        var stopwatch = Stopwatch.StartNew();
+        cts.Cancel();
+        var run = await runTask.WaitAsync(TimeSpan.FromSeconds(5));
+        stopwatch.Stop();
+
+        Assert.That(run.Status, Is.EqualTo(RunStatus.Cancelled));
+        Assert.That(stopwatch.Elapsed, Is.LessThan(TimeSpan.FromSeconds(1)),
+            $"Cancellation took {stopwatch.Elapsed.TotalMilliseconds:F0}ms.");
+        Assert.That(GetFiles(spillDirectory), Is.Empty);
+    }
+
 private Recipe CreateProbeRecipe()
 {
     var recipe = new Recipe { Name = "parallel" };
@@ -227,7 +345,7 @@ private async Task WriteRowsAsync(int count)
         await File.WriteAllLinesAsync(_dataPath, lines);
     }
 
-    private RecipeRunner CreateRunner() => new(
+    private RecipeRunner CreateRunner(RecipeRunOptions? options = null) => new(
         new RecipeValidationService(),
         new IBlockExecutor[]
         {
@@ -235,7 +353,8 @@ private async Task WriteRowsAsync(int count)
             new ExpressionBlockExecutor(),
             new ValidatorBlockExecutor(),
             new SamplerBlockExecutor()
-        });
+        },
+        options: options);
 
     private (Recipe Recipe, RecipeBlock Seed, RecipeBlock Validator, RecipeBlock Sampler) CreatePipeline(long sampleCount)
     {
@@ -396,4 +515,151 @@ private async Task WriteRowsAsync(int count)
             yield break;
         }
     }
+
+    private sealed class CountingRowSourceExecutor : IBlockExecutor
+    {
+        private readonly int _rows;
+        private int _attempts;
+
+        public CountingRowSourceExecutor(BlockType type, int rows)
+        {
+            Type = type;
+            _rows = rows;
+        }
+
+        public BlockType Type { get; }
+
+        public int Attempts => _attempts;
+
+        public Task<BlockExecutionResult> ExecuteAsync(
+            BlockExecutionContext context, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _attempts);
+            return Task.FromResult(new BlockExecutionResult(GenerateAsync(_rows, cancellationToken)));
+        }
+
+        private static async IAsyncEnumerable<DatasetRow> GenerateAsync(
+            int rows, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+        {
+            await Task.Yield();
+            for (var i = 0; i < rows; i++)
+            {
+                ct.ThrowIfCancellationRequested();
+                yield return new DatasetRow(i, $"{{\"value\":{i}}}");
+            }
+        }
+    }
+
+    private sealed class FailThenSucceedExecutor : IBlockExecutor
+    {
+        private int _attempts;
+
+        public FailThenSucceedExecutor(BlockType type) => Type = type;
+
+        public BlockType Type { get; }
+
+        public bool Fail { get; set; }
+
+        public int Attempts => _attempts;
+
+        public Task<BlockExecutionResult> ExecuteAsync(
+            BlockExecutionContext context, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _attempts);
+            if (Fail)
+            {
+                throw new InvalidOperationException("Synthetic resume failure.");
+            }
+
+            return Task.FromResult(new BlockExecutionResult(PassthroughAsync(context.Input!, cancellationToken)));
+        }
+
+        private static async IAsyncEnumerable<DatasetRow> PassthroughAsync(
+            IAsyncEnumerable<DatasetRow> input,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+        {
+            await foreach (var row in input.WithCancellation(ct))
+            {
+                yield return row;
+            }
+        }
+    }
+
+    private sealed class SpillThenFailOnceExecutor : IBlockExecutor
+    {
+        private int _attempts;
+
+        public SpillThenFailOnceExecutor(BlockType type) => Type = type;
+
+        public BlockType Type { get; }
+
+        public int Attempts => _attempts;
+
+        public Task<BlockExecutionResult> ExecuteAsync(
+            BlockExecutionContext context, CancellationToken cancellationToken)
+        {
+            var attempt = Interlocked.Increment(ref _attempts);
+            return Task.FromResult(new BlockExecutionResult(
+                GenerateAsync(attempt == 1, cancellationToken)));
+        }
+
+        private static async IAsyncEnumerable<DatasetRow> GenerateAsync(
+            bool failAtEnd, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+        {
+            await Task.Yield();
+            for (var i = 0; i < 3; i++)
+            {
+                ct.ThrowIfCancellationRequested();
+                yield return new DatasetRow(i, $"{{\"value\":{i}}}");
+            }
+
+            if (failAtEnd)
+            {
+                throw new InvalidOperationException("Synthetic failure after partial output.");
+            }
+        }
+    }
+
+    private sealed class SlowExecutor : IBlockExecutor
+    {
+        public SlowExecutor(BlockType type) => Type = type;
+
+        public BlockType Type { get; }
+
+        public Task<BlockExecutionResult> ExecuteAsync(
+            BlockExecutionContext context, CancellationToken cancellationToken) =>
+            Task.FromResult(new BlockExecutionResult(GenerateAsync(cancellationToken)));
+
+        private static async IAsyncEnumerable<DatasetRow> GenerateAsync(
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+        {
+            for (var i = 0; i < 100_000; i++)
+            {
+                await Task.Delay(25, ct);
+                yield return new DatasetRow(i, "{\"value\":1}");
+            }
+        }
+    }
+
+    private (Recipe Recipe, RecipeBlock Seed, RecipeBlock Expression) CreateTwoBlockRecipe()
+    {
+        var recipe = new Recipe { Name = "resume" };
+        var seed = CreateBlock("seed", BlockType.Seed, "seed_data",
+            new SeedBlockConfig(_dataPath, DataFileType.Jsonl, Streaming: false, UseIndexCache: true));
+        seed.OutputPorts.Add(CreatePort("seed_out", "rows", PortDirection.Output, "rows"));
+
+        var expression = CreateBlock("expr", BlockType.Expression, "map",
+            new ExpressionBlockConfig("""{"value":{{ value }}}""", new Dictionary<string, string>()));
+        expression.InputPorts.Add(CreatePort("expr_in", "input", PortDirection.Input, "rows"));
+        expression.OutputPorts.Add(CreatePort("expr_out", "output", PortDirection.Output, "rows"));
+
+        recipe.Blocks.AddRange(new[] { seed, expression });
+        recipe.Edges.Add(CreateEdge("e1", seed, seed.OutputPorts[0], expression, expression.InputPorts[0]));
+        return (recipe, seed, expression);
+    }
+
+    private static string[] GetFiles(string directory) =>
+        Directory.Exists(directory)
+            ? Directory.GetFileSystemEntries(directory, "*", SearchOption.AllDirectories)
+            : Array.Empty<string>();
 }

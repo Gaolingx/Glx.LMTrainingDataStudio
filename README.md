@@ -20,6 +20,8 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - 数据质量与治理：校验问题列表（级别/行号/JSON 路径/错误码）与跳行、JSONL 自动修复预览与写副本、搜索/正则替换、去重、固定 seed 混洗、比例/份数切分、数据集统计
 - 画布：网格/吸附（Alt 关闭）、鼠标中心缩放、Fit、拓扑自动布局、Mini-map 视口与点击导航、双击添加、复制携带连线、内联重命名、真实端口坐标、边 hover
 - 执行：层内受控并行、暂停/恢复、节点重试、运行输出目录与 `run-summary.json`
+- 执行韧性：节点间溢写磁盘（阈值与临时目录可配置）、节点级检查点与中断恢复、取消 1s 内停止与临时目录清理
+- SFT Export：文件选择器、运行前覆盖确认、可选字段白名单、写出行数与首行预览日志
 - 工程化：滚动日志与全局异常、Dark/Light 主题变体、GitHub Actions CI、win-x64 单文件发布、Headless UI 测试、MIT LICENSE、应用图标
 - 批量格式转换：OpenAI / ShareGPT / Alpaca / DPO / Pretrain，进度、取消、失败行 `.errors.jsonl`
 - JSONL SQLite 行索引缓存与分页读取；1M 行 1KB/行基线通过（索引 8.8s、分页 10.9ms、内存增量 14MB）
@@ -37,7 +39,7 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - 中英文界面本地化（zh-CN / en-US，可在设置中切换），节点库、属性面板与画布悬停提示包含完整节点说明
 - 通用 Block Config JSON 编辑器，可直接配置所有节点类型
 
-> 注意：当前仍是开发版。**数据逐行编辑 CRUD、搜索命中高亮、10M 实测、节点间溢写磁盘、节点尺寸手柄/边过渡动画、MSIX 安装包、README 截图、完整浅色主题、LLM 请求侧 tools/结构化输出、Validator 代码规则/超时、Sampler 多输出端口、SFT Export 字段裁剪、MCP 适配尚未实现**；应用默认启动空白 Recipe，可通过 File → New from Sample 加载 4 节点示例，或恢复上次打开的文件。
+> 注意：当前仍是开发版。**数据逐行编辑 CRUD、搜索命中高亮、10M 实测、节点尺寸手柄/边过渡动画、MSIX 安装包、README 截图、完整浅色主题、LLM 请求侧 tools/结构化输出、Validator 代码规则/超时、Sampler 多输出端口、MCP 适配尚未实现**；应用默认启动空白 Recipe，可通过 File → New from Sample 加载 4 节点示例，或恢复上次打开的文件。
 >
 > - 完整功能清单与节点能力矩阵：[PLAN/STATUS.md](PLAN/STATUS.md)
 > - 分阶段实施计划、阶段目标与验收标准：[PLAN/TODO.md](PLAN/TODO.md)
@@ -291,7 +293,9 @@ UI 采用 Recipe Graph / DAG 的设计：
 - 左侧 Block Sheet
 - 中央 Canvas 区域（节点、贝塞尔连线、错误/警告徽标）
 - 画布交互：网格背景与吸附（Alt 临时关闭）、鼠标中心缩放、Fit、拓扑自动布局、Mini-map 视口/点击导航、双击空白添加、双击节点内联重命名、复制携带内部连线、边 hover
-- 执行控制：Pause / Resume、节点重试设置、运行输出目录（`run-summary.json`）
+- 执行控制：Pause / Resume、节点重试设置、运行输出目录（`run-summary.json`）、节点间溢写阈值与运行临时目录
+- 执行恢复：Executions 视图对失败/取消的运行提供“恢复执行”，复用已完成节点输出；成功运行后自动清理检查点
+- SFT Export 面板：输出文件选择器、字段白名单（逗号分隔顶层字段）、运行前覆盖确认
 - 右侧属性编辑面板（含校验问题列表，可点击定位节点）
 - 悬浮 Run / Validate 控件
 - Mini-map 渲染
@@ -556,14 +560,17 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 - [部分] 亮色 / 暗色主题切换（主面板/画布已主题化，部分视图仍硬编码深色）
 - [ ] LiveCharts2 或 OxyPlot 进度图表
 - [x] 执行层内并行、暂停/恢复、节点重试、output 目录摘要
+- [x] 节点间溢写/流式读取、节点级检查点与中断恢复、取消/清理定量验收
+- [x] SFT Export 文件选择器、覆盖确认、字段白名单、行数与预览日志
+- [x] 1M 行 Seed → Expression → SFT Export 基线（17.2s，托管内存增量 1MB）
 - [x] 滚动日志、全局异常、CI、win-x64 单文件发布、Headless UI 测试、MIT LICENSE、应用图标
-- [x] 单元测试与集成测试（424 个：420 自动化通过 + 4 个 gated：2 个真实 provider 冒烟 + 2 个性能）
+- [x] 单元测试与集成测试（442 个：437 自动化通过 + 5 个 gated：2 个真实 provider 冒烟 + 3 个性能）
 - [x] Round 8：Recipe 新建/打开/保存、脏标记、最近文件、按类型端口契约
 - [x] Round 9：Expression/Validator/Sampler/Tool Profile 节点能力补齐
 - [x] Round 10：数据预览、CSV/Parquet、格式转换、DPO/Pretrain
 - [x] Round 11：校验修复、去重/混洗/切分、搜索替换、统计
 - [x] Round 12：画布体验、并行/暂停/重试、CI/打包/主题/日志
-- [ ] Round 13：执行与 IO 韧性（节点间溢写/流式、中断恢复、取消/清理硬化）
+- [x] Round 13：执行与 IO 韧性（节点间溢写/流式、中断恢复、取消/清理硬化、SFT Export 收尾）
 - [ ] Round 14：数据工作台编辑与预览（逐行 CRUD、搜索高亮、样本预览）
 - [ ] Round 15：节点能力收紧（LLM tools/结构化输出、Validator 代码规则、Sampler 多端口、Simulation 可视化配置）
 - [ ] Round 16：发布与体验（画布 polish、完整浅色主题、MSIX/文件关联、10M 基线、README 截图）

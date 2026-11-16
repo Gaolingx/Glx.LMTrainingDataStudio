@@ -52,6 +52,36 @@ public sealed class SettingsStoreTests
     }
 
     [Test]
+    public async Task SaveAsync_ThenLoad_RestoresRuntimeBufferSettings()
+    {
+        var settings = new AppSettings
+        {
+            SpillThresholdRows = 12_345,
+            RunTempDirectory = Path.Combine(_directory, "run-temp")
+        };
+
+        await _store.SaveAsync(settings);
+        var result = _store.Load();
+
+        Assert.That(result.Warnings, Is.Empty);
+        Assert.That(result.Settings.SpillThresholdRows, Is.EqualTo(12_345));
+        Assert.That(result.Settings.RunTempDirectory, Is.EqualTo(settings.RunTempDirectory));
+    }
+
+    [Test]
+    public void Load_InvalidRuntimeBufferSettings_FallBackToDefaults()
+    {
+        File.WriteAllText(_path, """{"spillThresholdRows":-1,"runTempDirectory":"  "}""");
+
+        var result = _store.Load();
+        var defaults = new AppSettings();
+
+        Assert.That(result.Settings.SpillThresholdRows, Is.EqualTo(defaults.SpillThresholdRows));
+        Assert.That(result.Settings.RunTempDirectory, Is.EqualTo(defaults.RunTempDirectory));
+        Assert.That(result.Warnings, Has.Count.GreaterThanOrEqualTo(2));
+    }
+
+    [Test]
     public async Task SaveAsync_ThenLoad_RestoresValues()
     {
         var settings = new AppSettings

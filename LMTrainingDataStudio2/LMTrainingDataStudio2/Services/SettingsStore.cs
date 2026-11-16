@@ -18,6 +18,7 @@ public sealed class SettingsStore : ISettingsStore
     public const int MaxParallelism = 64;
     public const int MaxNodeRetries = 10;
     public const int MaxRecentFiles = 10;
+    public const long MaxSpillThresholdRows = 10_000_000;
 
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -132,6 +133,25 @@ public sealed class SettingsStore : ISettingsStore
         else
         {
             settings.RunOutputDirectory = settings.RunOutputDirectory.Trim();
+        }
+
+        if (settings.SpillThresholdRows < 0 || settings.SpillThresholdRows > MaxSpillThresholdRows)
+        {
+            warnings.Add(
+                $"spillThresholdRows must be between 0 and {MaxSpillThresholdRows}; " +
+                $"found {settings.SpillThresholdRows}. Using default {defaults.SpillThresholdRows}.");
+            settings.SpillThresholdRows = defaults.SpillThresholdRows;
+        }
+
+        if (string.IsNullOrWhiteSpace(settings.RunTempDirectory))
+        {
+            warnings.Add(
+                $"runTempDirectory must not be empty. Using default '{defaults.RunTempDirectory}'.");
+            settings.RunTempDirectory = defaults.RunTempDirectory;
+        }
+        else
+        {
+            settings.RunTempDirectory = settings.RunTempDirectory.Trim();
         }
 
         settings.RecentFiles = settings.RecentFiles?

@@ -142,8 +142,9 @@ public sealed record CleanerBlockConfig(DatasetCleanupRules Rules) : BlockConfig
 
 /// <summary>
 /// Writes rows to a JSONL file in OpenAI messages format while passing them downstream.
+/// When <see cref="Fields"/> is non-empty, only those top-level fields are written.
 /// </summary>
-public sealed record SftExportBlockConfig(string OutputPath) : BlockConfig;
+public sealed record SftExportBlockConfig(string OutputPath, string[]? Fields = null) : BlockConfig;
 
 /// <summary>
 /// Prebuilt deterministic tool rules for the tools most agents use in traces.

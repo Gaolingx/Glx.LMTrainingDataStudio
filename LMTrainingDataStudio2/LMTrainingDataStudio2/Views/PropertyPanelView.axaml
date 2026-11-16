@@ -625,8 +625,21 @@
                 <TextBlock Text="{loc:Loc property.sft_export_configuration}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
                 <StackPanel Spacing="4">
                     <TextBlock Text="{loc:Loc property.output_jsonl_path}" FontSize="11" Foreground="#AAAAAA" />
-                    <TextBox Text="{Binding SelectedBlock.SftExportEditor.OutputPath, Mode=TwoWay}"
-                             FontSize="11" Padding="8,6" Watermark="out/sft.jsonl" />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                        <TextBox Text="{Binding SelectedBlock.SftExportEditor.OutputPath, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="out/sft.jsonl" />
+                        <Button Grid.Column="1" Content="{loc:Loc property.browse}"
+                                Click="OnBrowseSftOutputClick"
+                                FontSize="11" Padding="10,6"
+                                Background="#3A3A4E" Foreground="#FFFFFF" />
+                    </Grid>
+                </StackPanel>
+                <StackPanel Spacing="4">
+                    <TextBlock Text="{loc:Loc property.sft_export_fields}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBox Text="{Binding SelectedBlock.SftExportEditor.FieldsText, Mode=TwoWay}"
+                             FontSize="11" Padding="8,6" Watermark="messages, tools" />
+                    <TextBlock Text="{loc:Loc property.sft_export_fields_hint}"
+                               FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
                 </StackPanel>
             </StackPanel>
 

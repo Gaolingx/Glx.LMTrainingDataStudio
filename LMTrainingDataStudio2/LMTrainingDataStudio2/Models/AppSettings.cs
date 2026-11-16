@@ -35,6 +35,13 @@ public sealed class AppSettings
     public string? RunOutputDirectory { get; set; } =
         Path.Combine(Path.GetTempPath(), "LMTrainingDataStudio", "runs");
 
+    /// <summary>Rows kept in memory per inter-block buffer before spilling to disk.</summary>
+    public long SpillThresholdRows { get; set; } = 10_000;
+
+    /// <summary>Directory for temporary inter-block spill files.</summary>
+    public string RunTempDirectory { get; set; } =
+        Path.Combine(Path.GetTempPath(), "LMTrainingDataStudio", "run-temp");
+
     /// <summary>OpenAI API key; falls back to OPENAI_API_KEY when empty.</summary>
     public string? OpenAiApiKey { get; set; }
 

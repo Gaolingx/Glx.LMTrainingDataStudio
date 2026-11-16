@@ -38,6 +38,9 @@ public partial class ExecutionsViewModel : ObservableObject
 
     public ObservableCollection<ExecutionRunSummary> Runs { get; } = new();
 
+    public bool CanResumeSelectedRun =>
+        SelectedRun is { Status: RunStatus.Failed or RunStatus.Cancelled, OutputDirectory: not null };
+
     public ObservableCollection<string> StatusFilters { get; } = new()
     {
         AllStatuses, "Succeeded", "Failed", "Cancelled", "Running"
@@ -113,6 +116,9 @@ public partial class ExecutionsViewModel : ObservableObject
     }
 
     partial void OnSelectedRunSummaryChanged(ExecutionRunSummary? value) => _ = SelectRunAsync(value);
+
+    partial void OnSelectedRunChanged(ExecutionRun? value) =>
+        OnPropertyChanged(nameof(CanResumeSelectedRun));
 
     private void ApplyFilter()
     {

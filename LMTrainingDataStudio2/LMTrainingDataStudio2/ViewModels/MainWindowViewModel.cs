@@ -113,6 +113,12 @@ public partial class MainWindowViewModel : ObservableObject
     private string _runOutputDirectory = string.Empty;
 
     [ObservableProperty]
+    private long _spillThresholdRows = 10_000;
+
+    [ObservableProperty]
+    private string _runTempDirectory = string.Empty;
+
+    [ObservableProperty]
     private bool _isDarkTheme;
 
     [ObservableProperty]
@@ -205,6 +211,8 @@ public partial class MainWindowViewModel : ObservableObject
         MaxParallelism = _settings.MaxParallelism;
         NodeRetryCount = _settings.NodeRetryCount;
         RunOutputDirectory = _settings.RunOutputDirectory ?? string.Empty;
+        SpillThresholdRows = _settings.SpillThresholdRows;
+        RunTempDirectory = _settings.RunTempDirectory;
         IsDarkTheme = _settings.IsDarkTheme;
         OpenAiApiKey = _settings.OpenAiApiKey ?? string.Empty;
         AnthropicApiKey = _settings.AnthropicApiKey ?? string.Empty;
@@ -933,15 +941,54 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task RunRecipeAsync()
+    private async Task RunRecipeAsync() => await RunRecipeCoreAsync(resumeFrom: null);
+
+    /// <summary>
+    /// Confirms replacing existing SFT export targets before a run starts.
+    /// The window supplies the handler; headless callers proceed without prompting.
+    /// </summary>
+    public Func<IReadOnlyList<string>, Task<bool>>? ConfirmOverwriteAsync { get; set; }
+
+    [RelayCommand]
+    private async Task ResumeExecutionAsync(ExecutionRun? run)
+    {
+        if (run is null) return;
+
+        if (run.Status is not (RunStatus.Failed or RunStatus.Cancelled) ||
+            string.IsNullOrWhiteSpace(run.OutputDirectory))
+        {
+            StatusText = "Only failed or cancelled runs with an output directory can be resumed.";
+            return;
+        }
+
+        var recipe = ToRecipe();
+        if (!string.Equals(run.RecipeId, recipe.Id, StringComparison.Ordinal))
+        {
+            StatusText = "Open the recipe that produced this run before resuming it.";
+            return;
+        }
+
+        await RunRecipeCoreAsync(run);
+    }
+
+    private async Task RunRecipeCoreAsync(ExecutionRun? resumeFrom)
     {
         if (IsRunning) return;
 
+        var recipe = ToRecipe();
+        if (!await ConfirmExportOverwriteAsync(recipe))
+        {
+            StatusText = "Execution cancelled — existing export target was not replaced.";
+            return;
+        }
+
         IsRunning = true;
         Progress = 0;
-        StatusText = "Running recipe...";
+        StatusText = resumeFrom is null ? "Running recipe..." : "Resuming execution...";
         LogMessages.Clear();
-        LogMessages.Add("[Info] Recipe execution started.");
+        LogMessages.Add(resumeFrom is null
+            ? "[Info] Recipe execution started."
+            : $"[Info] Resuming run {resumeFrom.RunId}.");
 
         _runCancellation = new CancellationTokenSource();
         _runPause = new ExecutionPauseController();
@@ -950,12 +997,12 @@ public partial class MainWindowViewModel : ObservableObject
 
         try
         {
-            var recipe = ToRecipe();
             var runner = CreateRecipeRunner();
             var progress = new Progress<ExecutionProgress>(OnExecutionProgress);
             var pause = _runPause;
 
-            var run = await Task.Run(() => runner.RunAsync(recipe, progress, cancellationToken, pause));
+            var run = await Task.Run(() =>
+                runner.RunAsync(recipe, progress, cancellationToken, pause, resumeFrom));
 
             try
             {
@@ -989,6 +1036,36 @@ public partial class MainWindowViewModel : ObservableObject
             IsRunPaused = false;
             IsRunning = false;
         }
+    }
+
+    private async Task<bool> ConfirmExportOverwriteAsync(Recipe recipe)
+    {
+        var targets = new List<string>();
+        foreach (var block in recipe.Blocks)
+        {
+            if (block.Config is not SftExportBlockConfig export ||
+                string.IsNullOrWhiteSpace(export.OutputPath))
+            {
+                continue;
+            }
+
+            try
+            {
+                var path = Path.GetFullPath(export.OutputPath);
+                if (File.Exists(path) &&
+                    !targets.Contains(path, StringComparer.OrdinalIgnoreCase))
+                {
+                    targets.Add(path);
+                }
+            }
+            catch (Exception ex) when (ex is ArgumentException or NotSupportedException)
+            {
+                LogMessages.Add($"[Warning] Could not resolve export path '{export.OutputPath}': {ex.Message}");
+            }
+        }
+
+        if (targets.Count == 0 || ConfirmOverwriteAsync is null) return true;
+        return await ConfirmOverwriteAsync(targets);
     }
 
     [RelayCommand(CanExecute = nameof(CanCancelRun))]
@@ -1038,7 +1115,9 @@ public partial class MainWindowViewModel : ObservableObject
         options: new RecipeRunOptions(
             MaxParallelism,
             NodeRetryCount,
-            RunOutputDirectory));
+            RunOutputDirectory,
+            SpillThresholdRows,
+            RunTempDirectory));
 
     private void OnExecutionProgress(ExecutionProgress progress)
     {
@@ -1204,6 +1283,11 @@ public partial class MainWindowViewModel : ObservableObject
             RunOutputDirectory = string.IsNullOrWhiteSpace(RunOutputDirectory)
                 ? defaults.RunOutputDirectory
                 : RunOutputDirectory.Trim(),
+            SpillThresholdRows = Math.Clamp(
+                SpillThresholdRows, 0, SettingsStore.MaxSpillThresholdRows),
+            RunTempDirectory = string.IsNullOrWhiteSpace(RunTempDirectory)
+                ? defaults.RunTempDirectory
+                : RunTempDirectory.Trim(),
             IsDarkTheme = IsDarkTheme,
             Language = SelectedLanguageOption.Code,
             OpenAiApiKey = NullIfBlank(OpenAiApiKey),

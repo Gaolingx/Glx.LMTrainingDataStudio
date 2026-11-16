@@ -239,6 +239,68 @@ public sealed class SimulationExecutorsTests
     }
 
     [Test]
+    public async Task SftExport_FieldWhitelist_KeepsOnlyConfiguredTopLevelFields()
+    {
+        var outputPath = Path.Combine(_directory, "filtered", "sft.jsonl");
+        var block = CreateBlock(
+            BlockType.SftExport, "export",
+            new SftExportBlockConfig(outputPath, new[] { "messages", "custom" }));
+        var input = new[]
+        {
+            new DatasetRow(0,
+                """{"messages":[{"role":"user","content":"a"}],"tools":[{"type":"function"}],"custom":42}""")
+        };
+
+        var rows = await CollectAsync(
+            (await new SftExportBlockExecutor().ExecuteAsync(
+                CreateContext(block, input), CancellationToken.None)).Output);
+
+        Assert.That(rows, Has.Count.EqualTo(1));
+        var line = await File.ReadAllTextAsync(outputPath);
+        using var document = JsonDocument.Parse(line);
+        var root = document.RootElement;
+
+        Assert.That(root.TryGetProperty("messages", out _), Is.True);
+        Assert.That(root.GetProperty("custom").GetInt32(), Is.EqualTo(42));
+        Assert.That(root.TryGetProperty("tools", out _), Is.False);
+    }
+
+    [Test]
+    public async Task SftExport_LogsRowCountAndPreview()
+    {
+        var outputPath = Path.Combine(_directory, "preview", "sft.jsonl");
+        var block = CreateBlock(BlockType.SftExport, "export", new SftExportBlockConfig(outputPath));
+        var logs = new List<string>();
+        var input = new[]
+        {
+            new DatasetRow(0, """{"messages":[{"role":"user","content":"hello"}]}"""),
+            new DatasetRow(1, """{"messages":[{"role":"assistant","content":"world"}]}""")
+        };
+
+        await CollectAsync(
+            (await new SftExportBlockExecutor().ExecuteAsync(
+                CreateContext(block, input, logs), CancellationToken.None)).Output);
+
+        Assert.That(logs.Any(log => log.Contains("Exported 2 row(s)")), Is.True);
+        Assert.That(logs.Any(log => log.Contains("Preview:") && log.Contains("hello")), Is.True);
+    }
+
+    [Test]
+    public void SftExport_FieldWhitelistOnNonObjectRow_Throws()
+    {
+        var outputPath = Path.Combine(_directory, "filtered-invalid", "sft.jsonl");
+        var block = CreateBlock(
+            BlockType.SftExport, "export",
+            new SftExportBlockConfig(outputPath, new[] { "messages" }));
+        var input = new[] { new DatasetRow(0, """[1,2,3]""") };
+
+        Assert.ThrowsAsync<InvalidDataException>(
+            async () => await CollectAsync(
+                (await new SftExportBlockExecutor().ExecuteAsync(
+                    CreateContext(block, input), CancellationToken.None)).Output));
+    }
+
+    [Test]
     public async Task SftExport_OverwritesExistingFile()
     {
         var outputPath = Path.Combine(_directory, "sft.jsonl");

@@ -102,7 +102,10 @@ public abstract record BlockConfig
                 .ToArray()
         },
         CleanerBlockConfig cleaner => cleaner with { Rules = CloneCleanup(cleaner.Rules)! },
-        SftExportBlockConfig export => export with { },
+        SftExportBlockConfig export => export with
+        {
+            Fields = export.Fields is null ? null : [.. export.Fields]
+        },
         _ => throw new NotSupportedException($"Unsupported block configuration type: {GetType().Name}.")
     };
 

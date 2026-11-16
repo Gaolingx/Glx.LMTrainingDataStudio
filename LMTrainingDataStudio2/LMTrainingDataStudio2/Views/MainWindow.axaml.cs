@@ -25,8 +25,22 @@ public partial class MainWindow : Window
 
         if (DataContext is MainWindowViewModel vm)
         {
+            vm.ConfirmOverwriteAsync = ConfirmExportOverwriteAsync;
             await vm.RestoreLastRecipeAsync();
         }
+    }
+
+    private async Task<bool> ConfirmExportOverwriteAsync(IReadOnlyList<string> paths)
+    {
+        var message = string.Join(Environment.NewLine, paths) +
+                      Environment.NewLine + Environment.NewLine +
+                      LocalizationService.L("dialog.overwrite_exports_message");
+        var result = await MessageDialog.ShowAsync(
+            this,
+            LocalizationService.L("dialog.overwrite_exports_title"),
+            message,
+            MessageDialogButtons.OkCancel);
+        return result == MessageDialogResult.Ok;
     }
 
     private void OnFitCanvasClick(object? sender, RoutedEventArgs e)
