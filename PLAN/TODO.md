@@ -150,7 +150,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 | Phase | 主题 | 主要交付 | 出口标准 |
 | --- | --- | --- | --- |
 | 0 | 基线 | .NET 9 构建、最小 core 测试 | 已完成，29 测试通过 |
-| 1 | Core 基础层 | 强类型节点配置、Recipe/设置持久化、JSONL Reader | 数据可保存/加载，索引可复用，单测通过 |
+| 1 | Core 基础层 | 强类型节点配置、Recipe/设置持久化、JSONL Reader、校验器补强 | 核心完成；1M 性能与清理日志留待 Phase 5 |
 | 2 | 执行引擎 | Runner、执行器、执行记录、Executions UI | 示例 Recipe 真跑通，可取消、可追踪 |
 | 3 | 编辑器 UI | 属性配置、网格/吸附/Fit/Mini-map、Tool Schema | 全编辑链路手工验收通过 |
 | 4 | 数据能力 | CSV/Parquet、批量转换、校验/修复、数据编辑 | 数据处理闭环可用 |
@@ -171,6 +171,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 - [x] 设置持久化：`ISettingsStore`/`SettingsStore`，默认 `%AppData%/LMTrainingDataStudio/settings.json`，范围校验与回退警告、原子保存；`ApplySettings` 已落盘。
 - [x] JSONL 数据读取器：`JsonlDatasetReader` 分页/单行读取；索引指纹失效、LRU 容量清理、BOM/CRLF 字节偏移与超长行读取。
 - [x] 校验器补强：孤立节点警告、重复边、端口归属/方向、DataType 兼容；示例 Recipe 端口类型已修正。
+- [x] Phase 1 核心项全部完成；1M 行性能基准与缓存清理日志留待 Phase 5。
 
 #### 范围与实现方式
 
@@ -255,6 +256,17 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 #### 目标
 
 用真正的 DAG 执行替换 `Task.Delay` 模拟，建立可观察、可取消、可复现的执行链路。
+
+#### 当前进度（Round 4，2026-11-16）
+
+- [x] 执行模型：`ExecutionRun`、`NodeExecutionResult`、`ExecutionProgress`、`RunStatus` / `ExecutionStatus`。
+- [x] 执行契约：`IBlockExecutor`、`BlockExecutionContext`、`BlockExecutionResult`（输入/输出均为 `IAsyncEnumerable<DatasetRow>`）。
+- [x] 执行器：Seed（索引/流式）、Expression（`{{ path }}` 子集）、Validator（最小规则语法）、Sampler（reservoir / ratio，确定性）、LLM（`ILlmClient`，测试用 Fake）。
+- [x] `RecipeRunner`：校验门禁、拓扑分层、fail-fast + 下游 Skipped、取消、进度回调、节点日志。
+- [ ] 执行记录持久化（`ExecutionStore`）与 Executions UI。
+- [ ] MainWindow 运行按钮接入 Runner，删除 `Task.Delay` 模拟。
+- [ ] OpenAI 兼容 HTTP 客户端。
+- [ ] 节点间输出当前在内存物化，大数据阶段改为流式或溢写磁盘。
 
 #### 范围与实现方式
 
@@ -555,16 +567,20 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 
 ### 4.5 运行时与执行
 
-- [ ] 真实 Recipe 执行引擎（当前 `Task.Delay` 模拟）。
-- [ ] 节点执行器与执行上下文。
-- [ ] 拓扑排序、依赖传递、并行分支。
-- [ ] Execution / NodeState / 日志模型。
-- [ ] 取消 / 暂停 / 重试。
+- [x] 真实 Recipe 执行引擎（服务层，Round 4）。
+- [x] 节点执行器与执行上下文。
+- [x] 拓扑排序与依赖传递（层内串行；并行执行未做）。
+- [x] Execution / NodeState / 日志模型（内存态）。
+- [x] 取消（运行级与节点级）。
+- [ ] 暂停 / 重试。
+- [ ] MainWindow 运行按钮接入 Runner，删除 `Task.Delay` 模拟。
 - [ ] 异常处理与 `IsRunning` 恢复。
-- [ ] 真实进度（按节点/行数）。
+- [x] Runner 按节点/行数上报进度。
+- [ ] 状态栏 / Executions UI 展示真实进度。
 - [ ] 运行日志持久化与历史记录。
 - [ ] 输出目录、命名、结果摘要。
 - [ ] 中断恢复与临时文件清理。
+- [ ] 节点间输出当前在内存物化，需改为流式或溢写磁盘。
 
 ### 4.6 设置、主题与生命周期
 
@@ -604,7 +620,8 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 - [x] 校验器补强：孤立节点、重复边、端口归属/方向、DataType 兼容（6 个）。
 - [ ] 格式转换扩展测试：DPO、Pretrain、多轮 Alpaca、extra fields。
 - [ ] 索引缓存边界：缓存失效、容量清理、并发打开、超长行。
-- [ ] Recipe 执行引擎单测：拓扑、fail-fast、取消、进度。
+- [x] Recipe 执行引擎单测：端到端、fail-fast、取消、进度、拒绝执行（5 个）。
+- [x] 节点执行器单测：Seed / Expression / Validator / Sampler / LLM（12 个）。
 - [ ] ViewModel 单测：加载/保存、运行状态、异常恢复。
 - [ ] Avalonia Headless UI 测试。
 - [ ] 集成测试：1M 行全链路。
