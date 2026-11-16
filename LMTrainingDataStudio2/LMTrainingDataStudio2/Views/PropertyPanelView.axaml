@@ -163,6 +163,281 @@
                            FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
             </StackPanel>
 
+            <!-- Query source configuration -->
+            <StackPanel Spacing="8"
+                        IsVisible="{Binding SelectedBlock.QuerySourceEditor, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <Border Height="1" Background="#3A3A4E" />
+                <TextBlock Text="Query Source Configuration" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Queries (one per line)" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBox Text="{Binding SelectedBlock.QuerySourceEditor.QueriesText, Mode=TwoWay}"
+                             FontSize="11" Padding="8,6" Height="100"
+                             AcceptsReturn="True" TextWrapping="Wrap"
+                             Watermark="Analyze the TCP handshake" />
+                </StackPanel>
+
+                <Grid ColumnDefinitions="*,8,*">
+                    <StackPanel Grid.Column="0" Spacing="4">
+                        <TextBlock Text="Expansion mode" FontSize="11" Foreground="#AAAAAA" />
+                        <ComboBox ItemsSource="{Binding SelectedBlock.QuerySourceEditor.Modes}"
+                                  SelectedItem="{Binding SelectedBlock.QuerySourceEditor.SelectedMode, Mode=TwoWay}"
+                                  FontSize="11" HorizontalAlignment="Stretch">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:QuerySetModeOption">
+                                    <TextBlock Text="{Binding DisplayName}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Spacing="4">
+                        <TextBlock Text="Repeat" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBox Text="{Binding SelectedBlock.QuerySourceEditor.Repeat, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="1" />
+                    </StackPanel>
+                </Grid>
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="System prompt (optional)" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBox Text="{Binding SelectedBlock.QuerySourceEditor.SystemPrompt, Mode=TwoWay}"
+                             FontSize="11" Padding="8,6" Height="60"
+                             AcceptsReturn="True" TextWrapping="Wrap" />
+                </StackPanel>
+            </StackPanel>
+
+            <!-- Simulation configuration -->
+            <StackPanel Spacing="8"
+                        IsVisible="{Binding SelectedBlock.SimulationEditor, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <Border Height="1" Background="#3A3A4E" />
+                <TextBlock Text="Simulation Configuration" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Model transport" FontSize="11" Foreground="#AAAAAA" />
+                    <ComboBox ItemsSource="{Binding SelectedBlock.SimulationEditor.ModelModes}"
+                              SelectedItem="{Binding SelectedBlock.SimulationEditor.SelectedModelMode, Mode=TwoWay}"
+                              FontSize="11" HorizontalAlignment="Stretch">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:SimulationModelModeOption">
+                                <TextBlock Text="{Binding DisplayName}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </StackPanel>
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Provider" FontSize="11" Foreground="#AAAAAA" />
+                    <ComboBox ItemsSource="{Binding SelectedBlock.SimulationEditor.Providers}"
+                              SelectedItem="{Binding SelectedBlock.SimulationEditor.SelectedProvider, Mode=TwoWay}"
+                              FontSize="11" HorizontalAlignment="Stretch">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:LlmProviderOption">
+                                <TextBlock Text="{Binding DisplayName}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </StackPanel>
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Tool execution" FontSize="11" Foreground="#AAAAAA" />
+                    <ComboBox ItemsSource="{Binding SelectedBlock.SimulationEditor.ToolModes}"
+                              SelectedItem="{Binding SelectedBlock.SimulationEditor.SelectedToolMode, Mode=TwoWay}"
+                              FontSize="11" HorizontalAlignment="Stretch">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ToolExecutionModeOption">
+                                <TextBlock Text="{Binding DisplayName}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </StackPanel>
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Model" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBox Text="{Binding SelectedBlock.SimulationEditor.ModelAlias, Mode=TwoWay}"
+                             FontSize="11" Padding="8,6" Watermark="gpt-4o / claude-sonnet-4-5" />
+                </StackPanel>
+
+                <Grid ColumnDefinitions="*,8,*">
+                    <StackPanel Grid.Column="0" Spacing="4">
+                        <TextBlock Text="Max rounds" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBox Text="{Binding SelectedBlock.SimulationEditor.MaxRounds, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="8" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Spacing="4">
+                        <TextBlock Text="Concurrency" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBox Text="{Binding SelectedBlock.SimulationEditor.MaxConcurrency, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="1" />
+                    </StackPanel>
+                </Grid>
+
+                <Grid ColumnDefinitions="*,8,*">
+                    <StackPanel Grid.Column="0" Spacing="4">
+                        <TextBlock Text="Temperature" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBox Text="{Binding SelectedBlock.SimulationEditor.Temperature, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="0.7" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Spacing="4">
+                        <TextBlock Text="Max tokens" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBox Text="{Binding SelectedBlock.SimulationEditor.MaxTokens, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="2048" />
+                    </StackPanel>
+                </Grid>
+
+                <Grid ColumnDefinitions="*,8,*">
+                    <StackPanel Grid.Column="0" Spacing="4">
+                        <TextBlock Text="Timeout (s)" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBox Text="{Binding SelectedBlock.SimulationEditor.TimeoutSeconds, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="100" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Spacing="4">
+                        <TextBlock Text="Model retries" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBox Text="{Binding SelectedBlock.SimulationEditor.ModelMaxRetries, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="0" />
+                    </StackPanel>
+                </Grid>
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Endpoint (optional)" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBox Text="{Binding SelectedBlock.SimulationEditor.Endpoint, Mode=TwoWay}"
+                             FontSize="11" Padding="8,6" Watermark="https://api.openai.com/v1" />
+                </StackPanel>
+
+                <CheckBox Content="Emit incomplete trajectories"
+                          FontSize="11" Foreground="#CCCCCC"
+                          IsChecked="{Binding SelectedBlock.SimulationEditor.EmitIncompleteTrajectories, Mode=TwoWay}" />
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="System prompt (optional)" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBox Text="{Binding SelectedBlock.SimulationEditor.SystemPrompt, Mode=TwoWay}"
+                             FontSize="11" Padding="8,6" Height="60"
+                             AcceptsReturn="True" TextWrapping="Wrap" />
+                </StackPanel>
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Final content (scripted mode)" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBox Text="{Binding SelectedBlock.SimulationEditor.FinalContent, Mode=TwoWay}"
+                             FontSize="11" Padding="8,6" Height="50"
+                             AcceptsReturn="True" TextWrapping="Wrap" />
+                </StackPanel>
+
+                <Border Height="1" Background="#2F2F42" />
+                <TextBlock Text="Failure samples" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Failure JSONL path (optional)" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBox Text="{Binding SelectedBlock.SimulationEditor.FailureOutputPath, Mode=TwoWay}"
+                             FontSize="11" Padding="8,6" Watermark="out/failed.jsonl" />
+                </StackPanel>
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Max failure samples (0 = unlimited)" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBox Text="{Binding SelectedBlock.SimulationEditor.MaxFailureSamples, Mode=TwoWay}"
+                             FontSize="11" Padding="8,6" Watermark="100" />
+                </StackPanel>
+
+                <Grid ColumnDefinitions="*,8,*">
+                    <StackPanel Grid.Column="0" Spacing="4">
+                        <TextBlock Text="Input cost / 1M" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBox Text="{Binding SelectedBlock.SimulationEditor.InputCostPerMillionTokens, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="0" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Spacing="4">
+                        <TextBlock Text="Output cost / 1M" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBox Text="{Binding SelectedBlock.SimulationEditor.OutputCostPerMillionTokens, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="0" />
+                    </StackPanel>
+                </Grid>
+
+                <Border Height="1" Background="#2F2F42" />
+                <TextBlock Text="Real sandbox" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+
+                <Grid ColumnDefinitions="*,8,*">
+                    <StackPanel Grid.Column="0" Spacing="4">
+                        <TextBlock Text="Process timeout (ms)" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBox Text="{Binding SelectedBlock.SimulationEditor.SandboxTimeoutMs, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="30000" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Spacing="4">
+                        <TextBlock Text="Max output bytes" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBox Text="{Binding SelectedBlock.SimulationEditor.SandboxMaxOutputBytes, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="65536" />
+                    </StackPanel>
+                </Grid>
+
+                <Grid ColumnDefinitions="*,8,*">
+                    <StackPanel Grid.Column="0" Spacing="4">
+                        <TextBlock Text="Memory limit (MB)" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBox Text="{Binding SelectedBlock.SimulationEditor.SandboxMaxMemoryMb, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="512" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Spacing="4">
+                        <TextBlock Text="Max processes" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBox Text="{Binding SelectedBlock.SimulationEditor.SandboxMaxProcesses, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="8" />
+                    </StackPanel>
+                </Grid>
+
+                <CheckBox Content="Allow web_fetch network access"
+                          FontSize="11" Foreground="#CCCCCC"
+                          IsChecked="{Binding SelectedBlock.SimulationEditor.SandboxAllowNetwork, Mode=TwoWay}" />
+                <CheckBox Content="Allow private network addresses"
+                          FontSize="11" Foreground="#CCCCCC"
+                          IsChecked="{Binding SelectedBlock.SimulationEditor.SandboxAllowPrivateNetwork, Mode=TwoWay}" />
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Python executable" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBox Text="{Binding SelectedBlock.SimulationEditor.PythonExecutable, Mode=TwoWay}"
+                             FontSize="11" Padding="8,6" Watermark="python" />
+                </StackPanel>
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="PowerShell executable" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBox Text="{Binding SelectedBlock.SimulationEditor.PowerShellExecutable, Mode=TwoWay}"
+                             FontSize="11" Padding="8,6" Watermark="powershell / pwsh" />
+                </StackPanel>
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Bash executable" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBox Text="{Binding SelectedBlock.SimulationEditor.BashExecutable, Mode=TwoWay}"
+                             FontSize="11" Padding="8,6" Watermark="bash" />
+                </StackPanel>
+
+                <TextBlock Text="Tools, harness rules and scripts are edited in Config JSON below."
+                           FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
+            </StackPanel>
+
+            <!-- Cleaner configuration -->
+            <StackPanel Spacing="6"
+                        IsVisible="{Binding SelectedBlock.CleanerEditor, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <Border Height="1" Background="#3A3A4E" />
+                <TextBlock Text="Cleaner Configuration" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+
+                <CheckBox Content="Normalize whitespace" FontSize="11" Foreground="#CCCCCC"
+                          IsChecked="{Binding SelectedBlock.CleanerEditor.NormalizeWhitespace, Mode=TwoWay}" />
+                <CheckBox Content="Normalize newlines" FontSize="11" Foreground="#CCCCCC"
+                          IsChecked="{Binding SelectedBlock.CleanerEditor.NormalizeNewlines, Mode=TwoWay}" />
+                <CheckBox Content="Strip ANSI escapes" FontSize="11" Foreground="#CCCCCC"
+                          IsChecked="{Binding SelectedBlock.CleanerEditor.StripAnsi, Mode=TwoWay}" />
+                <CheckBox Content="Remove reasoning_content" FontSize="11" Foreground="#CCCCCC"
+                          IsChecked="{Binding SelectedBlock.CleanerEditor.RemoveReasoningContent, Mode=TwoWay}" />
+                <CheckBox Content="Drop empty messages" FontSize="11" Foreground="#CCCCCC"
+                          IsChecked="{Binding SelectedBlock.CleanerEditor.DropEmptyMessages, Mode=TwoWay}" />
+
+                <TextBlock Text="Regex replacements remain in Config JSON below."
+                           FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
+            </StackPanel>
+
+            <!-- SFT export configuration -->
+            <StackPanel Spacing="6"
+                        IsVisible="{Binding SelectedBlock.SftExportEditor, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <Border Height="1" Background="#3A3A4E" />
+                <TextBlock Text="SFT Export Configuration" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Output JSONL path" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBox Text="{Binding SelectedBlock.SftExportEditor.OutputPath, Mode=TwoWay}"
+                             FontSize="11" Padding="8,6" Watermark="out/sft.jsonl" />
+                </StackPanel>
+            </StackPanel>
+
             <!-- Generic JSON configuration editor -->
             <StackPanel Spacing="8">
                 <Border Height="1" Background="#3A3A4E" />

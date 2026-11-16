@@ -48,6 +48,18 @@ public partial class BlockNodeViewModel : ObservableObject
     private LlmConfigEditorViewModel? _llmEditor;
 
     [ObservableProperty]
+    private QuerySourceConfigEditorViewModel? _querySourceEditor;
+
+    [ObservableProperty]
+    private SimulationConfigEditorViewModel? _simulationEditor;
+
+    [ObservableProperty]
+    private CleanerConfigEditorViewModel? _cleanerEditor;
+
+    [ObservableProperty]
+    private SftExportConfigEditorViewModel? _sftExportEditor;
+
+    [ObservableProperty]
     private string _configJson = string.Empty;
 
     [ObservableProperty]
@@ -74,6 +86,22 @@ public partial class BlockNodeViewModel : ObservableObject
 
             LlmEditor = value is LlmBlockConfig llm
                 ? new LlmConfigEditorViewModel(llm, ApplyLlmConfig)
+                : null;
+
+            QuerySourceEditor = value is QuerySourceBlockConfig query
+                ? new QuerySourceConfigEditorViewModel(query, ApplyConfig)
+                : null;
+
+            SimulationEditor = value is SimulationBlockConfig simulation
+                ? new SimulationConfigEditorViewModel(simulation, ApplyConfig)
+                : null;
+
+            CleanerEditor = value is CleanerBlockConfig cleaner
+                ? new CleanerConfigEditorViewModel(cleaner, ApplyConfig)
+                : null;
+
+            SftExportEditor = value is SftExportBlockConfig export
+                ? new SftExportConfigEditorViewModel(export, ApplyConfig)
                 : null;
         }
     }
@@ -121,17 +149,11 @@ public partial class BlockNodeViewModel : ObservableObject
         return true;
     }
 
-    private void ApplySeedConfig(SeedBlockConfig config)
-    {
-        if (_config.Equals(config)) return;
+    private void ApplySeedConfig(SeedBlockConfig config) => ApplyConfig(config);
 
-        _config = config;
-        ConfigJson = JsonSerializer.Serialize(config, RecipeStore.SerializerOptions);
-        OnPropertyChanged(nameof(Config));
-        ConfigError = null;
-    }
+    private void ApplyLlmConfig(LlmBlockConfig config) => ApplyConfig(config);
 
-    private void ApplyLlmConfig(LlmBlockConfig config)
+    private void ApplyConfig(BlockConfig config)
     {
         if (_config.Equals(config)) return;
 
