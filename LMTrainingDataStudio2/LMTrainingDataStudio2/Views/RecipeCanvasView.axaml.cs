@@ -701,7 +701,8 @@ public partial class RecipeCanvasView : UserControl
             X = block.X,
             Y = block.Y,
             Width = block.Width,
-            Height = block.Height
+            Height = block.Height,
+            Config = block.Config.DeepClone()
         };
         foreach (var p in block.InputPorts) clone.InputPorts.Add(new PortViewModel { Name = p.Name, DataType = p.DataType });
         foreach (var p in block.OutputPorts) clone.OutputPorts.Add(new PortViewModel { Name = p.Name, DataType = p.DataType });
@@ -727,7 +728,8 @@ public partial class RecipeCanvasView : UserControl
             },
             X = position.X,
             Y = position.Y,
-            IsSelected = true
+            IsSelected = true,
+            Config = BlockConfig.CreateDefault(type)
         };
         block.InputPorts.Add(new PortViewModel { Name = "input", DataType = "any" });
         block.OutputPorts.Add(new PortViewModel { Name = "output", DataType = "any" });

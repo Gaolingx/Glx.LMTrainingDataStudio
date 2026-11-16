@@ -36,6 +36,20 @@ public partial class BlockNodeViewModel : ObservableObject
     [ObservableProperty]
     private bool _isSelected;
 
+    [ObservableProperty]
+    private string? _configError;
+
+    private BlockConfig _config = null!;
+
+    /// <summary>
+    /// Configuration whose block kind must match <see cref="Type"/>.
+    /// </summary>
+    public required BlockConfig Config
+    {
+        get => _config;
+        set => SetProperty(ref _config, value);
+    }
+
     public ObservableCollection<PortViewModel> InputPorts { get; } = new();
     public ObservableCollection<PortViewModel> OutputPorts { get; } = new();
 

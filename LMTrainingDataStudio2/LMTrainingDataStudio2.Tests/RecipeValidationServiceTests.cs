@@ -22,10 +22,11 @@ public sealed class RecipeValidationServiceTests
     public void Validate_ValidGraph_IsValidWithoutIssues()
     {
         var recipe = new Recipe();
-        var seed = CreateBlock("seed1", BlockType.Seed, "seed_data");
-        seed.Properties["source_path"] = "data.jsonl";
+        var seed = CreateBlock("seed1", BlockType.Seed, "seed_data",
+            new SeedBlockConfig("data.jsonl", DataFileType.Jsonl, Streaming: false, UseIndexCache: true));
         seed.OutputPorts.Add(CreatePort("seed_out", PortDirection.Output));
-        var validator = CreateBlock("val1", BlockType.Validator, "code_check");
+        var validator = CreateBlock("val1", BlockType.Validator, "code_check",
+            new ValidatorBlockConfig("expression", "len(messages) > 0", RejectOnFailure: true));
         validator.InputPorts.Add(CreatePort("val_in", PortDirection.Input));
 
         recipe.Blocks.AddRange(new[] { seed, validator });
@@ -112,12 +113,88 @@ public sealed class RecipeValidationServiceTests
             i.Severity == ValidationSeverity.Warning && i.Message.Contains("no model alias")), Is.True);
     }
 
-    private static RecipeBlock CreateBlock(string id, BlockType type, string name) => new()
+    [Test]
+    public void Validate_ConfigKindMismatch_ReportsError()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("b1", BlockType.Seed, "seed_data",
+            new ValidatorBlockConfig("expression", "len(rows) > 0", RejectOnFailure: true)));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.IsValid, Is.False);
+        Assert.That(result.Issues.Any(i =>
+            i.Severity == ValidationSeverity.Error &&
+            i.Message.Contains("uses ValidatorBlockConfig")), Is.True);
+    }
+
+    [Test]
+    public void Validate_ExpressionWithoutTemplate_ReportsWarning()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("e1", BlockType.Expression, "render"));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Severity == ValidationSeverity.Warning && i.Message.Contains("no template")), Is.True);
+    }
+
+    [Test]
+    public void Validate_ValidatorWithoutRule_ReportsWarning()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("v1", BlockType.Validator, "check"));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Severity == ValidationSeverity.Warning && i.Message.Contains("no rule")), Is.True);
+    }
+
+    [Test]
+    public void Validate_SamplerWithoutCountOrRatio_ReportsWarning()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("s1", BlockType.Sampler, "sample"));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Severity == ValidationSeverity.Warning && i.Message.Contains("neither count nor ratio")), Is.True);
+    }
+
+    [Test]
+    public void Validate_SamplerWithCount_NoSamplerWarning()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("s1", BlockType.Sampler, "sample",
+            new SamplerBlockConfig(Count: 100, Ratio: null, Seed: 42, Splits: Array.Empty<string>())));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i => i.Message.Contains("Sampler")), Is.False);
+    }
+
+    [Test]
+    public void Validate_ToolProfileWithoutTools_ReportsWarning()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("t1", BlockType.ToolProfile, "tools"));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Severity == ValidationSeverity.Warning && i.Message.Contains("no tools")), Is.True);
+    }
+
+    private static RecipeBlock CreateBlock(string id, BlockType type, string name, BlockConfig? config = null) => new()
     {
         Id = id,
         Type = type,
         Name = name,
-        DisplayName = name
+        DisplayName = name,
+        Config = config ?? BlockConfig.CreateDefault(type)
     };
 
     private static BlockPort CreatePort(string id, PortDirection direction) => new()

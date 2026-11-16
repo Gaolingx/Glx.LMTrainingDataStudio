@@ -28,7 +28,7 @@ public sealed class RecipeBlock
     public double Height { get; set; } = 80;
     public List<BlockPort> InputPorts { get; set; } = new();
     public List<BlockPort> OutputPorts { get; set; } = new();
-    public Dictionary<string, object?> Properties { get; set; } = new();
+    public required BlockConfig Config { get; init; }
 }
 
 /// <summary>

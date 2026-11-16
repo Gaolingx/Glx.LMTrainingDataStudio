@@ -39,6 +39,11 @@
                 </StackPanel>
             </Border>
 
+            <!-- Block-level validation error -->
+            <TextBlock Text="{Binding SelectedBlock.ConfigError}"
+                       FontSize="11" Foreground="#FF6666" TextWrapping="Wrap"
+                       IsVisible="{Binding SelectedBlock.ConfigError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
             <!-- Jinja Reference Name -->
             <StackPanel Spacing="4">
                 <TextBlock Text="Jinja Reference Name" FontSize="11" Foreground="#AAAAAA" />

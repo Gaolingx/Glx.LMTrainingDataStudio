@@ -164,6 +164,14 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 
 把“节点配置、Recipe、设置、JSONL 文件”从占位/内存态变成可持久化、可测试的核心能力，为执行引擎和 UI 提供稳定底座。
 
+#### 当前进度（Round 2，2026-11-16）
+
+- [x] 强类型节点配置：`BlockConfig` 多态层级、`RecipeBlock.Config` 必填、ViewModel 配置与错误提示、校验服务按配置类型检查；新增 19 个测试。
+- [ ] Recipe 持久化（`RecipeStore`、`SchemaVersion`）。
+- [ ] 设置持久化（`ISettingsStore`、`SettingsStore`）。
+- [ ] JSONL 数据读取器（`JsonlDatasetReader`、索引失效与容量）。
+- [ ] 校验器补强（孤立节点、端口方向/类型、重复边）。
+
 #### 范围与实现方式
 
 1. **强类型节点配置**
@@ -500,7 +508,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 
 ### 4.3 Recipe 节点模块
 
-- [ ] 节点配置模型（当前 `BlockNodeViewModel` 无 `Properties`，校验永远告警）。
+- [x] 节点配置模型：`BlockConfig` 多态层级 + `RecipeBlock.Config`，校验按配置类型检查（Round 2）。
 - [ ] 节点端口类型化（当前固定 input/output + any）。
 - [ ] 端口增删、改名、改类型（属性面板只读展示）。
 - [ ] Recipe 序列化 / 反序列化 / schema 版本。
@@ -589,6 +597,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 
 - [x] 测试项目建立，加入解决方案。
 - [x] core 最小单测：格式转换、JSONL 校验、Recipe 校验、索引缓存、Undo 历史（29 个）。
+- [x] `BlockConfig` 多态序列化、默认工厂、深拷贝、类型/配置匹配校验（19 个）。
 - [ ] 格式转换扩展测试：DPO、Pretrain、多轮 Alpaca、extra fields。
 - [ ] 索引缓存边界：缓存失效、容量清理、并发打开、超长行。
 - [ ] Recipe 执行引擎单测：拓扑、fail-fast、取消、进度。

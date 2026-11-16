@@ -155,31 +155,71 @@ public sealed class RecipeValidationService
     {
         foreach (var block in recipe.Blocks)
         {
-            switch (block.Type)
+            if (block.Config.GetBlockType() != block.Type)
             {
-                case BlockType.Seed:
-                    if (!block.Properties.ContainsKey("source_path") &&
-                        !block.Properties.ContainsKey("hf_dataset_id"))
+                result.Issues.Add(new ValidationIssue
+                {
+                    Severity = ValidationSeverity.Error,
+                    Message = $"Block '{block.Name}' is a {block.Type} node but uses {block.Config.GetType().Name}.",
+                    BlockId = block.Id
+                });
+                continue;
+            }
+
+            switch (block.Config)
+            {
+                case SeedBlockConfig seed when string.IsNullOrWhiteSpace(seed.SourcePath):
+                    result.Issues.Add(new ValidationIssue
                     {
-                        result.Issues.Add(new ValidationIssue
-                        {
-                            Severity = ValidationSeverity.Warning,
-                            Message = $"Seed block '{block.Name}' has no data source configured.",
-                            BlockId = block.Id
-                        });
-                    }
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Seed block '{block.Name}' has no data source configured.",
+                        BlockId = block.Id
+                    });
                     break;
 
-                case BlockType.Llm:
-                    if (!block.Properties.ContainsKey("model_alias"))
+                case LlmBlockConfig llm when string.IsNullOrWhiteSpace(llm.ModelAlias):
+                    result.Issues.Add(new ValidationIssue
                     {
-                        result.Issues.Add(new ValidationIssue
-                        {
-                            Severity = ValidationSeverity.Warning,
-                            Message = $"LLM block '{block.Name}' has no model alias configured.",
-                            BlockId = block.Id
-                        });
-                    }
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"LLM block '{block.Name}' has no model alias configured.",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case ExpressionBlockConfig expression when string.IsNullOrWhiteSpace(expression.Template):
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Expression block '{block.Name}' has no template configured.",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case ValidatorBlockConfig validator when string.IsNullOrWhiteSpace(validator.Rule):
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Validator block '{block.Name}' has no rule configured.",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case SamplerBlockConfig sampler when sampler.Count is null && sampler.Ratio is null:
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Sampler block '{block.Name}' has neither count nor ratio configured.",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case ToolProfileBlockConfig toolProfile when toolProfile.Profile?.Tools is not { Count: > 0 }:
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Tool profile block '{block.Name}' has no tools configured.",
+                        BlockId = block.Id
+                    });
                     break;
             }
         }

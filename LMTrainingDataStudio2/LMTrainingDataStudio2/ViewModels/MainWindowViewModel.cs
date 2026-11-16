@@ -122,6 +122,7 @@ public partial class MainWindowViewModel : ObservableObject
             DisplayName = "Training Data",
             X = 80,
             Y = 150,
+            Config = new SeedBlockConfig("data/train.jsonl", DataFileType.Jsonl, Streaming: false, UseIndexCache: true)
         };
         seedBlock.OutputPorts.Add(new PortViewModel { Id = "seed1_out", Name = "rows", DataType = "jsonl" });
 
@@ -133,6 +134,7 @@ public partial class MainWindowViewModel : ObservableObject
             DisplayName = "GPT-4o Generator",
             X = 380,
             Y = 120,
+            Config = new LlmBlockConfig("openai", "gpt-4o", Temperature: 0.7, MaxTokens: 2048, Prompt: null)
         };
         llmBlock.InputPorts.Add(new PortViewModel { Id = "llm1_in", Name = "input", DataType = "messages[]" });
         llmBlock.OutputPorts.Add(new PortViewModel { Id = "llm1_out", Name = "output", DataType = "messages[]" });
@@ -145,6 +147,7 @@ public partial class MainWindowViewModel : ObservableObject
             DisplayName = "Python Validator",
             X = 680,
             Y = 150,
+            Config = new ValidatorBlockConfig("expression", "len(messages) > 0", RejectOnFailure: true)
         };
         validatorBlock.InputPorts.Add(new PortViewModel { Id = "val1_in", Name = "input", DataType = "messages[]" });
         validatorBlock.OutputPorts.Add(new PortViewModel { Id = "val1_out", Name = "valid", DataType = "messages[]" });
@@ -191,6 +194,13 @@ public partial class MainWindowViewModel : ObservableObject
                 foreach (var issue in result.Issues)
                 {
                     LogMessages.Add($"[{issue.Severity}] {issue.Message}");
+                }
+
+                foreach (var block in Blocks)
+                {
+                    block.ConfigError = result.Issues
+                        .FirstOrDefault(i => i.BlockId == block.Id && i.Severity == ValidationSeverity.Error)
+                        ?.Message;
                 }
 
                 StatusText = result.IsValid ? "Validation passed ✓" : $"Validation failed: {result.Issues.Count(i => i.Severity == ValidationSeverity.Error)} error(s)";
@@ -240,6 +250,7 @@ public partial class MainWindowViewModel : ObservableObject
             DisplayName = $"New {type}",
             X = 300,
             Y = 200,
+            Config = BlockConfig.CreateDefault(type)
         };
         block.OutputPorts.Add(new PortViewModel { Name = "output", DataType = "any" });
         block.InputPorts.Add(new PortViewModel { Name = "input", DataType = "any" });
@@ -341,6 +352,7 @@ public partial class MainWindowViewModel : ObservableObject
                 DisplayName = blockVm.DisplayName,
                 X = blockVm.X,
                 Y = blockVm.Y,
+                Config = blockVm.Config,
                 InputPorts = blockVm.InputPorts.Select(p => new BlockPort
                 {
                     Id = p.Id,
