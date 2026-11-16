@@ -29,7 +29,13 @@ public partial class PropertyPanelView : UserControl
             AllowMultiple = false,
             FileTypeFilter = new[]
             {
+                new FilePickerFileType("Datasets")
+                {
+                    Patterns = new[] { "*.jsonl", "*.json", "*.csv", "*.parquet" }
+                },
                 new FilePickerFileType("JSONL") { Patterns = new[] { "*.jsonl", "*.json" } },
+                new FilePickerFileType("CSV") { Patterns = new[] { "*.csv" } },
+                new FilePickerFileType("Parquet") { Patterns = new[] { "*.parquet" } },
                 FilePickerFileTypes.All
             }
         });

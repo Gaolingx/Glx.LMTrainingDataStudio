@@ -1,4 +1,5 @@
 using LMTrainingDataStudio2.Models;
+using LMTrainingDataStudio2.Services.Datasets;
 using Microsoft.Data.Sqlite;
 
 namespace LMTrainingDataStudio2.Services;
@@ -6,7 +7,7 @@ namespace LMTrainingDataStudio2.Services;
 /// <summary>
 /// Reads JSONL rows through a persistent line index and a single open file stream.
 /// </summary>
-public sealed class JsonlDatasetReader : IDisposable, IAsyncDisposable
+public sealed class JsonlDatasetReader : IDatasetReader, IDisposable
 {
     private readonly IndexCacheService _indexCache;
     private readonly SemaphoreSlim _ioLock = new(1, 1);
@@ -22,6 +23,10 @@ public sealed class JsonlDatasetReader : IDisposable, IAsyncDisposable
     public string SourcePath { get; private set; } = string.Empty;
 
     public long TotalLines { get; private set; }
+
+    public DataFileType FileType => DataFileType.Jsonl;
+
+    public long TotalRows => TotalLines;
 
     /// <summary>
     /// Opens the file, building or reusing its index.

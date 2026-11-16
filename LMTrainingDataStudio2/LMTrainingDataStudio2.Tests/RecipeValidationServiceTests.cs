@@ -147,7 +147,7 @@ public sealed class RecipeValidationServiceTests
     }
 
     [Test]
-    public void Validate_SeedWithNonJsonlFile_ReportsWarning()
+    public void Validate_SeedWithCsvFile_AcceptsSupportedFileType()
     {
         var recipe = new Recipe();
         var seed = CreateBlock("seed1", BlockType.Seed, "seed_data",
@@ -157,8 +157,7 @@ public sealed class RecipeValidationServiceTests
 
         var result = _service.Validate(recipe);
 
-        Assert.That(result.Issues.Any(i =>
-            i.Severity == ValidationSeverity.Warning && i.Message.Contains("only JSONL is executable")), Is.True);
+        Assert.That(result.Issues.Any(i => i.Message.Contains("only JSONL")), Is.False);
     }
 
     [Test]

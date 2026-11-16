@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using LMTrainingDataStudio2.Models;
+using LMTrainingDataStudio2.Services.Datasets;
 
 namespace LMTrainingDataStudio2.Services;
 
@@ -34,7 +35,9 @@ public sealed class DatasetFormatConverter
     {
         if (row.ContainsKey("messages")) return DatasetFormat.OpenAI;
         if (row.ContainsKey("conversations")) return DatasetFormat.ShareGPT;
+        if (row.ContainsKey("chosen") && row.ContainsKey("rejected")) return DatasetFormat.Dpo;
         if (row.ContainsKey("instruction") || row.ContainsKey("output")) return DatasetFormat.Alpaca;
+        if (row.ContainsKey("text")) return DatasetFormat.Pretrain;
         return DatasetFormat.Auto;
     }
 
@@ -51,6 +54,8 @@ public sealed class DatasetFormatConverter
             DatasetFormat.OpenAI => ConvertOpenAI(row),
             DatasetFormat.ShareGPT => ConvertShareGPT(row),
             DatasetFormat.Alpaca => ConvertAlpaca(row),
+            DatasetFormat.Dpo or DatasetFormat.Pretrain => throw new DatasetFormatException(
+                $"{format} rows are not chat samples; use DatasetConversionService."),
             _ => ConvertFallback(row)
         };
     }
@@ -65,6 +70,8 @@ public sealed class DatasetFormatConverter
             DatasetFormat.OpenAI => ToOpenAI(sample),
             DatasetFormat.ShareGPT => ToShareGPT(sample),
             DatasetFormat.Alpaca => ToAlpaca(sample),
+            DatasetFormat.Dpo or DatasetFormat.Pretrain => throw new DatasetFormatException(
+                $"{targetFormat} rows cannot be produced from a chat sample."),
             _ => ToOpenAI(sample)
         };
     }

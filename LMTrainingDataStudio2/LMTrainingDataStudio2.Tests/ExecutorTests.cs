@@ -1,6 +1,7 @@
 using System.Text.Json;
 using LMTrainingDataStudio2.Models;
 using LMTrainingDataStudio2.Services;
+using LMTrainingDataStudio2.Services.Datasets;
 using LMTrainingDataStudio2.Services.Executors;
 
 namespace LMTrainingDataStudio2.Tests;
@@ -71,6 +72,47 @@ public sealed class ExecutorTests
 
         Assert.ThrowsAsync<InvalidOperationException>(
             async () => await executor.ExecuteAsync(CreateContext(block), CancellationToken.None));
+    }
+
+    [Test]
+    public async Task SeedExecutor_ReadsCsvSource()
+    {
+        var dataPath = Path.Combine(_directory, "data.csv");
+        await File.WriteAllTextAsync(dataPath, "id,text\n1,alpha\n2,beta\n");
+        var block = CreateBlock(BlockType.Seed, "seed",
+            new SeedBlockConfig(dataPath, DataFileType.Csv, Streaming: false, UseIndexCache: true));
+
+        var executor = new SeedBlockExecutor(_settings);
+        var result = await executor.ExecuteAsync(CreateContext(block), CancellationToken.None);
+        var rows = await CollectAsync(result.Output);
+
+        Assert.That(rows, Has.Count.EqualTo(2));
+        Assert.That(rows[0].LineNumber, Is.EqualTo(0));
+        using var document = JsonDocument.Parse(rows[1].Json);
+        Assert.That(document.RootElement.GetProperty("text").GetString(), Is.EqualTo("beta"));
+    }
+
+    [Test]
+    public async Task SeedExecutor_ReadsParquetSource()
+    {
+        var dataPath = Path.Combine(_directory, "data.parquet");
+        await using (var writer = new ParquetDatasetWriter(dataPath))
+        {
+            await writer.WriteRowAsync(new DatasetRow(0, """{"id":1,"text":"alpha"}"""));
+            await writer.WriteRowAsync(new DatasetRow(1, """{"id":2,"text":"beta"}"""));
+            await writer.CompleteAsync();
+        }
+
+        var block = CreateBlock(BlockType.Seed, "seed",
+            new SeedBlockConfig(dataPath, DataFileType.Parquet, Streaming: false, UseIndexCache: true));
+
+        var executor = new SeedBlockExecutor(_settings);
+        var result = await executor.ExecuteAsync(CreateContext(block), CancellationToken.None);
+        var rows = await CollectAsync(result.Output);
+
+        Assert.That(rows, Has.Count.EqualTo(2));
+        using var document = JsonDocument.Parse(rows[0].Json);
+        Assert.That(document.RootElement.GetProperty("id").GetInt64(), Is.EqualTo(1));
     }
 
     [Test]

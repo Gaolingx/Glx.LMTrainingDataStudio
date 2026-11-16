@@ -42,6 +42,12 @@ public partial class MainWindowViewModel : ObservableObject
     private bool _isEditorView = true;
 
     [ObservableProperty]
+    private bool _isExecutionsView;
+
+    [ObservableProperty]
+    private bool _isDataView;
+
+    [ObservableProperty]
     private bool _isBlockSheetVisible = true;
 
     [ObservableProperty]
@@ -107,6 +113,7 @@ public partial class MainWindowViewModel : ObservableObject
     public ObservableCollection<ValidationIssueViewModel> ValidationIssues { get; } = new();
     public CommandHistory CommandHistory { get; } = new();
     public ExecutionsViewModel Executions { get; }
+    public DataWorkbenchViewModel DataWorkbench { get; }
 
     /// <summary>Raised when the canvas must re-render without a collection change.</summary>
     public event Action? CanvasRenderRequested;
@@ -124,6 +131,7 @@ public partial class MainWindowViewModel : ObservableObject
         var loadResult = _settingsStore.Load();
         _settings = loadResult.Settings;
         Executions = new ExecutionsViewModel(_executionStore);
+        DataWorkbench = new DataWorkbenchViewModel(_settings);
 
         LoadSettingsSnapshot();
         InitializeBlockTemplates();
@@ -898,13 +906,25 @@ public partial class MainWindowViewModel : ObservableObject
     private void SwitchToEditor()
     {
         IsEditorView = true;
+        IsExecutionsView = false;
+        IsDataView = false;
     }
 
     [RelayCommand]
     private async Task SwitchToExecutionsAsync()
     {
         IsEditorView = false;
+        IsExecutionsView = true;
+        IsDataView = false;
         await Executions.RefreshAsync();
+    }
+
+    [RelayCommand]
+    private void SwitchToData()
+    {
+        IsEditorView = false;
+        IsExecutionsView = false;
+        IsDataView = true;
     }
 
     #endregion
@@ -947,6 +967,7 @@ public partial class MainWindowViewModel : ObservableObject
         {
             await _settingsStore.SaveAsync(settings);
             _settings = settings;
+            DataWorkbench.ApplySettings(settings);
             LoadSettingsSnapshot();
             StatusText = "Settings saved ✓";
             LogMessages.Add($"[Info] Settings saved to '{_settingsStore.FilePath}'.");

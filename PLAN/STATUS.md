@@ -1,7 +1,7 @@
 # STATUS — 功能清单、节点能力矩阵与下一阶段规划
 
-> 最后核对：2026-11-16，Round 9 完成后（工作区）
-> 验证基线：`dotnet build` 0 警告 0 错误；`dotnet test` 311 通过 + 2 个需环境变量的真实 provider 冒烟（gated，默认跳过）；真实 provider 冒烟此前已跑通。
+> 最后核对：2026-11-17，Round 10 完成后（工作区）
+> 验证基线：`dotnet build` 0 警告 0 错误；`dotnet test` 331 通过 + 3 个 gated 测试（2 个真实 provider 冒烟 + 1 个 1M 行性能，默认跳过）；1M 行 JSONL 基线已通过（索引 8.8s、分页 10.9ms、内存增量 14MB）。
 >
 > 图例：`[x]` 已完成并有测试/验证；`[部分]` 可用但有明确缺口；`[ ]` 未实现。
 
@@ -17,19 +17,23 @@
 - Expression 使用 Fluid 模板引擎（条件/循环/过滤器），带专属面板、语法校验与样本预览；输出 JSON 强校验。
 - Validator 支持表达式与 JSON Schema 规则、reject 文件、失败率日志；Sampler 支持确定性多文件切分。
 - Tool Profile 支持参数树编辑与 JSON 导入导出，并被 Simulation/LLM 复用。
+- 统一数据集 IO：JSONL / CSV / Parquet 随机分页读取与原子写出；Seed 节点支持三种格式。
+- 数据工作台（Data 视图）：分页预览、行号跳转、页面大小切换，JSONL 走 SQLite 索引，CSV 走记录边界索引，Parquet 按 row group 读取。
+- 批量格式转换：OpenAI / ShareGPT / Alpaca / DPO / Pretrain，支持进度、取消、失败行 `.errors.jsonl` 与原子目标写入。
+- 1M 行 JSONL 验收通过：索引 8.8s（≤10s）、100 行分页 10.9ms（≤100ms）、转换 66.9s、内存增量 14MB（≤300MB）。
 - JSONL 流式读取、SQLite 行索引缓存、分页读取。
 - DAG 校验、拓扑分层、顺序执行、fail-fast、下游 Skipped、取消、进度、日志、执行记录持久化与 Executions UI。
 - 10 种节点类型全部接入 Block Sheet、画布、默认配置与 Recipe JSON。
 - Query Source → Simulation → Cleaner → SFT Export 端到端 SFT 轨迹生成可用（脚本/真实 provider、模拟/真实工具均可切换）。
 - 真实 provider tool-calling（OpenAI Chat/Responses、Anthropic）与真实沙箱工具（python/PowerShell/bash/web_fetch）。
-- 311 个自动化测试 + 2 个 gated 真实 provider 冒烟测试。
+- 331 个自动化测试 + 3 个 gated 测试（2 个真实 provider 冒烟 + 1 个 1M 行性能）。
 
 ### 1.2 当前最大缺口
 
 1. **节点能力仍有边界**：Validator 暂无代码规则/超时；Sampler 有 Splits 多文件但无多输出端口与分层采样；Tool Profile 无 MCP 适配；LLM 仍不发送 tool definitions 给 provider。
-2. **数据工作台未接 UI**：CSV/Parquet、格式转换、校验修复、分页预览、数据编辑、去重/混洗/切分、搜索替换都还没有界面。
+2. **数据治理未接 UI**：数据编辑、搜索/正则替换、去重/混洗/切分、数据集统计、校验修复流程都还没有界面；CSV/Parquet 尚无 1M 行性能基线。
 3. **画布体验缺口**：网格背景/吸附、缩放锚点、Fit、自动布局、Mini-map 视口/点击、复制携带连线、可调分栏等。
-4. **发布工程化缺口**：Headless UI 测试、1M/10M 性能验收、CI、打包、主题切换、日志/崩溃处理、LICENSE/Assets。
+4. **发布工程化缺口**：Headless UI 测试、10M 性能验收、CI、打包、主题切换、日志/崩溃处理、LICENSE/Assets。
 
 ---
 
@@ -44,10 +48,10 @@
 | 行数进度 | [x] | `RowsProcessed` 上报 |
 | 专属属性面板 | [x] | 路径选择、文件类型、Index Cache 开关 |
 | 端口 schema 按类型固定 | [x] | 仅输出 `rows`；连接前校验方向/类型 |
-| CSV / Parquet 读取 | [ ] | UI 可选，执行时抛 `NotSupportedException`；仅 JSONL 可用 |
-| `Streaming` 开关生效 | [ ] | 配置存在，但执行分支只由 `UseIndexCache` 决定 |
-| 数据预览 / 过滤 / 列映射 | [ ] | 无 |
-| 大文件 1M 行性能验收 | [ ] | Phase 5 未做 |
+| CSV / Parquet 读取 | [x] | `DatasetIO` 统一读取；CSV 记录边界索引、Parquet row group |
+| `Streaming` 开关生效 | [部分] | 仅 JSONL 的 `UseIndexCache=false` 走纯流式；CSV/Parquet 由各自读取器决定 |
+| 数据预览 / 过滤 / 列映射 | [部分] | Data 视图可分页预览；节点内过滤/列映射未做 |
+| 大文件 1M 行性能验收 | [x] | JSONL 1KB/行：索引 8.8s、分页 10.9ms、内存增量 14MB（Round 10） |
 
 ### 2.2 LLM / Model（单轮模型调用）
 
@@ -175,7 +179,7 @@
 | 覆盖确认 / 追加模式 | [ ] | 总是覆盖目标 |
 | 输出预览 / 样本查看 | [ ] | 无 |
 | 按数量/比例拆分多文件 | [ ] | 无 |
-| DPO / Pretrain 目标格式 | [ ] | 仅 OAI messages |
+| DPO / Pretrain 目标格式 | [部分] | 数据工作台批量转换支持；SFT Export 节点仍只输出 OAI messages |
 
 ---
 
@@ -192,6 +196,10 @@
 - [x] Validator：JSON Schema 规则、reject 文件（lineNumber/reason/data）、失败率日志、专属面板。
 - [x] Sampler：ratio/count 多文件切分、确定性复现、原子写入与专属面板。
 - [x] Tool Profile：参数树编辑、JSON 导入导出、配置型执行器、Simulation/LLM 引用复用。
+- [x] 统一数据集读写（JSONL / CSV / Parquet）与临时文件 + 原子替换写出。
+- [x] 数据工作台：分页预览、行号跳转、页面大小切换、批量格式转换与失败行报告。
+- [x] DPO / Pretrain 格式检测、规范化与转换矩阵；不支持组合显式失败。
+- [x] 1M 行 JSONL 性能与内存基线（Round 10）。
 - [x] JSONL 读取、索引缓存、LRU 容量清理、源文件指纹失效。
 - [x] DAG 校验：空 Recipe、重名、环、悬空边、孤立节点、重复边、端口归属/方向、DataType 兼容、节点配置告警。
 - [x] 执行引擎：拓扑分层、层内串行、fail-fast、下游 Skipped、取消、进度、日志。
@@ -214,12 +222,12 @@
 
 ### 3.3 未实现
 
-- [ ] 数据集分页预览、行跳转、数据编辑、搜索/正则替换。
-- [ ] CSV / Parquet 读写与格式转换 UI。
-- [ ] DPO / Pretrain 格式。
-- [ ] 数据校验自动修复、失败行报告。
+- [x] 数据集分页预览与行号跳转（Round 10）；数据编辑、搜索/正则替换未做。
+- [x] CSV / Parquet 读写与格式转换 UI（Round 10）。
+- [x] DPO / Pretrain 格式检测与批量转换（Round 10；SFT Export 节点未直接输出）。
+- [ ] 数据校验自动修复；批量转换已提供失败行 `.errors.jsonl`。
 - [ ] 去重 / 混洗 / 切分。
-- [ ] 大文件 1M/10M 性能与内存验收。
+- [x] 1M 行 JSONL 性能与内存验收（Round 10）；10M 未做。
 - [ ] Headless UI 测试、CI、打包、安装包、LICENSE/Assets。
 - [ ] 主题切换真正生效、硬编码颜色资源化。
 - [ ] 全局异常处理、滚动日志、崩溃报告。
@@ -304,6 +312,8 @@
 - 任意支持格式转换后行数一致，失败行带行号与原因。
 - CSV/Parquet 往返内容一致。
 
+> 完成情况（2026-11-17）：统一 `IDatasetReader/IDatasetWriter` 已落地；CSV 记录边界索引、Parquet row group 读取、JSON 嵌套元数据还原；Data 视图支持分页/跳转/转换/取消/失败行；Seed 支持三种格式；新增 20 个常规测试 + 1 个 gated 1M 行性能测试。1KB/行 1M 行实测：索引 8.8s、分页 10.9ms、内存增量 14MB、转换 66.9s。未做：数据编辑/搜索/去重、CSV 类型推断、CSV/Parquet 1M 基线、SFT 节点直接输出 DPO/Pretrain。
+
 ### Round 11 — 数据工作台 B：质量与治理（P1）
 
 **交付**
@@ -334,15 +344,15 @@
 
 ## 六、建议的下一步
 
-Round 9 已完成，建议进入 **Round 10（数据工作台 A）**，按以下顺序落地：
+Round 10 已完成，建议进入 **Round 11（数据工作台 B）**，按以下顺序落地：
 
-1. **JSONL 分页预览**：虚拟化表格、行号跳转、只加载当前页，避免一次性读入大文件。
-2. **CSV / Parquet**：统一 `IDatasetReader/Writer`，Seed 读取与 SftExport/DatasetWriter 写出。
-3. **格式转换 UI**：OpenAI / ShareGPT / Alpaca 批量转换、进度、失败行 `.errors.jsonl`。
-4. **DPO / Pretrain** 格式模型与转换。
-5. **1M 行验收**：打开/预览/转换的内存与耗时基线（≤ 300MB）。
+1. **校验与修复**：`DatasetValidationService` 接线到 Data 视图，问题列表（级别/行号/路径）、行号跳转、自动修复预览与另存。
+2. **搜索 / 正则替换**：当前页与全文件、匹配预览、取消、写新文件。
+3. **去重 / 混洗 / 切分**：哈希 + SQLite/外排、固定 seed、行数守恒。
+4. **数据集统计**：角色分布、长度分布、空样本、重复率、工具调用数。
+5. **坏行 fixtures**：截断 JSON、超长行、非法 UTF-8、错误上限。
 
-理由：节点语义与端口契约已稳定；数据工作台是当前最大的用户可见缺口，且会复用已有的 JSONL/index cache 与格式转换服务。
+理由：分页预览与格式转换已打通，数据治理（校验、搜索、去重、统计）是下一块用户可见能力，并且可直接复用本轮建立的统一读写与错误报告管线。
 
 ---
 

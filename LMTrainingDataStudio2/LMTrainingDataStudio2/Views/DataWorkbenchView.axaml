@@ -1,0 +1,218 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:LMTrainingDataStudio2.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="700"
+             x:Class="LMTrainingDataStudio2.Views.DataWorkbenchView"
+             x:DataType="vm:DataWorkbenchViewModel">
+
+    <Grid ColumnDefinitions="*,360" RowDefinitions="Auto,*" Background="{StaticResource CanvasBackgroundBrush}">
+
+        <!-- Header -->
+        <Border Grid.Row="0" Grid.ColumnSpan="2" Height="48"
+                Background="{StaticResource HeaderBackgroundBrush}"
+                BorderBrush="{StaticResource PanelBorderBrush}"
+                BorderThickness="0,0,0,1">
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="12,0" ColumnSpacing="12">
+                <Button Grid.Column="0" Content="Open Dataset…"
+                        Click="OnOpenDatasetClick"
+                        IsEnabled="{Binding !IsBusy}"
+                        Padding="12,6" FontSize="12"
+                        Background="#4A90D9" Foreground="#FFFFFF"
+                        VerticalAlignment="Center" />
+
+                <TextBlock Grid.Column="1"
+                           Text="{Binding SourcePath, TargetNullValue='No dataset opened'}"
+                           FontSize="11" Foreground="#AAAAAA"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" />
+
+                <TextBlock Grid.Column="2" Text="{Binding SourceFileTypeText}"
+                           FontSize="11" Foreground="#888888"
+                           VerticalAlignment="Center" />
+
+                <TextBlock Grid.Column="3"
+                           Text="{Binding TotalRows, StringFormat='{}{0:N0} rows'}"
+                           FontSize="11" Foreground="#CCCCCC"
+                           VerticalAlignment="Center" />
+
+                <TextBlock Grid.Column="4" Text="{Binding PositionText}"
+                           FontSize="11" Foreground="#888888"
+                           VerticalAlignment="Center" />
+            </Grid>
+        </Border>
+
+        <!-- Preview -->
+        <DockPanel Grid.Row="1" Grid.Column="0">
+            <!-- Pagination -->
+            <Border DockPanel.Dock="Top" Height="40"
+                    Background="#222233"
+                    BorderBrush="{StaticResource PanelBorderBrush}"
+                    BorderThickness="0,0,0,1">
+                <StackPanel Orientation="Horizontal" Spacing="6" Margin="10,0"
+                            VerticalAlignment="Center">
+                    <Button Content="⏮" Command="{Binding FirstPageCommand}"
+                            Background="Transparent" Foreground="#CCCCCC" FontSize="12" Padding="8,4"
+                            ToolTip.Tip="First page" />
+                    <Button Content="◀ Prev" Command="{Binding PreviousPageCommand}"
+                            Background="Transparent" Foreground="#CCCCCC" FontSize="11" Padding="8,4" />
+                    <TextBlock Text="{Binding PositionText}" FontSize="11" Foreground="#AAAAAA"
+                               VerticalAlignment="Center" Margin="4,0" />
+                    <Button Content="Next ▶" Command="{Binding NextPageCommand}"
+                            Background="Transparent" Foreground="#CCCCCC" FontSize="11" Padding="8,4" />
+                    <Button Content="⏭" Command="{Binding LastPageCommand}"
+                            Background="Transparent" Foreground="#CCCCCC" FontSize="12" Padding="8,4"
+                            ToolTip.Tip="Last page" />
+                    <Border Width="1" Height="18" Background="#3A3A4E" Margin="6,0" />
+                    <TextBlock Text="Go to row" FontSize="10" Foreground="#888888"
+                               VerticalAlignment="Center" />
+                    <TextBox Text="{Binding GoToRowText, Mode=TwoWay}"
+                             Width="90" FontSize="11" VerticalAlignment="Center"
+                             Watermark="row" />
+                    <Button Content="Go" Command="{Binding GoToRowCommand}"
+                            Background="#3A3A4E" Foreground="#FFFFFF" FontSize="11" Padding="10,4" />
+                    <Border Width="1" Height="18" Background="#3A3A4E" Margin="6,0" />
+                    <TextBlock Text="Page size" FontSize="10" Foreground="#888888"
+                               VerticalAlignment="Center" />
+                    <ComboBox ItemsSource="{Binding AvailablePageSizes}"
+                              SelectedItem="{Binding PageSize, Mode=TwoWay}"
+                              Width="86" FontSize="11" VerticalAlignment="Center" />
+                </StackPanel>
+            </Border>
+
+            <TextBlock DockPanel.Dock="Bottom" Text="{Binding StatusText}"
+                       FontSize="10" Foreground="#777777" Margin="12,6"
+                       TextWrapping="Wrap" />
+
+            <!-- Empty state -->
+            <StackPanel IsVisible="{Binding !IsDatasetOpen}"
+                        VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="8">
+                <TextBlock Text="Open a dataset to preview it page by page."
+                           FontSize="13" Foreground="#888888" HorizontalAlignment="Center" />
+                <TextBlock Text="JSONL uses the SQLite line index; CSV and Parquet are read by record/row-group offsets."
+                           FontSize="10" Foreground="#666666" HorizontalAlignment="Center" />
+            </StackPanel>
+
+            <!-- Virtualized rows -->
+            <ListBox ItemsSource="{Binding Rows}"
+                     IsVisible="{Binding IsDatasetOpen}"
+                     Background="Transparent" BorderThickness="0"
+                     Margin="0,4">
+                <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:DatasetRowViewModel">
+                        <Grid ColumnDefinitions="52,*" Margin="6,3">
+                            <TextBlock Text="{Binding Number}" FontSize="10"
+                                       Foreground="#6A7A8A" VerticalAlignment="Top"
+                                       Margin="0,3,0,0" HorizontalAlignment="Right" />
+                            <TextBox Grid.Column="1"
+                                     Text="{Binding Preview}"
+                                     IsReadOnly="True"
+                                     AcceptsReturn="True"
+                                     TextWrapping="NoWrap"
+                                     FontFamily="Consolas, Menlo, monospace"
+                                     FontSize="11"
+                                     Background="#1E1E2E"
+                                     BorderBrush="#2E2E42"
+                                     BorderThickness="1"
+                                     Padding="8,5"
+                                     VerticalAlignment="Top" />
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </DockPanel>
+
+        <!-- Conversion panel -->
+        <Border Grid.Row="1" Grid.Column="1"
+                Background="{StaticResource PanelBackgroundBrush}"
+                BorderBrush="{StaticResource PanelBorderBrush}"
+                BorderThickness="1,0,0,0">
+            <DockPanel>
+                <Border DockPanel.Dock="Top" Height="40"
+                        Background="{StaticResource HeaderBackgroundBrush}"
+                        BorderBrush="{StaticResource PanelBorderBrush}"
+                        BorderThickness="0,0,0,1">
+                    <TextBlock Text="Format Conversion" FontSize="12" FontWeight="SemiBold"
+                               Foreground="#CCCCCC" VerticalAlignment="Center" Margin="12,0" />
+                </Border>
+
+                <ScrollViewer>
+                    <StackPanel Margin="14" Spacing="14">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Target format" FontSize="10" Foreground="#888888" />
+                            <ComboBox ItemsSource="{Binding TargetFormats}"
+                                      SelectedItem="{Binding SelectedTargetFormat, Mode=TwoWay}"
+                                      FontSize="11" HorizontalAlignment="Stretch">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:DatasetFormatOption">
+                                        <TextBlock Text="{Binding Name}" FontSize="11" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </StackPanel>
+
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Target file" FontSize="10" Foreground="#888888" />
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                                <TextBox Text="{Binding TargetPath, Mode=TwoWay}"
+                                         FontSize="10" Watermark="out.jsonl / out.csv / out.parquet" />
+                                <Button Grid.Column="1" Content="…"
+                                        Click="OnBrowseTargetClick"
+                                        Background="#3A3A4E" Foreground="#FFFFFF"
+                                        FontSize="11" Padding="10,4" />
+                            </Grid>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Content="Convert"
+                                    Command="{Binding ConvertCommand}"
+                                    IsEnabled="{Binding !IsConverting}"
+                                    Background="#4A90D9" Foreground="#FFFFFF"
+                                    FontSize="11" Padding="14,6" />
+                            <Button Content="Cancel"
+                                    Command="{Binding CancelConversionCommand}"
+                                    IsVisible="{Binding IsConverting}"
+                                    Background="#3A2020" Foreground="#FF8080"
+                                    FontSize="11" Padding="12,6" />
+                        </StackPanel>
+
+                        <StackPanel Spacing="4" IsVisible="{Binding IsConverting}">
+                            <TextBlock Text="Progress" FontSize="10" Foreground="#888888" />
+                            <ProgressBar Value="{Binding ConversionProgress}" Minimum="0" Maximum="1" Height="4" />
+                        </StackPanel>
+
+                        <TextBlock Text="{Binding ConversionSummary}"
+                                   FontSize="10" Foreground="#AAAAAA" TextWrapping="Wrap" />
+
+                        <!-- Errors -->
+                        <StackPanel Spacing="6" IsVisible="{Binding HasConversionErrors}">
+                            <TextBlock Text="Failed rows" FontSize="10" Foreground="#FF8080" />
+                            <ListBox ItemsSource="{Binding ConversionErrors}"
+                                     Background="#1E1E2E" BorderBrush="#2E2E42"
+                                     MaxHeight="240" FontSize="10">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" FontSize="10"
+                                                   Foreground="#E0A0A0" TextWrapping="Wrap" />
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </StackPanel>
+
+                        <Border Background="#1E1E2E" BorderBrush="#2E2E42" BorderThickness="1"
+                                CornerRadius="6" Padding="10">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Supported conversions" FontSize="10" Foreground="#888888" />
+                                <TextBlock Text="OpenAI ↔ ShareGPT ↔ Alpaca, chat → Pretrain, DPO → DPO, Pretrain → Pretrain."
+                                           FontSize="10" Foreground="#AAAAAA" TextWrapping="Wrap" />
+                                <TextBlock Text="Unsupported pairs fail explicitly and are listed in the .errors.jsonl report."
+                                           FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+    </Grid>
+</UserControl>

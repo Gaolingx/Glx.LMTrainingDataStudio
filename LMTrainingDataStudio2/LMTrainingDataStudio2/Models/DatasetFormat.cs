@@ -15,7 +15,13 @@ public enum DatasetFormat
     ShareGPT,
 
     /// <summary>Alpaca instruction/input/output format.</summary>
-    Alpaca
+    Alpaca,
+
+    /// <summary>Direct preference optimization prompt/chosen/rejected format.</summary>
+    Dpo,
+
+    /// <summary>Plain-text pretraining corpus with a top-level text field.</summary>
+    Pretrain
 }
 
 /// <summary>

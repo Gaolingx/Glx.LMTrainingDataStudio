@@ -8,7 +8,96 @@
 
 ---
 
-## 一、本轮进展（Round 9）
+## 一、本轮进展（Round 10）
+
+### 1.1 本轮做了什么
+
+- [x] 统一数据集读写：新增 `IDatasetReader` / `IDatasetWriter` 与 `DatasetIO` 工厂；JSONL 读取器接入接口；CSV 读取使用 RFC 4180 记录边界索引，Parquet 按 row group 随机读取，均只加载当前页。
+- [x] CSV / Parquet 写出：临时文件 + 原子替换；CSV 列取自首行，嵌套值存 JSON 文本；Parquet 由首行推断 schema，嵌套值存字符串并写入 `lmtds.json_fields` 元数据，读取时还原为 JSON。
+- [x] Seed 节点支持 JSONL / CSV / Parquet；`UseIndexCache=false` 时 JSONL 仍走纯流式分支；删除“仅 JSONL 可执行”的旧校验。
+- [x] 数据工作台（Data 视图）：打开 JSONL/CSV/Parquet、100–1000 行分页、首/上/下/末页、按行号跳转、虚拟化列表与 JSON 预览；分页请求带版本号，避免快速翻页串页。
+- [x] 批量格式转换：流式分页读取、进度、取消、原子目标文件；失败行写入同目录 `<name>.errors.jsonl`（`lineNumber` / `reason` / `data`），成功时清理旧错误文件；取消不落半成品。
+- [x] DPO / Pretrain：新增格式模型、检测与规范化；支持 OpenAI ↔ ShareGPT ↔ Alpaca、chat → Pretrain、DPO → DPO、Pretrain → Pretrain，跨族不支持时明确报错。
+- [x] 新增 21 个测试：数据 IO/转换 12、Data 工作台 7、Seed CSV/Parquet 2；另有 1 个 gated 1M 行性能测试。
+
+### 1.2 验证结果
+
+| 项目 | 命令 | 结果 |
+| --- | --- | --- |
+| 构建 | `dotnet build LMTrainingDataStudio2/LMTrainingDataStudio2.slnx` | 成功，0 警告，0 错误 |
+| 测试 | `dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx` | 331 通过，0 失败，3 跳过（2 真实 provider 冒烟 + 1 性能） |
+| 启动冒烟 | `LMTrainingDataStudio2.exe`（Debug，直接启动） | 进程持续运行 10s，无异常输出 |
+| 1M 行基线 | `LMTDS_PERF_TESTS=1 LMTDS_PERF_ROW_BYTES=1024 dotnet test --filter DatasetPerformanceTests` | 通过：索引 8.8s、最慢 100 行分页 10.9ms、转换 1M 行 66.9s、内存增量 14MB |
+
+1M 行基线（平均 1KB/行，1,000,000 行）：生成 0.8s；索引 8.8s（≤10s）；任意 100 行分页最慢 10.9ms（≤100ms）；JSONL→JSONL 转换 66.9s；内存增量 14MB（≤300MB）。
+
+本轮新增/扩展测试：
+
+| 测试类 | 数量 | 覆盖内容 |
+| --- | --- | --- |
+| `DatasetIOTests` | 12 | CSV 引号/换行/嵌套 JSON、随机分页；CSV 往返；Parquet 标量/嵌套/跨 row group 往返；JSONL→CSV 失败行；JSONL↔Parquet；转换矩阵与错误；取消清理；扩展名检测 |
+| `DataWorkbenchViewModelTests` | 7 | 打开/分页/跳转边界、CSV 表头映射、JSONL→CSV 转换、坏行列表、不支持组合、目标路径建议 |
+| `ExecutorTests` 扩展 | 2 | Seed 读取 CSV / Parquet |
+| `DatasetPerformanceTests`（gated） | 1 | 1M 行索引、分页、转换与内存基线 |
+
+### 1.3 本轮改动文件
+
+```text
+PLAN/TODO.md
+PLAN/STATUS.md
+README.md
+LMTrainingDataStudio2/LMTrainingDataStudio2/Models/DatasetFormat.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Models/DatasetSamples.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/DatasetFormatConverter.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/JsonlDatasetReader.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/RecipeValidationService.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Datasets/DatasetContracts.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Datasets/DatasetIO.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Datasets/JsonlDatasetWriter.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Datasets/CsvDatasetReader.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Datasets/CsvDatasetWriter.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Datasets/ParquetDatasetReader.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Datasets/ParquetDatasetWriter.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Datasets/DatasetConversionService.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Datasets/DatasetBatchConverter.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Executors/SeedBlockExecutor.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/ViewModels/DataWorkbenchViewModel.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/ViewModels/MainWindowViewModel.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Views/DataWorkbenchView.axaml
+LMTrainingDataStudio2/LMTrainingDataStudio2/Views/DataWorkbenchView.axaml.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Views/MainWindow.axaml
+LMTrainingDataStudio2/LMTrainingDataStudio2/Views/PropertyPanelView.axaml.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/DatasetIOTests.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/DataWorkbenchViewModelTests.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/DatasetPerformanceTests.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/ExecutorTests.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.cs
+```
+
+### 1.4 技术决策与取舍
+
+1. **所有数据集统一以“JSON 文本行”为交换格式。**
+   - JSONL 天然如此；CSV 每行映射为 `header → value` 对象，Parquet 每行映射为列名对象。预览、转换、Seed 共用同一套读取接口。
+2. **CSV 用自建记录边界索引，不依赖全文件重扫。**
+   - 扫描一次记录字节区间（处理引号内换行与 `""` 转义），之后任意页直接 seek；嵌套 JSON 值按 `{`/`[` 前缀识别并还原。
+3. **Parquet 用 row group 随机读，嵌套字段用 schema 自定义元数据标记。**
+   - 首行推断 `bool/int64/double/string` schema，对象/数组存 JSON 字符串并写入 `lmtds.json_fields`，读取时还原，避免结构丢平。
+4. **转换错误按行收集，不中断整批。**
+   - 失败行写入 `<target>.errors.jsonl`；目标文件仅在全部处理完成后原子替换，取消或异常不破坏已有目标。
+5. **不支持的格式组合显式失败。**
+   - chat ↔ DPO 需要双答案，DPO/Pretrain → chat 会丢失语义；仅支持 chat 三格式互转、chat → Pretrain、同族规范化。
+
+### 1.5 本轮未做
+
+- 数据编辑、搜索/正则替换、去重/混洗/切分、数据集统计（Round 11）。
+- CSV 类型推断（当前所有 CSV 值按字符串读取，JSON-looking 值除外）；Parquet schema 演进与多类型列合并。
+- SFT Export 节点直接输出 DPO / Pretrain（本轮只在数据工作台批量转换支持）。
+- CSV / Parquet 的 1M 行性能基线（本轮性能验收针对 JSONL）。
+- 数据工作台的人工 UI 验收（XAML 编译、启动冒烟与 ViewModel 单测通过；未逐项点击验证）。
+
+---
+
+## 附三：Round 9 历史进展（2026-11-16）
 
 ### 1.1 本轮做了什么
 
@@ -838,27 +927,27 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 
 ### 4.1 文件与数据集 IO
 
-- [ ] Recipe 新建 / 打开 / 保存 / 另存为（当前只有 Seed 数据源文件选择，Recipe 本身无文件入口）。
-- [ ] JSONL 流式分页预览与数据表格。
-- [ ] 大文件随机行跳转 UI。
-- [ ] CSV 读写（CsvHelper 已引用未使用）。
-- [ ] Parquet 读写（Parquet.Net 已引用未使用）。
-- [ ] `DataFileType` 枚举接线（当前无引用）。
+- [x] Recipe 新建 / 打开 / 保存 / 另存为（Round 8）。
+- [x] JSONL 流式分页预览与数据表格（Round 10，Data 视图）。
+- [x] 大文件随机行跳转 UI（Round 10）。
+- [x] CSV 读写（CsvHelper，Round 10）。
+- [x] Parquet 读写（Parquet.Net，Round 10）。
+- [x] `DataFileType` 枚举接线（Round 10，Seed + 数据工作台）。
 - [ ] 数据增删查改、保存回原文件。
 - [ ] 去重、混洗、切分。
 - [ ] 正则搜索与替换。
 - [ ] 输出预览弹窗 / 样本查看器。
-- [ ] 最近文件、脏标记、关闭确认。
+- [x] 最近文件、脏标记、关闭确认（Round 8）。
 - [ ] 文件编码、CRLF、超长行、无结尾换行专项处理。
 - [ ] 数据集统计（角色、长度、空样本、重复率、工具调用）。
 
 ### 4.2 格式转换与校验
 
-- [ ] `DatasetFormatConverter`、`DatasetValidationService` 接线到 UI（当前仅实例化未调用）。
-- [ ] 批量转换 UI / 服务、进度、失败行报告。
-- [ ] DPO 格式（枚举与转换器均缺失）。
-- [ ] Pretrain 格式（枚举与转换器均缺失）。
-- [ ] 未知格式不再静默 fallback，给出明确错误。
+- [部分] 转换器已接入数据工作台；`DatasetValidationService` 仍未接线到 UI。
+- [x] 批量转换 UI / 服务、进度、失败行报告（Round 10）。
+- [x] DPO 格式（Round 10，批量转换；SFT Export 节点未直接输出）。
+- [x] Pretrain 格式（Round 10，批量转换；SFT Export 节点未直接输出）。
+- [x] 未知格式不再静默 fallback，给出明确错误（Round 10）。
 - [ ] Alpaca 多轮转换不丢轮次、不丢 tools。
 - [ ] 转换保留额外字段 / 元数据，或明确声明丢弃策略。
 - [ ] ShareGPT tool_call 解析失败上报，不静默吞异常。
@@ -875,17 +964,17 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 - [ ] 节点端口类型化（当前固定 input/output + any）。
 - [ ] 端口增删、改名、改类型（属性面板只读展示）。
 - [x] Recipe 序列化 / 反序列化 / schema 版本（`RecipeStore`，Round 2）。
-- [ ] 节点状态与错误徽标。
+- [x] 节点状态与错误徽标（Round 8）。
 - [x] Seed 数据源文件选择、文件类型、Index Cache 编辑（Round 5）。
-- [ ] Seed Streaming 开关、数据预览、过滤。
+- [部分] Seed Streaming 开关仍只对 JSONL 生效；预览在 Data 视图，节点内过滤未做。
 - [x] LLM Provider（OpenAI Chat Completions / Responses / Anthropic Messages）、ModelAlias、Endpoint、温度、max tokens、Prompt（Round 5）。
 - [x] LLM 节点级超时与指数退避重试（Round 5）。
 - [x] LLM 密钥设置界面：settings.json 本机保存，环境变量兜底（Round 5）。
 - [ ] LLM 结构化输出、并发控制。
-- [ ] Expression：Jinja2 模板、变量映射、渲染预览、语法校验、沙箱。
-- [ ] Validator：代码/Schema 编辑、pass/reject 双输出、失败样本、失败率、超时/沙箱。
-- [ ] Sampler：数量/比例、随机种子、切分、多输出、分层采样。
-- [ ] Tool Profile：`ToolSchemaNode`/`ToolProfile` 全文件未被引用；树形编辑器、JSON 导入导出、MCP。
+- [x] Expression：Fluid 模板、变量映射、渲染预览、语法校验（Round 9）；无外部执行沙箱。
+- [部分] Validator：表达式/JSON Schema、reject 文件、失败样本（Round 9）；代码规则与超时未做。
+- [部分] Sampler：数量/比例、随机种子、Splits 多文件（Round 9）；多输出端口与分层采样未做。
+- [x] Tool Profile：树形编辑器、JSON 导入导出、Simulation/LLM 复用（Round 9）；MCP 未做。
 - [ ] 节点配置校验覆盖所有类型。
 - [x] 环、孤立节点、重复边、端口方向/类型兼容校验（Round 3）。
 - [x] 模拟 API 测试子节点：Query Source / Simulation / Cleaner / SFT Export（Round 6）。
@@ -1052,14 +1141,14 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 
 ### P1（补齐数据工作台能力）
 
-1. CSV / Parquet 读写与互转。
-2. DPO / Pretrain 格式。
-3. 索引缓存容量、失效、随机读取完整接线。
-4. 数据 CRUD、去重、混洗、切分、正则替换。
-5. 校验问题列表、行号跳转、自动修复流程。
-6. 大数据分页预览与统计。
-7. Canvas 网格/吸附/Fit/Mini-map/复制连线。
-8. 取消/重试、日志持久化、输出摘要。
+1. [x] CSV / Parquet 读写与互转（Round 10）。
+2. [x] DPO / Pretrain 格式检测、规范化与批量转换（Round 10；SFT Export 节点尚未直接输出）。
+3. [x] 索引缓存容量、失效、随机读取完整接线（Round 2 / Round 10）。
+4. [ ] 数据 CRUD、去重、混洗、切分、正则替换（Round 11）。
+5. [x] JSONL / CSV / Parquet 分页预览与行号跳转（Round 10）；校验问题列表、自动修复留待 Round 11。
+6. [ ] 大数据分页预览统计（角色/长度/重复率/工具调用）。
+7. [ ] Canvas 网格/吸附/Fit/Mini-map/复制连线。
+8. [ ] 取消/重试、日志持久化、输出摘要。
 
 ### P2（体验与工程化）
 
@@ -1084,7 +1173,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 | 11 | 数据工作台 B | P1 | 校验问题列表/自动修复；搜索/正则替换；去重/混洗/切分；数据集统计 | 行数守恒、同 seed 可复现、原文件不被修复破坏 |
 | 12 | 画布、执行与发布 | P1/P2 | 网格/吸附/锚点缩放/Fit/自动布局/Mini-map 交互；层内并行、暂停/重试、输出目录；Headless UI、CI、打包、主题、日志 | 手工脚本通过；500 节点无卡顿；干净环境可安装运行 |
 
-**Round 9 已完成（2026-11-16）**；下一步进入 Round 10 数据工作台 A（JSONL 分页预览、CSV/Parquet、格式转换、DPO/Pretrain、1M 行验收）。
+**Round 10 已完成（2026-11-17）**；下一步进入 Round 11 数据工作台 B（校验问题列表/自动修复、搜索替换、去重/混洗/切分、数据集统计）。
 
 ---
 

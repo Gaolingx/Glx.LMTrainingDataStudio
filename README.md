@@ -15,8 +15,11 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - Expression：Fluid 模板引擎（条件/循环/过滤器）、输出 JSON 校验、专属面板与样本预览
 - Validator：表达式 / JSON Schema 规则、reject JSONL、失败率日志；Sampler：确定性多文件切分
 - Tool Profile：参数树编辑、JSON 导入导出，并被 Simulation/LLM 引用复用
-- JSONL SQLite 行索引缓存与分页读取
-- OpenAI / ShareGPT / Alpaca 数据格式转换服务初版
+- 统一数据集 IO：JSONL / CSV / Parquet 分页读取与原子写出；Seed 支持三种格式
+- 数据工作台（Data 视图）：分页预览、行号跳转、页面大小切换
+- 批量格式转换：OpenAI / ShareGPT / Alpaca / DPO / Pretrain，进度、取消、失败行 `.errors.jsonl`
+- JSONL SQLite 行索引缓存与分页读取；1M 行 1KB/行基线通过（索引 8.8s、分页 10.9ms、内存增量 14MB）
+- OpenAI / ShareGPT / Alpaca 数据格式转换服务
 - 真实 RecipeRunner：Seed / Expression / Validator / Sampler / LLM 执行器，执行记录与 Executions UI
 - OpenAI Chat Completions / Responses、Anthropic Messages 客户端；密钥从设置或环境变量读取，支持节点级超时与指数退避重试
 - 模拟 API 测试：Query Source → Simulation（mini harness）→ Cleaner → SFT Export，多轮 tool 轨迹与 OpenAI messages JSONL 导出
@@ -26,7 +29,7 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - Query Source / Simulation / Cleaner / SFT Export / Expression / Validator / Sampler / Tool Profile 专属属性面板
 - 通用 Block Config JSON 编辑器，可直接配置所有节点类型
 
-> 注意：当前仍是开发版。**数据工作台 UI、自动布局、输出预览弹窗、Validator 代码规则/超时、Sampler 多输出端口、MCP 适配尚未实现**；应用默认启动空白 Recipe，可通过 File → New from Sample 加载 4 节点示例，或恢复上次打开的文件。
+> 注意：当前仍是开发版。**数据编辑/搜索/去重、自动布局、输出预览弹窗、Validator 代码规则/超时、Sampler 多输出端口、MCP 适配尚未实现**；应用默认启动空白 Recipe，可通过 File → New from Sample 加载 4 节点示例，或恢复上次打开的文件。
 >
 > - 完整功能清单与节点能力矩阵：[PLAN/STATUS.md](PLAN/STATUS.md)
 > - 分阶段实施计划、阶段目标与验收标准：[PLAN/TODO.md](PLAN/TODO.md)
@@ -136,7 +139,7 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 
 | 节点 | 执行状态 | 专属面板 | 主要缺口 |
 | --- | --- | --- | --- |
-| Seed | JSONL 可用 | 有 | CSV/Parquet、数据预览、Streaming 开关 |
+| Seed | JSONL / CSV / Parquet 可用 | 有 | Streaming 开关、节点内过滤/列映射 |
 | LLM | 三种 provider 可用 | 有 | 多轮/tools/结构化输出、并发、成本统计 |
 | Expression | Fluid 模板 + JSON 校验 | 有 | 沙箱/超时、外部函数 |
 | Validator | 表达式 / JSON Schema + reject 文件 | 有 | 代码规则、超时、失败样本 UI |
@@ -156,30 +159,40 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - 缓存内容保存行号与字节偏移，支持快速跳转指定行。
 - 支持配置最大缓存容量，默认目标为 512 MB。
 - 支持手动清理缓存。
+- CSV 使用 RFC 4180 记录边界索引，Parquet 按 row group 随机读取；两者都只加载当前页。
+- 1M 行、平均 1KB/行实测：索引 8.8s，任意 100 行分页 ≤10.9ms，转换 66.9s，内存增量 14MB。
 
 相关实现：
 
 - `LMTrainingDataStudio2/Services/IndexCacheService.cs`
+- `LMTrainingDataStudio2/Services/Datasets/`
 
 ### 2. 多格式支持与互转
 
-计划支持以下主流 LLM 数据格式：
+支持以下主流 LLM 数据格式：
 
 - OpenAI-compatible：`messages[]`
 - ShareGPT / LLaMA-Factory：`conversations[]`
 - Alpaca：`instruction` / `input` / `output`
+- DPO：`prompt` / `chosen` / `rejected`
+- Pretrain：`text`
 - Auto：自动检测输入格式
+
+数据工作台支持 OpenAI ↔ ShareGPT ↔ Alpaca、chat → Pretrain、DPO → DPO、Pretrain → Pretrain 的批量转换；不支持的组合会明确报错，失败行写入 `<target>.errors.jsonl`。
 
 相关实现：
 
 - `LMTrainingDataStudio2/Models/DatasetFormat.cs`
 - `LMTrainingDataStudio2/Services/DatasetFormatConverter.cs`
+- `LMTrainingDataStudio2/Services/Datasets/DatasetConversionService.cs`
+- `LMTrainingDataStudio2/Services/Datasets/DatasetBatchConverter.cs`
 
 ### 3. 数据验证与修复
 
 - JSONL 逐行异步验证。
 - 收集语法错误并返回行号。
 - 对简单问题保留自动修复入口。
+- 批量转换按行隔离错误，坏行带行号/原因/原始数据落盘，不中断整批。
 - Recipe 执行前验证节点、连接和基础配置。
 
 相关实现：
@@ -211,6 +224,7 @@ UI 采用 Recipe Graph / DAG 的设计：
 - 悬浮 Run / Validate 控件
 - Mini-map 渲染
 - 底部 Status Bar（文件路径、脏标记、进度、内存与缩放）
+- Data 视图：数据集分页预览、首/上/下/末页、按行号跳转、页面大小切换、格式转换与失败行列表
 
 相关实现：
 

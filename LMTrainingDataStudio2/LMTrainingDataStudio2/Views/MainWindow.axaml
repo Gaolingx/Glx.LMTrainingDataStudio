@@ -56,13 +56,16 @@
                 <!-- Spacer -->
                 <Border Grid.Column="2" />
 
-                <!-- Editor / Executions Toggle -->
+                <!-- Editor / Executions / Data Toggle -->
                 <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Spacing="2" Margin="0,0,12,0">
                     <Button Content="Editor" Command="{Binding SwitchToEditorCommand}"
                             Classes.accent="{Binding IsEditorView}"
                             Padding="12,6" FontSize="12" />
                     <Button Content="Executions" Command="{Binding SwitchToExecutionsCommand}"
-                            Classes.accent="{Binding !IsEditorView}"
+                            Classes.accent="{Binding IsExecutionsView}"
+                            Padding="12,6" FontSize="12" />
+                    <Button Content="Data" Command="{Binding SwitchToDataCommand}"
+                            Classes.accent="{Binding IsDataView}"
                             Padding="12,6" FontSize="12" />
                 </StackPanel>
 
@@ -252,7 +255,12 @@
         </Grid>
 
         <!-- Executions: run list + node/log details -->
-        <views:ExecutionsView IsVisible="{Binding !IsEditorView}" />
+        <views:ExecutionsView IsVisible="{Binding IsExecutionsView}" />
+
+        <!-- Data workbench: paginated preview + format conversion -->
+        <Border IsVisible="{Binding IsDataView}">
+            <views:DataWorkbenchView DataContext="{Binding DataWorkbench}" />
+        </Border>
         </Grid>
     </DockPanel>
 
