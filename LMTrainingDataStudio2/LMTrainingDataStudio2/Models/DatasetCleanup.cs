@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace LMTrainingDataStudio2.Models;
 
 /// <summary>
@@ -21,6 +23,7 @@ public sealed record DatasetCleanupRules
     public bool RemoveReasoningContent { get; init; }
     public bool DropEmptyMessages { get; init; }
 
+    [JsonIgnore]
     public bool HasAnyRule =>
         RegexReplacements is { Length: > 0 } ||
         NormalizeWhitespace ||

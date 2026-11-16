@@ -18,22 +18,22 @@
 - [x] 轨迹清洗：`TrajectoryCleaner` 支持正则替换（可忽略大小写）、空白规范化、换行规范化、ANSI 转义清理、移除 `reasoning_content`、丢弃空消息；Validator 节点也可配置 `Cleanup`。
 - [x] SFT 导出：Simulation 直接输出 OAI `messages` + `tools`；`SftExportBlockExecutor` 以临时文件 + 原子替换写入 JSONL。
 - [x] UI：新增 4 个 Block Sheet 模板、执行器注册、每个节点通用 Config JSON 编辑器（Apply 后即时生效并有错误提示）。
-- [x] 新增 52 个测试：harness 13、清洗 9、执行器与端到端流水线 15、配置序列化/深拷贝 5、配置 JSON 编辑器 5、配置校验 5。
+- [x] 新增 54 个测试：harness 14、清洗 9、执行器与端到端流水线 16、配置序列化/深拷贝 5、配置 JSON 编辑器 5、配置校验 5。
 
 ### 1.2 验证结果
 
 | 项目 | 命令 | 结果 |
 | --- | --- | --- |
 | 构建 | `dotnet build LMTrainingDataStudio2/LMTrainingDataStudio2.slnx` | 成功，0 警告，0 错误 |
-| 测试 | `dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx` | 198 通过，0 失败，0 跳过 |
+| 测试 | `dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx` | 200 通过，0 失败，0 跳过 |
 
 本轮新增/扩展测试：
 
 | 测试类 | 数量 | 覆盖内容 |
 | --- | --- | --- |
-| `SimulationHarnessTests` | 13 | 单轮/多轮、工具白名单、失败重试、超时、max rounds、abort、默认脚本、取消、模型超时、参数 JSON、OAI 序列化 |
+| `SimulationHarnessTests` | 14 | 单轮/多轮、工具白名单、失败重试、超时、max rounds、abort、默认脚本、取消、模型超时、参数 JSON、OAI 序列化 |
 | `TrajectoryCleanerTests` | 9 | 正则、空白/换行、ANSI、reasoning、空消息、数组 content、非样本行透传、非法正则 |
-| `SimulationExecutorsTests` | 15 | Query 同/多组、Simulation 输出与 system 覆盖、未完成轨迹丢弃/保留、Cleaner、Validator cleanup、SFT 导出、四节点端到端 |
+| `SimulationExecutorsTests` | 16 | Query 同/多组、Simulation 输出与 system 覆盖、未完成轨迹丢弃/保留、Cleaner、Validator cleanup、SFT 导出、四节点端到端 |
 | `BlockNodeViewModelTests` | 5 | JSON 配置编辑器回写、类型不匹配、非法 JSON、空输入 |
 | `BlockConfigSerializationTests` 扩展 | 5 | Query/Simulation/Cleaner/Export 往返、嵌套规则、深拷贝 |
 | `RecipeValidationServiceTests` 扩展 | 5 | 新节点必填项、重复工具名、max rounds/timeout 校验 |
@@ -585,7 +585,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 
 - [x] 更新本文件 Round 6 进展与 Phase 6 状态。
 - [x] 更新 README 当前状态、节点列表与路线图。
-- [x] 运行 `dotnet build` / `dotnet test`，记录 0 警告与 198 通过。
+- [x] 运行 `dotnet build` / `dotnet test`，记录 0 警告与 200 通过。
 - [ ] 真实 provider / 沙箱执行 / 专属面板完成后再次验收。
 
 ---
@@ -756,9 +756,9 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 - [x] Seed 配置编辑：字段回写、编辑器保持、Config 替换重建、非 Seed 无编辑器、错误清除、非 JSONL 校验警告（6 个）。
 - [x] LLM 接入：三种 Provider 请求/解析、密钥与错误、别名路由、重试/超时（12 个）；LLM 配置编辑器（4 个）；未知 Provider/超时/重试校验（3 个）。
 - [x] `LlmCredentials`：设置优先、环境兜底、未知 Provider、无环境变量（4 个）；设置往返包含密钥。
-- [x] 模拟 harness：多轮、白名单、失败重试、超时、max rounds、abort、取消、OAI 序列化（13 个）。
+- [x] 模拟 harness：多轮、白名单、失败重试、超时、max rounds、abort、取消、OAI 序列化、非 ASCII 保留（14 个）。
 - [x] 轨迹清洗：正则、空白/换行、ANSI、reasoning、空消息、数组 content（9 个）。
-- [x] 模拟执行器与端到端流水线：Query / Simulation / Cleaner / SftExport（15 个）。
+- [x] 模拟执行器与端到端流水线：Query / Simulation / Cleaner / SftExport、取消清理（16 个）。
 - [x] 新配置序列化/深拷贝、Config JSON 编辑器、配置校验（15 个）。
 - [ ] ViewModel 单测：加载/保存、运行状态、异常恢复。
 - [ ] Avalonia Headless UI 测试。

@@ -344,7 +344,7 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 - [ ] 亮色 / 暗色主题切换
 - [ ] LiveCharts2 或 OxyPlot 进度图表
 - [ ] 执行完成后的 output 目录摘要预览
-- [x] 单元测试与集成测试（198 个，`dotnet test` 全绿）
+- [x] 单元测试与集成测试（200 个，`dotnet test` 全绿）
 
 ## 编码约定
 

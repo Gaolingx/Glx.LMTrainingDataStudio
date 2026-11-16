@@ -263,6 +263,26 @@ public sealed class SimulationExecutorsTests
     }
 
     [Test]
+    public void SftExport_CancelledDuringEnumeration_LeavesNoOutputOrTempFile()
+    {
+        var outputPath = Path.Combine(_directory, "cancelled", "sft.jsonl");
+        var block = CreateBlock(BlockType.SftExport, "export", new SftExportBlockConfig(outputPath));
+        var context = new BlockExecutionContext
+        {
+            Block = block,
+            Input = ThrowAfterFirstRowAsync(),
+            Log = _ => { }
+        };
+
+        Assert.ThrowsAsync<OperationCanceledException>(
+            async () => await CollectAsync(
+                (await new SftExportBlockExecutor().ExecuteAsync(context, CancellationToken.None)).Output));
+
+        Assert.That(File.Exists(outputPath), Is.False);
+        Assert.That(File.Exists(outputPath + ".tmp"), Is.False);
+    }
+
+    [Test]
     public async Task RecipeRunner_SimulationPipeline_ExportsSftJsonl()
     {
         var outputPath = Path.Combine(_directory, "pipeline", "sft.jsonl");
@@ -395,6 +415,13 @@ public sealed class SimulationExecutorsTests
         {
             yield return row;
         }
+    }
+
+    private static async IAsyncEnumerable<DatasetRow> ThrowAfterFirstRowAsync()
+    {
+        await Task.Yield();
+        yield return new DatasetRow(0, """{"messages":[]}""");
+        throw new OperationCanceledException();
     }
 
     private static async Task<List<DatasetRow>> CollectAsync(IAsyncEnumerable<DatasetRow> rows)

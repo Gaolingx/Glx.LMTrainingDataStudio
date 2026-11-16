@@ -300,6 +300,16 @@ public sealed class SimulationHarnessTests
             Is.EqualTo("""{"code":"1"}"""));
     }
 
+    [Test]
+    public async Task TrajectorySerializer_PreservesNonAsciiText()
+    {
+        var trajectory = await CreateHarness().RunAsync("请分析 TCP 握手", CreateConfig());
+
+        var json = TrajectorySerializer.ToOaiJson(trajectory);
+
+        Assert.That(json, Does.Contain("请分析 TCP 握手"));
+    }
+
     private static SimulationBlockConfig CreateConfig(
         SimulatedToolRule[]? tools = null,
         ToolHarnessRules? rules = null,
