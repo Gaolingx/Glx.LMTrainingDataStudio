@@ -168,7 +168,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 
 - [x] 强类型节点配置：`BlockConfig` 多态层级、`RecipeBlock.Config` 必填、ViewModel 配置与错误提示、校验服务按配置类型检查；新增 19 个测试。
 - [x] Recipe 持久化：`RecipeStore` 原子写入、camelCase 多态 JSON、`SchemaVersion` 校验、`RecipeFormatException` 带路径与位置。
-- [ ] 设置持久化（`ISettingsStore`、`SettingsStore`）。
+- [x] 设置持久化：`ISettingsStore`/`SettingsStore`，默认 `%AppData%/LMTrainingDataStudio/settings.json`，范围校验与回退警告、原子保存；`ApplySettings` 已落盘。
 - [ ] JSONL 数据读取器（`JsonlDatasetReader`、索引失效与容量）。
 - [ ] 校验器补强（孤立节点、端口方向/类型、重复边）。
 
@@ -568,7 +568,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 
 ### 4.6 设置、主题与生命周期
 
-- [ ] 设置持久化（`AppSettings` 注释声称落盘，实际仅内存）。
+- [x] 设置持久化：`ISettingsStore`/`SettingsStore`（Round 2）。
 - [ ] 暗/亮主题切换（`App.axaml` 固定 Dark）。
 - [ ] 硬编码颜色资源化。
 - [ ] 网格吸附设置生效。
@@ -599,6 +599,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 - [x] core 最小单测：格式转换、JSONL 校验、Recipe 校验、索引缓存、Undo 历史（29 个）。
 - [x] `BlockConfig` 多态序列化、默认工厂、深拷贝、类型/配置匹配校验（19 个）。
 - [x] `RecipeStore`：保存/加载往返、JSON 格式、覆盖写与临时文件清理、坏 JSON/缺失配置/版本校验、取消（9 个）。
+- [x] `SettingsStore`：默认路径/默认值、保存加载往返、非法值回退与警告、坏 JSON、覆盖写、取消（9 个）。
 - [ ] 格式转换扩展测试：DPO、Pretrain、多轮 Alpaca、extra fields。
 - [ ] 索引缓存边界：缓存失效、容量清理、并发打开、超长行。
 - [ ] Recipe 执行引擎单测：拓扑、fail-fast、取消、进度。

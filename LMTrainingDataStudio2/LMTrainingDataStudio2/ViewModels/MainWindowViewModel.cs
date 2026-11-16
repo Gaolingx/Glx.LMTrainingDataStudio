@@ -15,7 +15,8 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly RecipeValidationService _recipeValidation = new();
     private readonly DatasetValidationService _datasetValidation = new();
     private readonly DatasetFormatConverter _formatConverter = new();
-    private readonly AppSettings _settings = new();
+    private readonly ISettingsStore _settingsStore;
+    private AppSettings _settings;
 
     [ObservableProperty]
     private string _recipeName = "Untitled Recipe";
@@ -80,12 +81,26 @@ public partial class MainWindowViewModel : ObservableObject
     public ObservableCollection<string> LogMessages { get; } = new();
     public CommandHistory CommandHistory { get; } = new();
 
-    public MainWindowViewModel()
+    public MainWindowViewModel() : this(new SettingsStore())
     {
+    }
+
+    public MainWindowViewModel(ISettingsStore settingsStore)
+    {
+        _settingsStore = settingsStore ?? throw new ArgumentNullException(nameof(settingsStore));
+        var loadResult = _settingsStore.Load();
+        _settings = loadResult.Settings;
+
         LoadSettingsSnapshot();
         InitializeBlockTemplates();
         LoadSampleRecipe();
         UpdateMemoryUsage();
+
+        foreach (var warning in loadResult.Warnings)
+        {
+            LogMessages.Add($"[Warning] {warning}");
+        }
+
         CommandHistory.HistoryChanged += (_, _) =>
         {
             StatusText = CommandHistory.CanUndo || CommandHistory.CanRedo ? "Recipe history updated" : "Ready";
@@ -312,20 +327,34 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void ApplySettings()
+    private async Task ApplySettingsAsync()
     {
-        _settings.MaxCacheSizeMb = Math.Max(16, MaxCacheSizeMb);
-        _settings.CacheDirectory = string.IsNullOrWhiteSpace(CacheDirectory)
-            ? Path.Combine(Path.GetTempPath(), "LMTrainingDataStudio", "index-cache")
-            : CacheDirectory.Trim();
-        _settings.EnableGridSnap = EnableGridSnap;
-        _settings.GridSnapSize = Math.Max(1, GridSnapSize);
-        _settings.IsDarkTheme = IsDarkTheme;
+        var defaults = new AppSettings();
+        var settings = new AppSettings
+        {
+            MaxCacheSizeMb = Math.Max(SettingsStore.MinCacheSizeMb, MaxCacheSizeMb),
+            CacheDirectory = string.IsNullOrWhiteSpace(CacheDirectory)
+                ? defaults.CacheDirectory
+                : CacheDirectory.Trim(),
+            EnableGridSnap = EnableGridSnap,
+            GridSnapSize = Math.Clamp(GridSnapSize, SettingsStore.MinGridSnapSize, SettingsStore.MaxGridSnapSize),
+            IsDarkTheme = IsDarkTheme
+        };
 
-        LoadSettingsSnapshot();
-        StatusText = "Settings applied ✓";
-        LogMessages.Add("[Info] Settings applied for this session.");
-        IsSettingsVisible = false;
+        try
+        {
+            await _settingsStore.SaveAsync(settings);
+            _settings = settings;
+            LoadSettingsSnapshot();
+            StatusText = "Settings saved ✓";
+            LogMessages.Add($"[Info] Settings saved to '{_settingsStore.FilePath}'.");
+            IsSettingsVisible = false;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            StatusText = "Failed to save settings";
+            LogMessages.Add($"[Error] Failed to save settings to '{_settingsStore.FilePath}': {ex.Message}");
+        }
     }
 
     [RelayCommand]
