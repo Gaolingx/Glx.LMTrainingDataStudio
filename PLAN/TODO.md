@@ -1,6 +1,6 @@
 # PLAN / TODO — 实施计划与验收标准
 
-> 最后更新：2026-11-17
+> 最后更新：2026-11-17（文档同步：已按源码复核第四节目录与阶段计划）
 > 当前基线：.NET 9 / Avalonia 11.3 / NUnit 4
 > 工作方式：小步提交，每个 Phase 独立验收；开发期允许 break change，不保留兼容层。
 >
@@ -8,7 +8,16 @@
 
 ---
 
-## 一、本轮进展（Round 12）
+## 〇、文档同步（2026-11-17）
+
+- 逐项核对 `Services/`、`ViewModels/`、`Views/` 与测试，修正第四节目录中已完成的条目（画布、数据治理、执行控制、UI 面板等）。
+- 修正与代码不一致的描述：LLM Prompt 使用 Fluid 模板（不再写“仅 field.path”）；SFT Export 按行透传、不主动裁剪字段；CurrentFilePath 已接线；内存占用仍只采样一次。
+- 新增 Round 13–16 规划：执行与 IO 韧性、数据工作台编辑与预览、节点能力收紧、发布与体验。
+- 当前验证：`dotnet build` 0 警告；`dotnet test` 386 通过 + 4 个 gated 跳过。
+
+---
+
+## 一、Round 12 进展（历史）
 
 ### 1.1 本轮做了什么
 
@@ -807,13 +816,13 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
    - 输入/输出统一为 `IAsyncEnumerable<DatasetRow>`，避免整批载入内存。
 3. **Runner**
    - `Services/RecipeRunner.cs`：先调用 `RecipeValidationService`，有 Error 直接拒绝执行。
-   - 使用 Kahn 拓扑排序分层；MVP 先按层内顺序执行，后续可并行。
+   - 使用 Kahn 拓扑排序分层；MVP 先按层内顺序执行，Round 12 已升级为层内受控并行。
    - 失败策略：默认 fail-fast，当前节点失败后下游标记 Skipped。
    - 进度通过 `IProgress<ExecutionProgress>` 汇报；每处理 N 行或状态变化时上报。
    - 取消：响应 `CancellationToken`，1 秒内停止并清理临时输出。
 4. **执行器（MVP 顺序）**
    - Seed：通过 `JsonlDatasetReader` 逐行输出。
-   - Expression：先实现 `{{ field }}` 变量替换与字段映射子集，用 `IExpressionEngine` 隔离，后续替换为 Jinja 引擎。
+   - Expression：先实现 `{{ field }}` 变量替换与字段映射子集，用 `IExpressionEngine` 隔离，Round 9 已替换为 Fluid 引擎。
    - Validator：实现表达式/JSON Schema 二选一的最小校验，输出 pass/reject 两条流。
    - Sampler：确定性随机种子；支持按数量或比例采样，输出单流；切分后续扩展。
    - LLM：定义 `ILlmClient`，实现 OpenAI-compatible HTTP 客户端；测试用 Fake。
@@ -892,7 +901,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 8. **Tool Schema 编辑器**
    - 使用 `TreeView` 编辑 `ToolSchemaNode`：增删、重命名、类型、必填、枚举、默认值、描述。
    - 支持 JSON 导入/导出，错误提示到具体节点。
-9. **Prompt / Jinja 编辑器**
+9. **Prompt / Fluid 编辑器**
    - 多行编辑 + 变量插入 + 渲染预览（依赖 Expression 引擎接口）。
 10. **端口坐标**
     - 端口命中测试与连线端点改为读取实际控件位置（`TranslatePoint` / `TransformToVisual`），删除 `55 + index * 18` 估算。
@@ -1098,59 +1107,64 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 ### 4.1 文件与数据集 IO
 
 - [x] Recipe 新建 / 打开 / 保存 / 另存为（Round 8）。
-- [x] JSONL 流式分页预览与数据表格（Round 10，Data 视图）。
+- [x] JSONL 流式分页预览与数据表格（Round 10，Data 视图；ListBox 虚拟化）。
 - [x] 大文件随机行跳转 UI（Round 10）。
 - [x] CSV 读写（CsvHelper，Round 10）。
 - [x] Parquet 读写（Parquet.Net，Round 10）。
 - [x] `DataFileType` 枚举接线（Round 10，Seed + 数据工作台）。
-- [ ] 数据增删查改、保存回原文件。
-- [ ] 去重、混洗、切分。
-- [ ] 正则搜索与替换。
-- [ ] 输出预览弹窗 / 样本查看器。
+- [x] 去重、混洗、切分（Round 11，数据工作台 Transform）。
+- [x] 正则搜索与替换（Round 11，当前页/全文件/预览/取消）。
+- [x] 数据集统计（角色、长度、空样本、重复率、工具调用，Round 11）。
+- [ ] 数据增删查改、单元格编辑、保存回原文件与编辑撤销/重做。
+- [ ] 输出预览弹窗 / 样本查看器（SFT Export、Validator、Simulation）。
 - [x] 最近文件、脏标记、关闭确认（Round 8）。
-- [ ] 文件编码、CRLF、超长行、无结尾换行专项处理。
-- [ ] 数据集统计（角色、长度、空样本、重复率、工具调用）。
+- [部分] 文件编码、CRLF、超长行、无结尾换行：JSONL 读取/校验已覆盖（Round 11）；CSV/Parquet 编码选项未暴露。
+- [ ] CSV 类型推断与列类型展示（当前全部按字符串）。
+- [ ] 多文件/目录数据源与 HuggingFace/HTTP 加载。
 
 ### 4.2 格式转换与校验
 
-- [部分] 转换器已接入数据工作台；`DatasetValidationService` 仍未接线到 UI。
+- [x] 转换器与 `DatasetValidationService` 均已接入数据工作台（Round 10/11）。
 - [x] 批量转换 UI / 服务、进度、失败行报告（Round 10）。
 - [x] DPO 格式（Round 10，批量转换；SFT Export 节点未直接输出）。
 - [x] Pretrain 格式（Round 10，批量转换；SFT Export 节点未直接输出）。
 - [x] 未知格式不再静默 fallback，给出明确错误（Round 10）。
+- [x] JSONL 结构校验（messages/roles/content/tools，Round 11）。
+- [x] 自动修复入口、预览、写修复副本（Round 11）。
+- [x] 校验问题列表、行号跳转（Round 11）；级别/错误码筛选未做。
+- [x] 校验错误上限/采样，避免超大坏文件吃满内存（Round 11）。
+- [ ] 校验问题分组与级别筛选 UI。
 - [ ] Alpaca 多轮转换不丢轮次、不丢 tools。
 - [ ] 转换保留额外字段 / 元数据，或明确声明丢弃策略。
 - [ ] ShareGPT tool_call 解析失败上报，不静默吞异常。
 - [ ] `AttachTools` 不插入空 system 消息。
-- [ ] JSONL 结构校验（messages/roles/content/tools）。
-- [ ] 自动修复入口、预览、另存。
-- [ ] 校验问题列表、行号跳转、级别筛选。
-- [ ] 校验错误上限/采样，避免超大坏文件吃满内存。
 - [ ] HuggingFace 数据源加载。
 
 ### 4.3 Recipe 节点模块
 
 - [x] 节点配置模型：`BlockConfig` 多态层级 + `RecipeBlock.Config`，校验按配置类型检查（Round 2）。
-- [ ] 节点端口类型化（当前固定 input/output + any）。
+- [x] 节点端口类型化：统一为 `rows`，输入/输出按 BlockType 生成（Round 8）。
 - [ ] 端口增删、改名、改类型（属性面板只读展示）。
 - [x] Recipe 序列化 / 反序列化 / schema 版本（`RecipeStore`，Round 2）。
 - [x] 节点状态与错误徽标（Round 8）。
 - [x] Seed 数据源文件选择、文件类型、Index Cache 编辑（Round 5）。
-- [部分] Seed Streaming 开关仍只对 JSONL 生效；预览在 Data 视图，节点内过滤未做。
+- [部分] Seed Streaming 开关仍只对 JSONL 生效且 UI 未暴露；预览在 Data 视图，节点内过滤/列映射未做。
 - [x] LLM Provider（OpenAI Chat Completions / Responses / Anthropic Messages）、ModelAlias、Endpoint、温度、max tokens、Prompt（Round 5）。
+- [x] LLM Prompt 使用 Fluid 模板（条件/循环/过滤器），执行期语法校验。
 - [x] LLM 节点级超时与指数退避重试（Round 5）。
 - [x] LLM 密钥设置界面：settings.json 本机保存，环境变量兜底（Round 5）。
-- [ ] LLM 结构化输出、并发控制。
+- [x] LLM Tool Profile 引用：tools 写入输出行。
+- [ ] LLM 请求侧 tool definitions、结构化输出、多轮上下文、并发控制、token/成本统计。
 - [x] Expression：Fluid 模板、变量映射、渲染预览、语法校验（Round 9）；无外部执行沙箱。
-- [部分] Validator：表达式/JSON Schema、reject 文件、失败样本（Round 9）；代码规则与超时未做。
+- [部分] Validator：表达式/JSON Schema、reject 文件、失败样本落盘（Round 9）；代码规则、超时、失败样本 UI 未做。
 - [部分] Sampler：数量/比例、随机种子、Splits 多文件（Round 9）；多输出端口与分层采样未做。
 - [x] Tool Profile：树形编辑器、JSON 导入导出、Simulation/LLM 复用（Round 9）；MCP 未做。
-- [ ] 节点配置校验覆盖所有类型。
+- [x] 节点配置校验覆盖所有 10 种类型（Round 8/9）。
 - [x] 环、孤立节点、重复边、端口方向/类型兼容校验（Round 3）。
 - [x] 模拟 API 测试子节点：Query Source / Simulation / Cleaner / SFT Export（Round 6）。
 - [x] 多轮 tool-calling 轨迹记录与工具白名单 / 失败 / 超时 / 重试规则（Round 6）。
 - [x] 轨迹清洗（正则替换、格式规范化、ANSI、reasoning、空消息）与 Validator 可选清洗（Round 6）。
-- [x] OAI messages JSONL 导出（Round 6）。
+- [x] JSONL 导出（按行透传 + 原子替换，Round 6）。
 - [x] 真实 tool-calling provider 客户端（OpenAI Chat/Responses、Anthropic tool_use，Round 7）。
 - [x] 真实 python / PowerShell / bash 沙箱执行与资源限制（Round 7）。
 - [x] Query / Simulation / Cleaner / SFT Export 专属属性面板（Round 7）。
@@ -1158,64 +1172,51 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 
 ### 4.4 编辑器 UI / Canvas
 
-已实现（Round 1–7，保留在此便于对照）：
+已实现（Round 1–12，保留在此便于对照）：
 
 - [x] Block Sheet 拖放添加、可搜索添加菜单（`~` / 右键）、节点拖动、多选拖动、框选。
 - [x] 端口连线、边选择/删除、中键平移、滚轮缩放、缩放百分比。
-- [x] 基础 Undo/Redo（添加/删除/移动/连线/粘贴块）、节点/边右键菜单。
-- [x] 复制/粘贴块（不携带边）、Mini-map 基础渲染。
+- [x] Undo/Redo（添加/删除/移动/连线/粘贴块/重命名）、节点/边右键菜单、`Ctrl+Z` / `Ctrl+Y`。
+- [x] 复制/粘贴块、Mini-map 渲染、双击空白添加、双击节点内联重命名。
+- [x] 网格背景、网格吸附（Alt 临时关闭）、鼠标中心缩放、Fit to View、拓扑自动布局。
+- [x] Mini-map 视口矩形与点击导航、复制携带内部连线、真实端口坐标、边 hover、增量拖拽。
+- [x] 左右 `GridSplitter` 可调整宽度。
+- [x] 属性面板校验问题列表与画布错误/警告徽标。
+- [x] 10 个节点的专属属性面板（Cleaner/Simulation 部分字段仍走 Config JSON）。
+- [x] 通用 Block Config JSON 编辑器（Round 6）。
+- [x] Executions 视图与运行详情（列表、状态过滤、节点表、日志、取消、输出目录）。
+- [x] 状态栏 `TotalLines`、`CurrentFilePath`、缩放百分比真实数据。
+- [x] 未保存更改指示与关闭确认、Recipe 内容持久化。
 
 未实现：
 
-- [ ] 网格背景绘制（XAML 注释存在，实际未绘制）。
-- [ ] 网格吸附生效（设置当前无效；拖动/落点/粘贴均未吸附，Alt 临时关闭未实现）。
-- [ ] 缩放以鼠标为中心（当前向原点漂移）。
-- [ ] Fit to View。
-- [ ] 自动布局。
-- [ ] Mini-map 视口矩形、点击/拖动导航（基础渲染已实现，视口交互未做）。
-- [ ] 双击空白添加节点（当前通过 `~` 或右键菜单添加）。
-- [ ] 复制粘贴携带内部连线。
+- [ ] Undo/Redo 菜单/按钮入口与 `Ctrl+Shift+Z`；属性面板删除与配置修改进入撤销历史。
 - [ ] 系统剪贴板 / 跨实例粘贴。
-- [ ] 右键 Rename 真正重命名（当前仅打开属性面板）。
-- [ ] 左右 GridSplitter 可调整宽度（当前固定 200/320）。
-- [ ] Undo/Redo 菜单/按钮入口与 `Ctrl+Shift+Z`（当前仅 `Ctrl+Z` / `Ctrl+Y`）。
-- [ ] 属性面板删除可撤销（当前走直接删除命令，未进历史）。
-- [ ] 属性修改进入 Undo 历史。
 - [ ] 快捷键全局化，避免焦点冲突。
-- [ ] 端口坐标读取真实控件布局（当前 `55 + index * 18` 硬编码）。
-- [ ] 节点尺寸调整手柄。
-- [ ] 边 hover 高亮、动画、标签避让（当前仅选中高亮）。
-- [ ] 样本/输出预览弹窗。
-- [x] 属性面板 Seed 专属配置（数据源/文件类型/Index Cache）。
-- [x] LLM 专属配置（Provider/Model/Endpoint/温度/Max tokens/Prompt）。
-- [ ] 其余节点（Expression/Validator/Sampler/ToolProfile）专属配置项。
-- [ ] Prompt / Jinja 编辑器。
-- [ ] Tool Schema 树形编辑器。
-- [x] 通用 Block Config JSON 编辑器（Round 6）。
-- [x] Query / Simulation / Cleaner / SFT Export 专属属性面板（Round 7）。
-- [ ] 节点校验摘要与画布错误标记。
-- [x] Executions 视图与运行详情（Round 4）。
-- [ ] 状态栏 `TotalLines`、`CurrentFilePath`、缩放真实数据。
-- [ ] 内存占用定时刷新（当前只在构造时取一次）。
-- [ ] 未保存更改指示与关闭确认。
-- [ ] 画布内容持久化（当前重启回到示例 Recipe）。
+- [ ] 节点尺寸调整手柄、边过渡动画、标签避让、自动布局间距/分组选项。
+- [ ] 样本/输出预览弹窗；Cleaner 前后 diff；Validator 失败样本 UI。
+- [ ] Simulation Tools / Rules / Script 可视化编辑器。
+- [ ] Cleaner 正则规则列表 UI；Validator Cleanup 规则 UI。
+- [ ] 状态栏内存占用定时刷新（当前只在构造时采样一次）。
+- [ ] 完整浅色主题：部分视图仍硬编码深色。
 
 ### 4.5 运行时与执行
 
 - [x] 真实 Recipe 执行引擎（服务层，Round 4）。
 - [x] 节点执行器与执行上下文。
-- [x] 拓扑排序与依赖传递（层内串行；并行执行未做）。
+- [x] 拓扑排序与依赖传递（Round 12：层内受控并行）。
 - [x] Execution / NodeState / 日志模型（内存态）。
 - [x] 取消（运行级与节点级）。
-- [ ] 暂停 / 重试。
+- [x] 暂停 / 恢复 / 节点重试（Round 12）。
 - [x] MainWindow 运行按钮接入 Runner，删除 `Task.Delay` 模拟。
 - [x] 异常处理与 `IsRunning` 恢复。
 - [x] Runner 按节点/行数上报进度。
 - [x] 状态栏展示当前节点与进度；Executions UI 展示节点结果。
-- [ ] 状态栏 `CurrentFilePath`、缩放等其余占位数据。
-- [x] 运行日志持久化与历史记录（`ExecutionStore` + Executions UI 已接入）。
-- [ ] 输出目录、命名、结果摘要。
-- [ ] 中断恢复与临时文件清理。
+- [x] 状态栏 `CurrentFilePath`、缩放、总行数等实时数据。
+- [x] 运行日志持久化与历史记录（`ExecutionStore` + Executions UI）。
+- [x] 输出目录、命名、结果摘要（`run-summary.json`，Round 12）。
+- [ ] 中断恢复：从上次失败/中断节点继续。
+- [ ] 全链路临时文件清理验收；取消 1s 内停止的定量验收。
 - [ ] 节点间输出当前在内存物化，需改为流式或溢写磁盘。
 - [x] 模拟 API 多轮执行（确定性模型 + 模拟工具）与四节点 SFT 轨迹流水线（Round 6）。
 - [x] 真实模型 tool-calling 与真实工具执行（Round 7）。
@@ -1224,29 +1225,31 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 
 - [x] 设置持久化：`ISettingsStore`/`SettingsStore`（Round 2）。
 - [x] 暗/亮主题变体与 `ThemeManager`（Round 12；部分视图仍有硬编码深色）。
-- [部分] 硬编码颜色资源化：主面板/画布已主题化，节点内部颜色仍为常量。
+- [部分] 硬编码颜色资源化：主面板/画布已主题化，Data 视图与节点内部颜色仍为常量。
 - [x] 网格吸附设置生效（Round 12；Alt 临时关闭）。
-- [ ] 数值输入校验与范围提示。
+- [x] 窗口/应用图标（Round 12：`Assets/app-icon.png`）。
+- [x] 全局异常处理与滚动日志（Round 12：`AppLog` + AppDomain/TaskScheduler/UI 线程）。
+- [ ] 数值输入校验与范围提示（当前是保存时 clamp）。
 - [ ] 缓存目录浏览按钮与可写性检查。
 - [ ] API 密钥加密存储（当前 settings.json 明文，仅限本机使用）。
 - [ ] 设置变更通知已创建的服务。
-- [x] 窗口/应用图标（Round 12：`Assets/app-icon.png`）。
 - [ ] 单实例 / 文件关联 / 命令行打开。
-- [x] 全局异常处理与滚动日志（Round 12：`AppLog` + AppDomain/TaskScheduler/UI 线程）。
+- [ ] 完整浅色主题（移除剩余硬编码颜色）。
+- [ ] 内存占用定时刷新。
 
 ### 4.7 代码质量与已知缺陷
 
 - [x] `_datasetValidation`、`_formatConverter` 未使用字段已移除（Round 12）。
+- [x] `ToolSchemaNode`、`ToolProfile` 已用于 Tool Profile 编辑器与 Simulation/LLM 复用（Round 9）。
+- [x] `MainWindowViewModel.AddBlock` 已被画布/添加菜单调用（Round 12 复核）。
 - [ ] `BlockTypeToColorConverter`、`InverseBoolConverter` 未使用。
-- [ ] `MainWindowViewModel.AddBlock` RelayCommand 未绑定。
-- [ ] `BlockTemplateViewModel.ColorKey` 未使用。
-- [ ] `ToolSchemaNode`、`ToolProfile` 未使用（`DataFileType` 已接入 Seed 配置与校验）。
-- [ ] `RecipeValidationService` 校验缺口（见 4.3）。
+- [ ] `BlockTemplateViewModel.ColorKey` 未使用（若确认无用则删除）。
+- [ ] `RecipeValidationService` 校验缺口（列号、问题分组；见 4.3）。
 - [ ] `ValidationIssue` 缺少错误码、列号、分组信息。
 - [ ] `Task.Run` + `Dispatcher.Post` 模式异常不可传播。
-- [ ] 日志无级别、时间戳、来源。
-- [ ] Recipe / 设置 / 缓存无 schema 版本与迁移策略。
-- [ ] 大文件内存策略无基准验证。
+- [x] 日志已包含 UTC 时间戳与级别（`AppLog`）；来源/分类筛选未做。
+- [部分] Recipe 有 schema 版本；Settings/Index Cache 无迁移策略。
+- [x] 大文件内存策略已有 1M 行基准（Round 10/11）；执行链路持久化内存未解决（见 4.5）。
 
 ### 4.8 测试
 
@@ -1274,14 +1277,14 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 - [x] provider tool-calling：三种 provider 请求/响应、usage、错误、harness 往返（9 个）。
 - [x] 真实 provider 冒烟：tool_calls/usage 与 harness 两轮往返，环境变量启用（2 个，默认跳过）。
 - [x] 四个新节点专属编辑器：创建、回写、隐藏字段保留（5 个）。
-- [ ] ViewModel 单测：加载/保存、运行状态、异常恢复。
-- [ ] Avalonia Headless UI 测试。
-- [ ] 集成测试：1M 行全链路。
 - [x] 畸形输入测试集与 fixtures（Round 11：坏行/超长行/非法 UTF-8/错误上限）。
-- [ ] 性能基准（BenchmarkDotNet 或等价）。
 - [x] CI 自动化（Round 12：`.github/workflows/ci.yml`）。
 - [x] Avalonia Headless UI 测试（Round 12：主窗口、画布、主题）。
 - [x] 视口/布局/日志/并行执行/暂停/重试测试（Round 12，18 个）。
+- [x] ViewModel 单测：文档生命周期、数据工作台、Executions、各节点配置编辑器（Round 5–12）。
+- [部分] 集成测试：分模块 1M 行与四节点流水线已覆盖；完整 1M 行多节点链路待 Round 13。
+- [部分] 性能基准：NUnit gated 1M 行测试已有；BenchmarkDotNet 专项基准未做。
+- [x] 当前测试总数：386 通过 + 4 gated（2026-11-17 复核）。
 
 ### 4.9 工程化与发布
 
@@ -1291,61 +1294,83 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 - [x] CI/CD 流水线（Round 12：GitHub Actions）。
 - [ ] `.editorconfig` / 分析器 / 警告即错误。
 - [x] 日志框架（Round 12：滚动文件日志 + 全局异常；导出未做）。
+- [ ] 崩溃报告导出/一键打包诊断。
 - [ ] 中英文文案统一 / 本地化。
-- [x] README 路线图与实现状态同步（Round 12）。
+- [x] README 路线图与实现状态同步（Round 12；2026-11-17 再次复核）。
 - [x] 构建环境：`net9.0` + `global.json` 已落地，本机构建通过。
 
 ---
 
 ## 五、优先级与建议顺序
 
-### P0（当前先做，Round 8–9）
+> 历史 P0（Phase 1 持久化、Phase 2 执行引擎、Round 6/7 模拟与真实 provider/沙箱、Round 8–12）已完成，见 [STATUS.md](STATUS.md)。
 
-> 历史 P0（Phase 1 持久化、Phase 2 执行引擎、Round 6/7 模拟与真实 provider/沙箱）已完成，见 [STATUS.md](STATUS.md)。
+### P0 — Round 13：执行与 IO 韧性
 
-1. [x] Recipe 新建/打开/保存/另存为 + 最近文件 + 脏标记 + 关闭确认（Round 8 完成）。
-2. [x] 按 BlockType 生成端口 schema；每种节点必需输入/输出校验；错误连接拦截与画布错误徽标（Round 8 完成）。
-3. [x] Expression 真实模板引擎 + 专属面板 + 渲染预览/语法校验（Round 9 完成）。
-4. [x] Validator reject 分支 + Schema 规则 + 失败样本；Sampler Splits 多文件；Tool Profile 树形编辑器与复用（Round 9 完成；多输出端口/MCP 留后续）。
-5. 状态栏 `CurrentFilePath` 与真实文件路径；属性面板删除/修改接入 Undo。
-6. 设置持久化后的网格吸附、主题切换真正生效。
-7. 每个 Round 随代码补最小单测；Phase 5 做完整矩阵。
+1. [ ] 节点间输出流式/溢写磁盘，内存阈值与临时目录可配置，运行结束/取消/失败统一清理。
+2. [ ] 节点级中断恢复：保存已完成节点输出，从上次失败/中断节点继续。
+3. [ ] 取消 1s 内停止与全链路临时文件清理的定量测试。
+4. [ ] SFT Export：文件选择器、覆盖确认、可选字段白名单、写出行数/预览摘要。
+5. [ ] 1M 行 Seed → Expression → SFT Export 链路内存 ≤ 300MB 验收。
 
-### P1（补齐数据工作台能力）
+### P1 — Round 14：数据工作台编辑与预览
 
-1. [x] CSV / Parquet 读写与互转（Round 10）。
-2. [x] DPO / Pretrain 格式检测、规范化与批量转换（Round 10；SFT Export 节点尚未直接输出）。
-3. [x] 索引缓存容量、失效、随机读取完整接线（Round 2 / Round 10）。
-4. [x] 去重、混洗、切分、搜索/正则替换（Round 11）；数据逐行 CRUD 未做。
-5. [x] JSONL / CSV / Parquet 分页预览与行号跳转（Round 10）；校验问题列表、自动修复（Round 11）。
-6. [x] 大数据统计：角色/长度/空样本/重复率/工具调用（Round 11）。
-7. [x] Canvas 网格/吸附/Fit/自动布局/Mini-map/复制连线（Round 12）。
-8. [x] 暂停/重试、滚动日志、输出摘要（Round 12）；节点间溢写磁盘未做。
+1. [ ] 逐行 CRUD（插入/删除/复制/单元格编辑）与写回/另存。
+2. [ ] 编辑撤销/重做与保存前差异摘要。
+3. [ ] 搜索命中高亮、校验问题分组/筛选。
+4. [ ] 统一样本/输出预览弹窗（SFT/Validator/Simulation/Cleaner）。
+5. [ ] 1M 行编辑/保存内存上限测试。
 
-### P2（体验与工程化）
+### P1 — Round 15：节点能力收紧
 
-1. 节点尺寸手柄、边过渡动画、样本预览（自动布局已完成）。
-2. Tool Schema 树形编辑器、MCP 配置。
-3. 主题资源化（部分）、图标（已完成）、README 截图。
-4. 安装包/文件关联/自动更新。
-5. 分析器、本地化（CI/日志已完成）。
-6. LICENSE（MIT）与文档同步。
+1. [ ] LLM 请求侧 tools、结构化输出、多轮、并发、token/成本、失败样本。
+2. [ ] Validator 代码规则/超时/多规则/pass-reject 端口。
+3. [ ] Sampler 多输出端口/分层采样/统计预览。
+4. [ ] Simulation Tools/Rules/Script UI、流式 delta、速率限制/价格预设。
+5. [ ] Query Source 模板与外部 query 源。
+
+### P2 — Round 16：发布与体验
+
+1. [ ] 节点尺寸手柄、边动画、标签避让、Undo/Redo 菜单、属性修改撤销。
+2. [ ] 完整浅色主题、内存定时刷新。
+3. [ ] MSIX/安装包、文件关联、单实例、命令行打开、崩溃报告导出。
+4. [ ] 10M 行与 CSV/Parquet 大规模基线、README 截图、示例 Recipe。
+5. [ ] `.editorconfig`、分析器、警告即错误、文案统一。
+
+### 已完成（供对照）
+
+- [x] Recipe 文件生命周期、端口契约、错误徽标（Round 8）。
+- [x] Expression/Validator/Sampler/Tool Profile 核心能力（Round 9）。
+- [x] CSV/Parquet、格式转换、DPO/Pretrain、1M 基线（Round 10）。
+- [x] 校验/修复、搜索替换、去重/混洗/切分、统计（Round 11）。
+- [x] 画布核心交互、并行/暂停/重试、CI/打包/日志（Round 12）。
 
 ---
 
-## 六、下一阶段规划（Round 8–12）
+## 六、阶段规划
 
-> 目标、交付与验收的完整版本见 [STATUS.md](STATUS.md) 第五节；这里保留执行顺序与出口标准。
+> 目标、交付与验收的完整版本见 [STATUS.md](STATUS.md) 第六节；这里保留执行顺序与出口标准。
+
+### 6.1 已完成：Round 8–12
 
 | Round | 主题 | 优先级 | 核心交付 | 出口标准 |
 | --- | --- | --- | --- | --- |
 | 8 | Recipe 生命周期与节点契约 | P0 | 新建/打开/保存/另存为、最近文件、脏标记、关闭确认；按类型端口 schema；端口与必需连接校验；错误徽标 | 保存重载完全一致；端口正确；坏文件有明确错误；0 警告、测试全绿 |
-| 9 | 节点能力补齐 | P0/P1 | Expression 真实模板引擎 + 面板/预览；Validator Schema + reject 分支；Sampler Splits/多输出；Tool Profile 树形编辑器与复用 | 每个节点成功/失败/边界测试；模板/规则/切分结果可验证 |
+| 9 | 节点能力补齐 | P0/P1 | Expression 真实模板引擎 + 面板/预览；Validator Schema + reject 分支；Sampler Splits；Tool Profile 树形编辑器与复用 | 每个节点成功/失败/边界测试；模板/规则/切分结果可验证 |
 | 10 | 数据工作台 A | P1 | JSONL 分页预览/行跳转；CSV/Parquet 读写；格式转换 UI；DPO/Pretrain；1M 行验收 | 1M 行内存 ≤ 300MB；转换行数守恒；失败行有行号 |
-| 11 | 数据工作台 B（已完成 2026-11-17） | P1 | 校验问题列表/自动修复；搜索/正则替换；去重/混洗/切分；数据集统计 | 行数守恒、同 seed 可复现、原文件不被修复破坏；368 测试通过 |
-| 12 | 画布、执行与发布（已完成 2026-11-17） | P1/P2 | 网格/吸附/锚点缩放/Fit/自动布局/Mini-map 交互；层内并行、暂停/重试、输出目录；Headless UI、CI、打包、主题、日志 | 386 测试通过；500 节点布局 <100ms；单文件发布启动成功 |
+| 11 | 数据工作台 B | P1 | 校验问题列表/自动修复；搜索/正则替换；去重/混洗/切分；数据集统计 | 行数守恒、同 seed 可复现、原文件不被修复破坏；368 测试通过 |
+| 12 | 画布、执行与发布 | P1/P2 | 网格/吸附/锚点缩放/Fit/自动布局/Mini-map 交互；层内并行、暂停/重试、输出目录；Headless UI、CI、打包、主题、日志 | 386 测试通过；500 节点布局 <100ms；单文件发布启动成功 |
 
-**Round 12 已完成（2026-11-17）**；后续工作聚焦：节点间流式/溢写磁盘、10M 实测、MSIX/安装包、完整浅色主题、README 截图与 MCP/LLM tools 等既有缺口。
+### 6.2 下一阶段：Round 13–16
+
+| Round | 主题 | 优先级 | 核心交付 | 出口标准 |
+| --- | --- | --- | --- | --- |
+| 13 | 执行与 IO 韧性 | P0 | 节点间溢写磁盘/流式读取；节点级中断恢复；取消/清理硬化；SFT Export 收尾 | 1M 行链路内存 ≤300MB；取消 1s 内停止；恢复输出一致；无临时文件残留 |
+| 14 | 数据工作台编辑与预览 | P1 | 逐行 CRUD/单元格编辑/写回；搜索高亮；问题分组；样本/输出预览 | 编辑行数守恒、撤销可恢复、覆盖有确认；1M 行编辑内存 ≤300MB |
+| 15 | 节点能力收紧 | P1 | LLM tools/结构化输出/多轮/并发/成本；Validator 代码规则/超时/双端口；Sampler 多端口/分层；Simulation 可视化配置 | 请求体与结构化输出可验证；端口行数守恒；分层比例在容差内 |
+| 16 | 发布与体验 | P2 | 画布 polish、完整浅色主题、MSIX/文件关联/单实例、10M 基线、README 截图、分析器 | 500 节点逐帧 <100ms；浅色无残留；安装/双击打开可用；10M 基线记录 |
+
+**执行顺序**：Round 13 → 14 → 15 → 16；每轮结束按第七节收尾模板更新勾选状态、README 与提交记录。
 
 ---
 

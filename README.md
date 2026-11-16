@@ -34,7 +34,7 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - Query Source / Simulation / Cleaner / SFT Export / Expression / Validator / Sampler / Tool Profile 专属属性面板
 - 通用 Block Config JSON 编辑器，可直接配置所有节点类型
 
-> 注意：当前仍是开发版。**数据逐行编辑 CRUD、搜索命中高亮、10M 实测、节点间溢写磁盘、节点尺寸手柄/边过渡动画、MSIX 安装包、README 截图、完整浅色主题、Validator 代码规则/超时、Sampler 多输出端口、MCP 适配尚未实现**；应用默认启动空白 Recipe，可通过 File → New from Sample 加载 4 节点示例，或恢复上次打开的文件。
+> 注意：当前仍是开发版。**数据逐行编辑 CRUD、搜索命中高亮、10M 实测、节点间溢写磁盘、节点尺寸手柄/边过渡动画、MSIX 安装包、README 截图、完整浅色主题、LLM 请求侧 tools/结构化输出、Validator 代码规则/超时、Sampler 多输出端口、SFT Export 字段裁剪、MCP 适配尚未实现**；应用默认启动空白 Recipe，可通过 File → New from Sample 加载 4 节点示例，或恢复上次打开的文件。
 >
 > - 完整功能清单与节点能力矩阵：[PLAN/STATUS.md](PLAN/STATUS.md)
 > - 分阶段实施计划、阶段目标与验收标准：[PLAN/TODO.md](PLAN/TODO.md)
@@ -73,7 +73,7 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - `ProviderChatCompletionClient`：OpenAI Chat Completions、OpenAI Responses、Anthropic Messages 的请求构造与 tool call 解析；密钥从应用设置或环境变量读取。
 - `RealToolRuntime` + `SandboxProcessRunner`：python（`-I`）、PowerShell（`-NoProfile -NonInteractive -ExecutionPolicy Bypass -File`）、bash（`--noprofile --norc -c`）、web_fetch（默认关闭，阻止私网/回环，禁跟随重定向）。
 - `DatasetCleanupRules`：正则替换、空白/换行规范化、ANSI 清理、移除 reasoning、丢弃空消息；Cleaner 节点与 Validator 均可使用。
-- `SftExportBlockExecutor`：流式写临时文件，成功后原子替换目标 JSONL；只输出 `messages` 与 `tools`。
+- `SftExportBlockExecutor`：流式写临时文件，成功后原子替换目标 JSONL；按行透传并做 JSON 规范化（不主动裁剪字段，上游 Simulation 输出 `messages` 与 `tools`）。
 
 > 沙箱是协作式隔离，不是内核级安全边界：进程以当前用户身份运行，未使用容器或命名空间。Windows 通过 Job Object 限制内存与活动进程；其他平台只有超时、进程树终止、环境白名单与输出上限。
 >
@@ -153,7 +153,7 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 | Query Source | 单组/多组 query | 有 | 模板、外部来源 |
 | Simulation | 脚本/真实 provider + 模拟/真实工具 | 有 | Tools/Rules/Script UI、流式、容器隔离 |
 | Cleaner | 正则/格式/ANSI/reasoning/空消息 | 部分 | 正则规则 UI、预览、坏行报告 |
-| SFT Export | 原子 JSONL | 有 | 文件选择器、预览、拆分、DPO/Pretrain |
+| SFT Export | 流式 + 原子替换 + 行透传 | 有 | 文件选择器、字段裁剪、预览、拆分、DPO/Pretrain |
 
 完整矩阵与逐项缺口见 [PLAN/STATUS.md](PLAN/STATUS.md)。
 
@@ -219,10 +219,10 @@ UI 采用 Recipe Graph / DAG 的设计：
 
 - Seed Block：数据输入源
 - LLM / Model Block：模型调用
-- Expression Block：Jinja 风格字段变换
-- Validator Block：Schema / 代码 / 数据质量校验（可选轨迹清洗）
+- Expression Block：Fluid（Liquid）风格字段变换
+- Validator Block：表达式 / JSON Schema 校验与过滤（代码规则、超时待后续）
 - Sampler Block：确定性采样与数据切分
-- Tool Profile Block：OpenAI-compatible Tool Schema / MCP 工具配置
+- Tool Profile Block：OpenAI-compatible Tool Schema 配置（MCP 适配待后续）
 - Query Source Block：模拟用户 query（同 query 重复 / 多组 query）
 - Simulation Block：模拟 API + mini harness（多轮工具调用、白名单、失败、超时、重试）
 - Cleaner Block：正则替换与格式规范化
@@ -399,36 +399,38 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 
 用于展示 Recipe DAG。当前已支持：
 
-- Block Sheet 拖放添加、可搜索添加菜单（`~` / 右键）
-- 节点拖动、多选拖动、框选、端口连线与边删除
-- 中键平移、滚轮缩放、缩放百分比显示
-- 基础 Undo / Redo（添加/删除/移动/连线/粘贴块）
-- 右键菜单（复制/重命名入口/删除）
-- Mini-map 渲染
+- Block Sheet 拖放添加、可搜索添加菜单（`~` / 右键）、双击空白添加
+- 节点拖动、多选拖动、框选、端口连线与边删除、边 hover
+- 中键平移、滚轮缩放、鼠标中心缩放、缩放百分比、Fit to View
+- 网格背景与网格吸附（Alt 临时关闭）、拓扑自动布局
+- Mini-map 渲染、视口矩形与点击导航
+- Undo / Redo（添加/删除/移动/连线/粘贴块/重命名）、`Ctrl+Z` / `Ctrl+Y`
+- 复制携带内部连线、双击节点内联重命名、右键菜单
+- 可拖动分栏、真实端口坐标
 
 尚未实现：
 
-- 网格背景与网格吸附
-- 鼠标中心缩放、Fit to View、自动布局
-- Mini-map 视口矩形与点击导航
-- 双击空白添加、复制携带内部连线、内联重命名
-- 可拖动分栏、真实端口坐标、节点尺寸手柄
+- 节点尺寸调整手柄、边过渡动画、标签避让
+- Undo/Redo 菜单与按钮、`Ctrl+Shift+Z`、属性修改进入撤销历史
+- 系统剪贴板 / 跨实例粘贴
+- 完整浅色主题（部分视图仍硬编码深色）
 
 ### Property Panel
 
 根据当前选中的 Block 显示配置项，包括：
 
-- Jinja 引用名
-- 节点专属配置（Seed / LLM / Query Source / Simulation / Cleaner / SFT Export）
+- Block 引用名
+- 节点专属配置（Seed / LLM / Expression / Validator / Sampler / Tool Profile / Query Source / Simulation / Cleaner / SFT Export）
+- Cleaner 正则规则、Simulation 的 Tools/Rules/Script 目前仍通过 Config JSON 编辑
 - 通用 Config JSON 编辑器（适用于所有节点，包含 kind 与 BlockType 一致性校验）
-- Validation 摘要
+- Validation 摘要与问题列表（可定位节点）
 - Progress / Logs
 
 ### Status Bar
 
 显示当前状态、行数、文件路径、进度条、内存占用和缩放百分比。
 
-> 当前 `CurrentFilePath` 尚未赋值，内存占用只在启动时采样一次；这两项会在 Round 8/12 补齐。
+> `CurrentFilePath`、`TotalLines` 和缩放百分比已接入真实数据；内存占用仍只在启动时采样一次，定时刷新列在 Round 16。
 
 ## 数据格式示例
 
@@ -504,6 +506,10 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 - [x] Round 10：数据预览、CSV/Parquet、格式转换、DPO/Pretrain
 - [x] Round 11：校验修复、去重/混洗/切分、搜索替换、统计
 - [x] Round 12：画布体验、并行/暂停/重试、CI/打包/主题/日志
+- [ ] Round 13：执行与 IO 韧性（节点间溢写/流式、中断恢复、取消/清理硬化）
+- [ ] Round 14：数据工作台编辑与预览（逐行 CRUD、搜索高亮、样本预览）
+- [ ] Round 15：节点能力收紧（LLM tools/结构化输出、Validator 代码规则、Sampler 多端口、Simulation 可视化配置）
+- [ ] Round 16：发布与体验（画布 polish、完整浅色主题、MSIX/文件关联、10M 基线、README 截图）
 
 ## 编码约定
 

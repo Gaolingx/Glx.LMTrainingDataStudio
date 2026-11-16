@@ -1,9 +1,11 @@
 # STATUS — 功能清单、节点能力矩阵与下一阶段规划
 
-> 最后核对：2026-11-17，Round 12 完成后（工作区）
-> 验证基线：`dotnet build` 0 警告 0 错误；`dotnet test` 386 通过 + 4 个 gated 测试（2 个真实 provider 冒烟 + 2 个性能，默认跳过）；Headless UI 3 个测试通过；1M 行 JSONL 基线通过（索引 8.8s、分页 10.9ms、内存增量 14MB）；1M 行质量操作基线通过（去重+混洗+切分 124.2s、统计 63.6s、托管内存增量 2MB）；win-x64 单文件发布启动通过。
+> 最后核对：2026-11-17（已逐项与源码、测试复核）
+> 验证基线：`dotnet build` 0 警告 0 错误；`dotnet test` 386 通过 + 4 个 gated 测试（2 个真实 provider 冒烟 + 2 个性能，默认跳过）；Headless UI 3 个测试通过；1M 行 JSONL 与 1M 行质量操作基线通过；win-x64 单文件发布启动通过。
 >
 > 图例：`[x]` 已完成并有测试/验证；`[部分]` 可用但有明确缺口；`[ ]` 未实现。
+>
+> 说明：本文件是“已做/未做”的主清单；与 README 冲突时以本文件为准。本轮文档同步修正了几处旧描述：LLM Prompt 已使用 Fluid 模板；SFT Export 节点按行透传，不主动裁剪字段；README 画布“未实现”段落已过期。
 
 ---
 
@@ -20,43 +22,104 @@
 - 统一数据集 IO：JSONL / CSV / Parquet 随机分页读取与原子写出；Seed 节点支持三种格式。
 - 数据工作台（Data 视图）：分页预览、行号跳转、页面大小切换，JSONL 走 SQLite 索引，CSV 走记录边界索引，Parquet 按 row group 读取。
 - 批量格式转换：OpenAI / ShareGPT / Alpaca / DPO / Pretrain，支持进度、取消、失败行 `.errors.jsonl` 与原子目标写入。
-- 数据治理：校验问题列表（级别/行号/JSON 路径/错误码）与跳行；JSONL 自动修复预览与“写修复副本”（原文件不变）；搜索/正则替换（当前页/全文件/预览/取消）；去重、固定 seed 混洗、比例/份数切分；角色/长度/空样本/重复率/工具调用统计。
+- 数据治理：校验问题列表（级别/行号/JSON 路径/错误码）与跳行；JSONL 自动修复预览与“写修复副本”；搜索/正则替换（当前页/全文件/预览/取消）；去重、固定 seed 混洗、比例/份数切分；角色/长度/空样本/重复率/工具调用统计。
 - 1M 行 JSONL 验收通过：索引 8.8s（≤10s）、100 行分页 10.9ms（≤100ms）、转换 66.9s、内存增量 14MB（≤300MB）。
-- 1M 行质量操作验收通过：去重+混洗+切分 124.2s（50 万保留/50 万重复）、统计 63.6s、托管内存增量 2MB（≤300MB）。
+- 1M 行质量操作验收通过：去重+混洗+切分 124.2s、统计 63.6s、托管内存增量 2MB（≤300MB）。
 - JSONL 流式读取、SQLite 行索引缓存、分页读取。
-- DAG 校验、拓扑分层、顺序执行、fail-fast、下游 Skipped、取消、进度、日志、执行记录持久化与 Executions UI。
+- DAG 校验、拓扑分层、层内受控并行、顺序执行、fail-fast、下游 Skipped、取消、暂停/恢复、节点重试、进度、日志、执行记录持久化与 Executions UI。
+- 每次运行的输出目录与 `run-summary.json`；Executions UI 显示输出目录。
 - 10 种节点类型全部接入 Block Sheet、画布、默认配置与 Recipe JSON。
 - Query Source → Simulation → Cleaner → SFT Export 端到端 SFT 轨迹生成可用（脚本/真实 provider、模拟/真实工具均可切换）。
 - 真实 provider tool-calling（OpenAI Chat/Responses、Anthropic）与真实沙箱工具（python/PowerShell/bash/web_fetch）。
-- 画布交互：网格/吸附（Alt 关闭）、鼠标中心缩放、Fit、拓扑自动布局、Mini-map 视口与点击导航、双击添加、复制携带连线、内联重命名、真实端口坐标、边 hover、增量拖拽更新。
-- 执行体验：层内受控并行、暂停/恢复、节点重试、每次运行的输出目录与 `run-summary.json`、Executions UI 显示输出目录。
+- 画布交互：网格/吸附（Alt 关闭）、鼠标中心缩放、Fit、拓扑自动布局、Mini-map 视口与点击导航、双击添加、复制携带连线、内联重命名、真实端口坐标、边 hover、增量拖拽、可拖动分栏。
 - 工程化：滚动日志与全局异常、Dark/Light 主题资源、GitHub Actions CI、win-x64 单文件发布脚本、Headless UI 测试、MIT LICENSE、应用图标。
-- 386 个自动化测试 + 4 个 gated 测试（2 个真实 provider 冒烟 + 2 个性能）。
+- 390 个自动化测试：386 个常规通过 + 4 个 gated（2 个真实 provider 冒烟 + 2 个性能）。
 
-### 1.2 当前最大缺口
+### 1.2 当前最大缺口（按优先级）
 
-1. **节点能力仍有边界**：Validator 暂无代码规则/超时；Sampler 有 Splits 多文件但无多输出端口与分层采样；Tool Profile 无 MCP 适配；LLM 仍不发送 tool definitions 给 provider。
-2. **数据治理仍有缺口**：逐行 CRUD/单元格编辑、命中高亮、问题分组未做；CSV/Parquet 与 10M 行质量操作尚无实测基线（1M JSONL 已通过）。
-3. **画布剩余体验**：节点尺寸手柄、边过渡动画、Undo/Redo 菜单与快捷键、完整浅色主题（部分视图仍硬编码深色）；500 节点已完成布局性能测试，未做逐帧 UI 计时。
-4. **执行与发布剩余缺口**：节点间流式/溢写磁盘、中断后节点级恢复；10M 性能验收、MSIX/安装包、README 截图。
+1. **执行韧性**：节点间输出仍全量物化在内存；无溢写磁盘、无节点级中断恢复；取消 1s 内停止尚无定量验收；临时文件清理只有局部测试。
+2. **数据工作台编辑**：分页表格只读；无逐行 CRUD/单元格编辑/写回；搜索无命中高亮；校验问题无分组；无统一样本/输出预览弹窗。
+3. **节点能力**：LLM 不向 provider 发送 tool definitions，无结构化输出/多轮/并发/成本统计；Validator 无代码规则与超时；Sampler 无多输出端口与分层采样；Simulation 的 Tools/Rules/Script 仍依赖 Config JSON；Tool Profile 无 MCP。
+4. **发布与体验**：10M 行实测、MSIX/安装包、文件关联/单实例、README 截图、完整浅色主题、节点尺寸手柄/边过渡动画、Undo/Redo 菜单尚未完成。
+
+### 1.3 一页总览
+
+**已做（可交付）**
+
+- Recipe 生命周期、端口契约、DAG 校验、顺序/并行执行、暂停/重试/取消、执行记录与输出摘要。
+- 10 个节点的执行器、默认配置、Recipe 序列化与画布接线。
+- Expression / Validator / Sampler / Tool Profile / Query Source / Simulation / Cleaner / SFT Export 专属属性面板。
+- JSONL / CSV / Parquet 读取、索引、分页、转换、校验、修复、搜索替换、去重、混洗、切分、统计。
+- Simulation 离线脚本与真实 provider、模拟/真实工具、并发、成本、失败样本。
+- 画布核心交互、主题资源、日志、CI、单文件发布、Headless UI 测试。
+
+**部分完成（可用但有缺口）**
+
+- Seed：三种格式可读；Streaming 只在 JSONL + 关闭索引缓存时生效，UI 未暴露；无节点内过滤/列映射。
+- LLM：三种 provider、超时/重试、Fluid Prompt 可用；tools 只写入输出、不发给 provider；无结构化输出/多轮/并发/成本。
+- Validator：表达式 + JSON Schema + reject 文件可用；失败样本无 UI 预览；无代码规则/超时/多规则组合。
+- Sampler：count/ratio/splits 可用；切分写文件但不产生独立输出端口；无分层采样/统计预览。
+- Cleaner：5 个布尔规则 + 正则规则可用；正则规则仍走 Config JSON；无预览/diff/坏行报告。
+- SFT Export：流式 + 原子替换 + 行透传可用；无文件选择器/覆盖确认/字段裁剪/预览/拆分/DPO-Pretrain 直出。
+- 执行：层内并行/暂停/重试/输出摘要可用；节点间全量内存物化，无溢写/恢复。
+- 画布：核心交互可用；无节点尺寸手柄/边动画/Undo-Redo 菜单；配置修改未进撤销历史。
+- 设置：主题变体与网格吸附生效；部分视图仍硬编码深色；内存占用只在启动时采样一次。
+
+**未实现（下一阶段工作池）**
+
+- 数据逐行 CRUD、单元格编辑、写回原文件、编辑撤销/重做。
+- 搜索命中高亮、校验问题分组、样本/输出预览弹窗。
+- 节点间流式/溢写磁盘、节点级中断恢复、取消 1s 定量验收、临时文件全链路清理。
+- LLM 请求侧 tools、结构化输出、多轮上下文、并发、token/成本统计、失败样本。
+- Validator 代码规则/超时/失败样本 UI/独立通过-拒绝端口。
+- Sampler 多输出端口、分层/分组采样、统计预览。
+- Simulation Tools/Rules/Script 可视化编辑器、流式 delta、速率限制/价格预设、容器级隔离。
+- Query Source 模板/外部数据源/随机或模型生成 query。
+- Tool Profile MCP 适配、共享工具库、LLM 请求侧复用。
+- Seed 多文件/目录、过滤/列映射、编码选项、HuggingFace/HTTP 数据源。
+- 10M 行实测、CSV/Parquet 大规模质量基线、CSV 类型推断。
+- 节点尺寸手柄、边过渡动画、标签避让、自动布局间距选项、完整浅色主题。
+- Undo/Redo 菜单与属性修改撤销、全局快捷键、系统剪贴板/跨实例粘贴。
+- MSIX/安装包、文件关联、单实例、命令行打开、崩溃报告导出、README 截图。
+- API Key 加密存储、设置变更通知、中文/英文文案统一、分析器与警告即错误。
 
 ---
 
 ## 二、节点能力矩阵（全部 10 个节点）
 
+### 2.0 端口契约与职责总表
+
+| 节点 | 输入端口 | 输出端口 | 责任 |
+| --- | --- | --- | --- |
+| Seed | 无 | `rows` | 从 JSONL/CSV/Parquet 读取数据 |
+| LLM / Model | `input` | `output` | 逐行调用模型，输出 assistant 消息 |
+| Expression | `input` | `output` | Fluid 模板/字段映射变换 |
+| Validator | `input` | `output` | 表达式/JSON Schema 过滤，可写 reject 文件 |
+| Sampler | `input` | `output` | 数量/比例采样，或切分多文件 |
+| Tool Profile | 无 | 无 | 工具 schema 配置，被 Simulation/LLM 引用 |
+| Query Source | 无 | `queries` | 生成模拟用户 query |
+| Simulation | `input` | `output` | 多轮 tool-calling 轨迹生成 |
+| Cleaner | `input` | `output` | 正则/格式/ANSI/reasoning/空消息清洗 |
+| SFT Export | `input` | 无 | 流式写 JSONL 并透传给下游（若有） |
+
+> 所有数据端口当前统一为 `rows` 类型；端口数量、名称、类型暂不可在 UI 中增删改。
+
 ### 2.1 Seed（数据输入）
 
 | 能力 | 状态 | 说明 |
 | --- | --- | --- |
-| JSONL 流式读取 | [x] | `SeedBlockExecutor` + `JsonlDatasetReader` |
+| JSONL / CSV / Parquet 读取 | [x] | `DatasetIO` 统一读取；CSV 记录边界索引、Parquet row group |
 | SQLite 索引缓存 | [x] | `UseIndexCache=true` 时走索引；可配置容量并清理 |
+| JSONL 纯流式 | [x] | `UseIndexCache=false` 时逐行读取 |
 | 行数进度 | [x] | `RowsProcessed` 上报 |
 | 专属属性面板 | [x] | 路径选择、文件类型、Index Cache 开关 |
-| 端口 schema 按类型固定 | [x] | 仅输出 `rows`；连接前校验方向/类型 |
-| CSV / Parquet 读取 | [x] | `DatasetIO` 统一读取；CSV 记录边界索引、Parquet row group |
-| `Streaming` 开关生效 | [部分] | 仅 JSONL 的 `UseIndexCache=false` 走纯流式；CSV/Parquet 由各自读取器决定 |
+| 端口 schema | [x] | 仅输出 `rows`；连接前校验方向/类型 |
+| 1M 行性能验收 | [x] | JSONL 1KB/行：索引 8.8s、分页 10.9ms、内存增量 14MB |
+| `Streaming` 开关 | [部分] | 仅 JSONL + 关闭索引缓存时生效；CSV/Parquet 由读取器决定；UI 未暴露 |
 | 数据预览 / 过滤 / 列映射 | [部分] | Data 视图可分页预览；节点内过滤/列映射未做 |
-| 大文件 1M 行性能验收 | [x] | JSONL 1KB/行：索引 8.8s、分页 10.9ms、内存增量 14MB（Round 10） |
+| 多文件 / 目录 / HuggingFace / HTTP 源 | [ ] | 仅单文件路径 |
+| 编码/分隔符/类型推断选项 | [ ] | CSV 全部按字符串暴露 |
+| 节点内 Limit/Offset/采样 | [ ] | 无 |
 
 ### 2.2 LLM / Model（单轮模型调用）
 
@@ -66,14 +129,17 @@
 | OpenAI Responses | [x] | `LlmApiClient` |
 | Anthropic Messages | [x] | `LlmApiClient` |
 | 模型、Endpoint、温度、Max tokens | [x] | 专属面板 |
-| Prompt 模板 | [部分] | 仅 `{{ field.path }}`，空 Prompt 时发送整行 JSON |
+| Prompt 模板 | [x] | 与 Expression 相同的 Fluid 引擎；空 Prompt 时发送整行 JSON |
 | 节点级超时 / 指数退避重试 | [x] | `TimeoutSeconds` / `MaxRetries` |
 | 密钥设置 | [x] | settings.json 本机保存，环境变量兜底 |
 | 输出格式 | [x] | 每行输出 `messages[{role:assistant,content}]` |
-| 多轮上下文 / tools / 结构化输出 | [ ] | LLM 节点只有单条 user 内容；tool-calling 只在 Simulation |
-| 并发调用 / 成本统计 | [ ] | 无 |
-| Prompt 预览 / Jinja / 语法校验 | [ ] | 无 |
+| Tool Profile 引用 | [部分] | 工具定义写入输出行，不发送给 provider |
+| Prompt 预览 / 语法校验 | [ ] | 执行期会校验模板，编辑期无预览 |
+| 多轮上下文 / 请求侧 tools | [ ] | LLM 节点只有单条 user 内容 |
+| 结构化输出（JSON Schema） | [ ] | 无 `response_format` / schema 强约束 |
+| 并发调用 / token/成本统计 | [ ] | 无 |
 | 失败样本单独输出 | [ ] | 失败即节点失败 |
+| 流式输出 / 模型列表 | [ ] | 无 |
 
 ### 2.3 Expression（字段变换）
 
@@ -83,25 +149,31 @@
 | 数组 `length` | [x] | `{{ messages.length }}` |
 | 字段别名映射 | [x] | `ExpressionBlockConfig.Fields` |
 | 无模板时字段映射 | [x] | 输出只含映射字段 |
-| 真实 Jinja2 / Liquid 引擎 | [x] | Fluid.Core；支持条件、循环、过滤器与 `json` 过滤器 |
+| Fluid 模板引擎 | [x] | 条件、循环、过滤器与 `json` 过滤器 |
 | 输出 JSON 合法性校验 | [x] | 渲染后立即解析；失败带行号与 JSON 位置 |
 | 专属属性面板 | [x] | 模板、字段别名、样本 JSON、预览输出 |
 | 渲染预览 / 语法校验 | [x] | 编辑期模板语法校验 + 样本渲染预览 |
-| 沙箱 / 超时 | [ ] | 纯模板渲染，无外部执行 |
+| 自定义函数 / 类型转换 | [ ] | 仅 Fluid 内置能力 |
+| 错误行策略（跳过/写失败文件） | [ ] | 模板错误即节点失败 |
+| 沙箱 / 超时 | [ ] | 纯模板渲染，无外部执行；暂不需要 |
 
 ### 2.4 Validator（规则校验与过滤）
 
 | 能力 | 状态 | 说明 |
 | --- | --- | --- |
 | 表达式规则 | [x] | `<path> <op> <value>` 或 `<path> exists`；支持 `== != contains > >= < <=` |
+| JSON Schema 规则 | [x] | JsonSchema.Net |
 | 非法行处理 | [x] | 解析失败视为 reject |
+| `RejectOnFailure=false` 透传 | [x] | 不匹配行也放行 |
 | 通过行可选清洗 | [x] | `ValidatorBlockConfig.Cleanup` |
 | 通过/拒绝计数日志 | [x] | 节点日志输出 |
 | reject 输出端口 / 失败文件 | [x] | `RejectOutputPath` 原子写 `{ lineNumber, reason, data }` JSONL |
-| JSON Schema / 代码规则 | [部分] | JSON Schema（JsonSchema.Net）；代码规则未实现 |
 | 专属属性面板 | [x] | 规则类型、规则/Schema、reject 开关与路径 |
-| 失败样本查看 / 失败率 / 超时 | [部分] | 失败样本落盘 + 失败率日志；无超时 |
-| 端口 schema 固定为输入/输出 | [x] | 输入 + 输出 `rows`；必需输入连接校验 |
+| 失败样本查看 / 失败率 / 超时 | [部分] | 失败样本落盘 + 失败率日志；无 UI 预览与超时 |
+| 代码规则 | [ ] | 无 C#/脚本规则 |
+| 多规则组合 / 正则规则 | [ ] | 单条规则 |
+| 独立 pass/reject 输出端口 | [ ] | reject 只写文件，不参与连线 |
+| 问题码 / 校验摘要 UI | [ ] | 仅日志与 reject 文件 |
 
 ### 2.5 Sampler（确定性采样）
 
@@ -111,10 +183,11 @@
 | 按比例采样 | [x] | Bernoulli + 固定 seed |
 | 确定性种子 | [x] | `Seed` |
 | `Splits` 切分 | [x] | `name:ratio` / `name:count`；确定性、单行只进一个文件 |
-| 多输出端口 / 多文件 | [部分] | 多文件已实现；多输出端口未实现 |
-| 分层采样 | [ ] | 无 |
+| 多输出端口 / 多文件 | [部分] | 多文件已实现；所有行仍从单一 output 端口透传 |
 | 专属属性面板 | [x] | Count / Ratio / Seed / Splits / 输出目录 |
-| 采样结果预览 / 统计 | [ ] | 仅日志汇总各 split 行数 |
+| 采样结果预览 / 统计 | [部分] | 仅日志汇总各 split 行数 |
+| 分层 / 分组采样 | [ ] | 无 |
+| 切分内再混洗 / 保序选项 | [ ] | 无 |
 
 ### 2.6 Tool Profile（工具配置）
 
@@ -122,11 +195,15 @@
 | --- | --- | --- |
 | 配置模型 | [x] | `ToolProfileBlockConfig` + `ToolProfile` + `ToolDefinition` |
 | 默认配置与 JSON 编辑 | [x] | 专属面板 + 通用 Config JSON |
-| 执行器 | [x] | `ToolProfileBlockExecutor` 配置型节点，无数据输出 |
+| 执行器 | [x] | `ToolProfileBlockExecutor` 配置型节点，无数据端口 |
 | 被 Simulation / LLM 复用 | [x] | Simulation 合并 profile tools；LLM 将 tools 写入输出元数据 |
 | Tool Schema 树形编辑器 | [x] | 参数树可增删/改名/改类型/必填；与 JSON Schema 双向同步 |
 | JSON 导入 / 导出 | [x] | 支持完整 profile、tool 数组或单个 tool |
-| MCP 工具 | [ ] | 无 |
+| 端口 / 校验 | [x] | 无数据端口；工具名/重复/引用校验在 RecipeValidationService |
+| Enum / Default 值 UI | [ ] | 模型支持，面板未暴露 |
+| 共享工具库 / 版本管理 | [ ] | profile 存在 Recipe 内 |
+| MCP 工具 | [ ] | 无 stdio/HTTP MCP 客户端与工具发现 |
+| 鉴权 / 工具调用请求侧复用 | [ ] | 仅 schema 复用 |
 
 ### 2.7 Query Source（模拟用户 query）
 
@@ -136,9 +213,10 @@
 | 多组 query 展开 | [x] | `MultipleQueries` |
 | System Prompt | [x] | 写入行 `system` 字段 |
 | 专属属性面板 | [x] | 多行 query、模式、Repeat、System Prompt |
-| query 模板 / 变量替换 | [ ] | 无 |
-| CSV / 外部 query 源 | [ ] | 无 |
+| query 模板 / 变量替换 | [ ] | 按字面量输出 |
+| CSV / JSONL / 外部 query 源 | [ ] | 仅面板内文本 |
 | 随机 / 模型生成 query | [ ] | 无 |
+| 去重 / 元数据 / 权重 | [ ] | 无 |
 
 ### 2.8 Simulation（多轮 tool-calling 轨迹）
 
@@ -154,9 +232,12 @@
 | tokens / 延迟 / 成本统计 | [x] | 逐行与汇总写 run log，不进 SFT 样本 |
 | 未完成轨迹独立输出 | [x] | `FailureOutputPath` 原子写，`MaxFailureSamples` 限制 |
 | 专属属性面板 | [x] | provider/模式/并发/成本/失败样本/沙箱参数 |
+| Tool Profile 合并 | [x] | profile tools 与节点 tools 合并，节点优先 |
 | Tools / Rules / Script UI 编辑器 | [ ] | 仍用 Config JSON |
 | 流式 delta / 速率限制 / 价格预设 | [ ] | 无 |
 | 容器级隔离 / 非 Windows 资源限制 | [ ] | 当前为协作式沙箱 |
+| MCP 工具接入 | [ ] | 依赖 Tool Profile MCP |
+| 工具结果裁剪/摘要策略 UI | [ ] | 仅输出上限与超时 |
 
 ### 2.9 Cleaner（轨迹清洗）
 
@@ -167,24 +248,28 @@
 | ANSI 清理 | [x] | |
 | 移除 reasoning_content | [x] | |
 | 丢弃空消息 | [x] | |
-| 清洗 `messages` 与 `tools[].description` | [x] | 未知字段保留 |
-| 专属属性面板 | [部分] | 布尔开关已接入；正则规则仍用 Config JSON |
+| 清洗 `messages` 与 `tools[].description` | [x] | 未知字段保留；无 `messages` 的行原样返回 |
+| 专属属性面板 | [部分] | 5 个布尔开关已接入；正则规则仍用 Config JSON |
 | 清洗预览 / diff | [ ] | 无 |
 | 坏行跳过与报告 | [ ] | 遇到坏 JSON 直接失败 |
 | 规则列表 UI | [ ] | 无 |
+| 自定义字段/JSONPath 清洗 | [ ] | 无 |
 
 ### 2.10 SFT Export（训练样本导出）
 
 | 能力 | 状态 | 说明 |
 | --- | --- | --- |
-| OAI messages + tools JSONL | [x] | 只输出 `messages` + `tools` |
-| 流式写临时文件 + 原子替换 | [x] | 取消/异常删除临时文件 |
+| JSONL 流式写出 | [x] | 临时文件 + 原子替换；取消/异常删除临时文件 |
+| JSON 规范化 | [x] | 每行解析后重写，保留原有字段 |
+| 按行透传给下游 | [x] | 节点有输出端口，下游可继续处理 |
 | 专属属性面板 | [x] | 输出路径 |
+| “只输出 messages + tools” | [部分] | 节点不裁剪字段；上游 Simulation 只产出 messages/tools，但 SFT Export 本身会保留额外字段 |
 | 文件选择器 | [ ] | 手输路径 |
 | 覆盖确认 / 追加模式 | [ ] | 总是覆盖目标 |
 | 输出预览 / 样本查看 | [ ] | 无 |
-| 按数量/比例拆分多文件 | [ ] | 无 |
-| DPO / Pretrain 目标格式 | [部分] | 数据工作台批量转换支持；SFT Export 节点仍只输出 OAI messages |
+| 字段白名单 / 目标格式选择 | [ ] | 无 |
+| 按数量/比例拆分多文件 | [ ] | 可用 Sampler 前置切分 |
+| DPO / Pretrain 直出 | [ ] | 数据工作台批量转换支持，节点本身只写 JSONL |
 
 ---
 
@@ -193,7 +278,7 @@
 ### 3.1 已完成
 
 - [x] 强类型 `BlockConfig` 多态层级、`kind` 判别、默认工厂、深拷贝、类型匹配校验。
-- [x] Recipe / Settings 原子持久化服务与 schema 版本。
+- [x] Recipe / Settings 原子持久化服务与 Recipe schema 版本。
 - [x] Recipe 文件生命周期：新建（空白/示例）、打开、保存、另存为、最近文件、脏标记、关闭确认与重启恢复。
 - [x] 端口契约：按 BlockType 生成端口；连接前校验方向、DataType、重复边、单输入与环；非法连接被拦截。
 - [x] 校验问题列表（属性面板）与画布节点错误/警告徽标，问题可定位到节点。
@@ -203,10 +288,9 @@
 - [x] Tool Profile：参数树编辑、JSON 导入导出、配置型执行器、Simulation/LLM 引用复用。
 - [x] 统一数据集读写（JSONL / CSV / Parquet）与临时文件 + 原子替换写出。
 - [x] 数据工作台：分页预览、行号跳转、页面大小切换、批量格式转换与失败行报告。
-- [x] 数据质量与治理（Round 11）：校验问题列表（级别/行号/路径/错误码）与跳行、JSONL 自动修复预览与写副本、搜索/正则替换、去重、确定性混洗、比例/份数切分、数据集统计。
+- [x] 数据质量与治理：校验问题列表（级别/行号/路径/错误码）与跳行、JSONL 自动修复预览与写副本、搜索/正则替换、去重、确定性混洗、比例/份数切分、数据集统计。
 - [x] DPO / Pretrain 格式检测、规范化与转换矩阵；不支持组合显式失败。
-- [x] 1M 行 JSONL 性能与内存基线（Round 10）。
-- [x] 1M 行质量操作基线（Round 11：去重+混洗+切分 124.2s、统计 63.6s、托管内存增量 2MB）。
+- [x] 1M 行 JSONL 性能与内存基线；1M 行质量操作基线（去重+混洗+切分 124.2s、统计 63.6s、托管内存增量 2MB）。
 - [x] JSONL 读取、索引缓存、LRU 容量清理、源文件指纹失效。
 - [x] DAG 校验：空 Recipe、重名、环、悬空边、孤立节点、重复边、端口归属/方向、DataType 兼容、节点配置告警。
 - [x] 执行引擎：拓扑分层、层内受控并行、fail-fast、下游 Skipped、取消、进度、日志。
@@ -216,35 +300,68 @@
 - [x] 真实沙箱与 Windows 资源限制。
 - [x] 模拟四节点流水线、并发、成本、失败样本。
 - [x] 通用 Config JSON 编辑器（kind/BlockType 一致性校验）。
-- [x] 撤销/重做基础能力：添加、删除、移动、连线、删除边、粘贴（块）。
-- [x] 画布基础交互：Block Sheet 拖放、可搜索添加菜单（`~` / 右键）、节点拖动、多选拖动、框选、端口连线、边选择/删除、中键平移、滚轮缩放、右键菜单、Mini-map 渲染、缩放百分比。
-- [x] 画布增强（Round 12）：网格背景与吸附（Alt 关闭）、鼠标中心缩放、Fit、拓扑自动布局、Mini-map 视口/点击、双击添加、复制携带连线、内联重命名、真实端口坐标、边 hover、增量拖拽。
+- [x] 撤销/重做基础能力：添加、删除、移动、连线、删除边、粘贴（块）、重命名。
+- [x] 画布基础交互：Block Sheet 拖放、可搜索添加菜单（`~` / 右键）、节点拖动、多选拖动、框选、端口连线、边选择/删除、中键平移、滚轮缩放、右键菜单、Mini-map 渲染、缩放百分比、可拖动分栏。
+- [x] 画布增强：网格背景与吸附（Alt 关闭）、鼠标中心缩放、Fit、拓扑自动布局、Mini-map 视口/点击、双击添加、复制携带连线、内联重命名、真实端口坐标、边 hover、增量拖拽。
 - [x] Settings 持久化：缓存目录/上限、网格设置、执行并行/重试/输出目录、主题选择、API Key 本机保存。
-- [x] 工程化（Round 12）：滚动日志与全局异常、CI、win-x64 单文件发布、Headless UI 测试、MIT LICENSE、应用图标、主题变体。
+- [x] 工程化：滚动日志与全局异常、CI、win-x64 单文件发布、Headless UI 测试、MIT LICENSE、应用图标、主题变体。
+- [x] 最近文件路径与 `CurrentFilePath` 状态栏接线；`TotalLines` 随执行进度更新；缩放百分比实时显示。
 
 ### 3.2 部分完成
 
 - [部分] 校验：已覆盖端口契约、必需输入、单输入、方向/类型、环与配置；缺少列号与问题分组（数据集校验已有错误码/路径）。
 - [部分] 执行：已支持层内并行/暂停/重试/输出摘要；节点间仍全量内存物化，无流式/溢写磁盘与节点级中断恢复。
 - [部分] 画布：端口坐标已改为实测值，缩放锚点/Fit/自动布局/Mini-map 点击/复制连线已完成；Undo/Redo 无菜单/按钮、无节点尺寸手柄与边过渡动画。
-- [部分] 设置：网格吸附与主题变体已生效；部分视图仍硬编码深色；内存占用只在构造时读取。
+- [部分] 设置：网格吸附与主题变体已生效；部分视图仍硬编码深色；内存占用只在构造时读取一次，无定时刷新。
+- [部分] 主题：Dark/Light 资源已拆分；Data 视图行、属性面板部分文本等仍有硬编码颜色。
 
-### 3.3 未实现
+### 3.3 未实现（按领域）
 
-- [x] 数据集分页预览与行号跳转（Round 10）；数据逐行 CRUD/单元格编辑未做。
-- [x] CSV / Parquet 读写与格式转换 UI（Round 10）。
-- [x] DPO / Pretrain 格式检测与批量转换（Round 10；SFT Export 节点未直接输出）。
-- [x] 数据校验问题列表、自动修复、搜索/正则替换（Round 11）。
-- [x] 去重 / 混洗 / 切分、数据集统计（Round 11）。
-- [ ] 搜索命中高亮、问题分组、数据编辑撤销/重做。
-- [x] 1M 行 JSONL 性能与内存验收（Round 10）、1M 行质量操作验收（Round 11）；10M 未做。
-- [x] Headless UI 测试、CI、win-x64 单文件发布（Round 12）；MSIX/安装包未做。
-- [x] LICENSE（MIT）与应用图标（Round 12）；README 截图未做。
-- [部分] 主题切换：Dark/Light 资源与 ThemeManager 已生效；部分视图仍硬编码深色。
-- [x] 全局异常处理、滚动日志（Round 12）；崩溃报告导出未做。
-- [ ] 单实例 / 文件关联 / 命令行打开。
-- [ ] 节点尺寸调整、边过渡动画、标签避让。
-- [ ] 节点间流式/溢写磁盘、节点级中断恢复。
+**数据与数据工作台**
+
+- [ ] 数据逐行 CRUD：插入、删除、单元格/JSON 编辑、写回原文件或另存。
+- [ ] 数据编辑撤销/重做与保存前差异预览。
+- [ ] 搜索命中高亮；校验问题按级别/错误码分组与筛选。
+- [ ] 统一样本/输出预览弹窗（SFT Export、Validator reject、Simulation 失败样本、Cleaner 前后 diff）。
+- [ ] CSV 类型推断与列类型展示；CSV/Parquet 1M 行质量基线；10M 行实测。
+- [ ] Seed 节点内过滤/列映射/多文件/目录/HuggingFace/HTTP 源。
+- [ ] 输出文件追加模式、字段白名单与目标格式选择。
+
+**执行与性能**
+
+- [ ] 节点间流式读取与溢写磁盘（内存阈值、临时目录、成功后清理）。
+- [ ] 节点级中断恢复：记录已完成节点输出，从上次失败/中断节点继续。
+- [ ] 取消 1s 内停止的定量验收；全链路临时文件清理验收。
+- [ ] 执行竞态/并发写同一目标文件的检测与提示。
+- [ ] 10M 行执行/质量/转换基线。
+- [ ] 执行历史批量清理与保留策略。
+
+**节点能力**
+
+- [ ] LLM 请求侧 tools、结构化输出、多轮上下文、并发、token/成本统计、失败样本。
+- [ ] Validator 代码规则、超时、多规则组合、失败样本 UI、独立 pass/reject 端口。
+- [ ] Sampler 多输出端口、分层/分组采样、统计预览。
+- [ ] Simulation Tools/Rules/Script 可视化编辑器、流式 delta、速率限制/价格预设、容器级隔离。
+- [ ] Query Source 模板/外部数据源/随机或模型生成 query。
+- [ ] Tool Profile MCP（stdio/HTTP）、共享工具库、鉴权。
+- [ ] Validator/LLM/SFT Export 的文件选择器与路径校验统一。
+
+**画布与 UI**
+
+- [ ] 节点尺寸调整手柄、边过渡动画、标签避让、自动布局间距/分组选项。
+- [ ] Undo/Redo 菜单与按钮、`Ctrl+Shift+Z`、属性面板删除/配置修改进入撤销历史。
+- [ ] 系统剪贴板/跨实例粘贴；全局快捷键避免焦点冲突。
+- [ ] 完整浅色主题（移除硬编码深色）。
+- [ ] 可拖动分栏持久化列宽；状态栏内存定时刷新。
+
+**发布与工程化**
+
+- [ ] 10M 性能报告与 CSV/Parquet 基线。
+- [ ] MSIX/安装包、文件关联、单实例、命令行打开 Recipe。
+- [ ] README 截图、示例 Recipe、发布说明。
+- [ ] 崩溃报告导出；日志级别/来源筛选。
+- [ ] API Key 加密存储、设置变更通知。
+- [ ] 中英文文案统一/本地化；`.editorconfig`、分析器、警告即错误。
 
 ---
 
@@ -253,118 +370,119 @@
 | 节点 | 专属面板 | 已覆盖字段 | 仍依赖 Config JSON |
 | --- | --- | --- | --- |
 | Seed | 是 | 路径、文件类型、Index Cache | 无（Streaming 未暴露） |
-| LLM | 是 | Provider、Model、温度、Max tokens、超时、重试、Endpoint、Prompt | 无 |
+| LLM | 是 | Provider、Model、温度、Max tokens、超时、重试、Endpoint、Prompt、Tool Profile | 无 |
 | Expression | 是 | 模板、字段别名、样本 JSON、预览输出 | 无 |
 | Validator | 是 | 规则类型、规则/Schema、reject 开关与路径 | Cleanup 正则规则 |
 | Sampler | 是 | Count、Ratio、Seed、Splits、输出目录 | 无 |
-| Tool Profile | 是 | 工具列表、参数 JSON、参数树、profile JSON 导入导出 | 无 |
+| Tool Profile | 是 | 工具列表、参数 JSON、参数树、profile JSON 导入导出 | Enum/Default 未暴露 |
 | Query Source | 是 | Queries、Mode、Repeat、System Prompt | 无 |
-| Simulation | 是 | Provider、模式、模型、轮数、并发、温度、tokens、超时、重试、Endpoint、System/Final、失败样本、成本、沙箱 | Tools、Rules、Script |
+| Simulation | 是 | Provider、模式、模型、轮数、并发、温度、tokens、超时、重试、Endpoint、System/Final、失败样本、成本、沙箱、Tool Profile | Tools、Rules、Script |
 | Cleaner | 是（部分） | 5 个布尔规则 | RegexReplacements |
-| SFT Export | 是 | 输出路径 | 无 |
+| SFT Export | 是 | 输出路径 | 无（无文件选择器） |
 
 ---
 
-## 五、下一阶段规划（Round 8–12）
+## 五、已完成轮次（Round 8–12）
 
-### Round 8 — Recipe 生命周期与节点契约（P0，已完成 2026-11-16）
-
-**目标**：让“编辑中的 Recipe”真正可保存、可恢复、可交付；修正节点端口契约。
-
-**交付**
-1. Recipe 新建 / 打开 / 保存 / 另存为：Avalonia `StorageProvider`、`RecipeStore` 复用、错误提示带路径与 JSON 位置。
-2. 最近文件、脏标记、关闭确认、重启后恢复上次打开文件（或明确回到空白）。
-3. 把硬编码示例 Recipe 改为“从示例新建”，不再作为唯一启动内容。
-4. 按 BlockType 生成端口 schema：
-   - Seed / Query Source：仅输出；
-   - SftExport：仅输入；
-   - Tool Profile：无数据端口；
-   - 其余：输入 + 输出。
-5. 校验补强：每种节点的必需输入/输出、单输入约束、端口类型与节点类型匹配；修正示例 Recipe 端口。
-6. 画布节点显示校验错误徽标；属性面板问题列表可定位。
-7. 测试：RecipeStore/ViewModel 文件生命周期、端口工厂、端口校验、坏文件加载。
-
-> 完成情况：File 菜单 + 快捷键 + StorageProvider 已接线；最近文件/上次路径写入设置；脏标记与关闭确认可用；启动默认空白并可恢复上次文件；“New from Sample”加载 4 节点示例；端口 schema 与连接拦截已生效；属性面板问题列表与画布徽标已接入；新增端口/连接/文档生命周期测试，测试总数 285（+2 gated）。
-
-**验收**
-- 保存后重新加载，节点/边/配置/坐标/schemaVersion 完全一致。
-- 关闭有未保存修改时弹确认；取消不丢数据。
-- 从 Block Sheet 添加的节点端口正确；错误连线被校验拦截。
-- `dotnet build` 0 警告，`dotnet test` 全绿。
-
-### Round 9 — 节点能力补齐（P0/P1，已完成 2026-11-16）
-
-**交付**
-1. Expression：替换为真实模板引擎（Fluid），支持条件/循环/过滤器；专属面板 + 变量说明 + 渲染预览 + 语法错误定位；输出必须是合法 JSON。
-2. Validator：专属面板；JSON Schema 规则；reject 分支（`RejectOutputPath`）；失败率与失败样本；`RejectOnFailure=false` 时透传。
-3. Sampler：`Splits` 真正生效（ratio/count 多文件）；专属面板；确定性测试。
-4. Tool Profile：Tool Schema 树形编辑器、JSON 导入/导出、被 Simulation/LLM 复用；MCP 适配留到后续。
-5. 每个节点至少覆盖成功/失败/边界路径测试。
-
-**验收**
-- Expression 条件/循环/过滤器示例通过；非法模板在编辑期报错。
-- Validator 通过/拒绝行数守恒，拒绝样本可查看。
-- Sampler 输出行数守恒、同 seed 可复现、切分文件数正确。
-- Tool Profile 导出的 JSON 可被 OpenAI 工具格式消费。
-
-> 完成情况：新增 Fluid.Core 与 JsonSchema.Net；四个节点均接入专属面板；新增 Expression/Validator/Sampler/Tool Profile 测试，测试总数 311（+2 gated）。多输出端口、Validator 代码规则/超时、LLM 请求侧 tool definitions 与 MCP 留到后续。
-
-### Round 10 — 数据工作台 A：预览与格式（P1）
-
-**交付**
-1. JSONL 分页预览表格（虚拟化），行号跳转、只加载当前页。
-2. Seed 支持 CSV / Parquet 读取；DatasetWriter 支持 CSV / Parquet 写出；统一 `IDatasetReader/Writer`。
-3. 格式转换服务接线到 UI：OpenAI / ShareGPT / Alpaca，批量转换、进度、失败行 `.errors.jsonl`。
-4. DPO / Pretrain 格式模型与转换。
-5. 1M 行 JSONL 打开/预览/转换性能验收，内存 ≤ 300MB。
-
-**验收**
-- 1M 行文件打开与分页跳转满足基线；不一次性加载全文件。
-- 任意支持格式转换后行数一致，失败行带行号与原因。
-- CSV/Parquet 往返内容一致。
-
-> 完成情况（2026-11-17）：统一 `IDatasetReader/IDatasetWriter` 已落地；CSV 记录边界索引、Parquet row group 读取、JSON 嵌套元数据还原；Data 视图支持分页/跳转/转换/取消/失败行；Seed 支持三种格式；新增 20 个常规测试 + 1 个 gated 1M 行性能测试。1KB/行 1M 行实测：索引 8.8s、分页 10.9ms、内存增量 14MB、转换 66.9s。未做：数据编辑/搜索/去重、CSV 类型推断、CSV/Parquet 1M 基线、SFT 节点直接输出 DPO/Pretrain。
-
-### Round 11 — 数据工作台 B：质量与治理（P1）
-
-**交付**
-1. 校验问题列表（级别/行号/路径/消息/跳转）与自动修复预览。
-2. 搜索 / 正则替换（当前页、全文件、匹配预览、取消）。
-3. 去重（哈希 + SQLite/外排）、混洗（固定 seed）、按比例/份数切分。
-4. 数据集统计：角色分布、长度分布、空样本、重复率、工具调用数。
-5. 大数据坏行/超长行/非法 UTF-8 fixtures 与错误上限。
-
-**验收**
-- 去重/混洗/切分行数守恒，同 seed 可复现。
-- 自动修复只改目标文件，原文件不变。
-- 1M/10M 行处理不崩溃，内存与耗时记录在案。
-
-> 完成情况（2026-11-17）：`ValidateAsync` 字节级 JSONL 校验（严格 UTF-8/超长行/BOM）与 CSV/Parquet 结构校验、问题码/路径/错误上限；JSONL 自动修复预览与写副本；搜索/正则替换（当前页/全文件/预览/取消）；SHA256 + SQLite 去重、固定 seed 外排混洗、比例/份数切分；统计（角色/长度/空样本/重复率/工具调用）。Data 视图新增 Search/Transform/Stats/Validate 标签页。新增 37 个常规测试 + 1 个 gated 质量操作基线；1M 行（256B/行）实测去重+混洗+切分 124.2s、统计 63.6s、托管内存增量 2MB。未做：数据逐行 CRUD、命中高亮、10M 实测（提供 `LMTDS_PERF_ROWS=10000000` 入口）、CSV/Parquet 1M 质量基线。
-
-### Round 12 — 画布、执行体验与发布工程化（P1/P2）
-
-**交付**
-1. 画布：网格背景、网格吸附（含 Alt 临时关闭）、鼠标中心缩放、Fit to View、自动布局、Mini-map 视口矩形与点击导航、双击空白添加、复制携带内部连线、内联重命名、可拖动分栏、真实端口坐标、节点尺寸手柄、边 hover/动画。
-2. 执行：层内并行、暂停/重试、节点间流式或溢写磁盘、输出目录/命名/摘要、中断恢复与临时文件清理。
-3. 工程化：Headless UI 测试、1M/10M 基准、CI、打包/单文件/安装包、主题切换、滚动日志/全局异常、LICENSE/Assets/README 截图。
-
-**验收**
-- 画布操作满足手工脚本；500 节点拖动/缩放单帧 < 100ms。
-- 执行取消 1s 内停止且无半成品输出；并行层行为可测试。
-- 干净环境可安装启动，CI 全绿。
-
-> 完成情况（2026-11-17）：画布完成网格/吸附（Alt 关闭）、鼠标中心缩放、Fit、拓扑自动布局、Mini-map 视口与点击、双击添加、复制携带连线、内联重命名、实测端口坐标、边 hover 与增量拖拽；执行完成层内受控并行、暂停/恢复、节点重试、输出目录与 `run-summary.json`；工程化完成滚动日志/全局异常、主题变体、CI、win-x64 单文件发布、Headless UI 测试、MIT LICENSE 与应用图标。新增 18 个测试（总计 386 通过 + 4 gated），500 节点布局测试 <100ms，单文件发布启动冒烟通过。未做：节点尺寸手柄、边过渡动画、节点间流式/溢写磁盘、节点级中断恢复、10M 实测、MSIX/安装包、README 截图、完整浅色主题（部分视图硬编码深色）、拖动/缩放逐帧 UI 计时。
+| Round | 主题 | 关键交付 | 结果 |
+| --- | --- | --- | --- |
+| 8 | Recipe 生命周期与节点契约 | File 菜单/快捷键、最近文件、脏标记、关闭确认、上次文件恢复、按类型端口契约、错误徽标 | 285 测试 |
+| 9 | 节点能力补齐 | Fluid 模板、JSON Schema + reject、Sampler Splits、Tool Profile 树形编辑与复用 | 311 测试 |
+| 10 | 数据工作台 A | JSONL 分页/跳转、CSV/Parquet、批量转换、DPO/Pretrain、1M 基线 | 331 测试 |
+| 11 | 数据工作台 B | 校验/修复、搜索替换、去重/混洗/切分、统计 | 368 测试 |
+| 12 | 画布、执行与发布 | 网格/吸附/锚点缩放/Fit/自动布局/Mini-map、并行/暂停/重试/输出摘要、CI/打包/主题/日志 | 386 测试 + 4 gated |
 
 ---
 
-## 六、建议的后续工作
+## 六、下一阶段规划（Round 13–16）
 
-Round 12 已完成；剩余工作按优先级：
+> 排序原则：先解决会限制后续功能的数据规模与执行可靠性，再补用户直接可见的数据编辑与节点能力，最后做发布体验。
 
-1. **执行韧性**：节点间流式/溢写磁盘、取消 1s 内停止的定量验收、节点级中断恢复与临时文件清理。
-2. **画布 polish**：节点尺寸手柄、边过渡动画、Undo/Redo 菜单与快捷键、完整浅色主题、拖动/缩放逐帧基准。
-3. **发布工程化**：10M 性能验收、MSIX/安装包、CI 产物发布、README 截图与示例 Recipe。
-4. **节点能力**：Validator 代码规则/超时、Sampler 多输出端口/分层采样、LLM tool definitions、Tool Profile MCP 适配。
+### Round 13 — 执行与 IO 韧性（P0）
+
+**目标**：让 DAG 在大数据量下不依赖全量内存，并具备可恢复、可验证的取消/清理行为。
+
+**交付**
+
+1. 节点间输出溢写：为每条边建立临时 JSONL 缓冲，达到内存阈值后落盘；下游按流读取；运行结束/取消/失败统一清理。
+2. 执行恢复：在运行输出目录保存节点完成状态与输出引用；Executions UI 提供“从上次失败/中断处继续”。
+3. 取消与超时硬化：取消后 1s 内停止新行处理；所有目标文件保持原子替换；清理 `.tmp` 与溢写目录。
+4. SFT Export 收尾：输出路径文件选择器、覆盖确认、可选字段白名单（`messages`/`tools`）、写出行数与预览摘要。
+5. 测试：1M 行多节点链路内存上限、取消时序、恢复一致性、临时文件清理。
+
+**验收**
+
+- 1M 行 Seed → Expression → SFT Export 链路托管内存峰值 ≤ 300MB（可配置阈值），不一次性物化全部行。
+- 取消后 1s 内停止，目标文件不存在半成品，溢写目录为空。
+- 中断后恢复跳过已完成节点，最终输出与不中断运行逐字节一致（或哈希一致）。
+- `dotnet build` 0 警告，测试全绿。
+
+### Round 14 — 数据工作台编辑与预览（P1）
+
+**目标**：把 Data 视图从“只读预览 + 批处理”升级为可编辑的数据工作台。
+
+**交付**
+
+1. 逐行 CRUD：插入/删除/复制行，单元格 JSON 编辑，保存到新文件或覆盖原文件（覆盖需确认）。
+2. 编辑撤销/重做与保存前差异摘要；大文件按页编辑 + 流式重写，不整文件载入。
+3. 搜索命中高亮；校验问题按级别/错误码分组与筛选。
+4. 统一样本/输出预览：SFT Export 输出、Validator reject、Simulation 失败样本、Cleaner 前后 diff。
+5. 测试：编辑行数守恒、撤销恢复、覆盖保护、1M 行编辑保存内存上限。
+
+**验收**
+
+- 任意页可编辑并保存，未修改行字节不变；取消保存不破坏原文件。
+- 撤销/重做恢复内容与行号；搜索命中在表格中可见。
+- 1M 行编辑/保存托管内存增量 ≤ 300MB。
+- 预览弹窗与节点/文件路径可双向定位。
+
+### Round 15 — 节点能力收紧（P1）
+
+**目标**：补齐影响数据质量与工具调用工作流的关键节点能力。
+
+**交付**
+
+1. LLM：请求侧 tool definitions、结构化输出（JSON Schema/`response_format`）、多轮上下文、并发、token/成本统计、失败样本。
+2. Validator：代码规则（受限表达式/脚本）+ 超时 + 多规则组合 + 失败样本 UI + 独立 pass/reject 端口。
+3. Sampler：多输出端口（train/valid/test）、分层/分组采样、切分统计预览。
+4. Simulation：Tools / Rules / Script 可视化编辑器；流式 delta；速率限制与价格预设。
+5. Query Source：模板变量、外部 CSV/JSONL query 源。
+6. 测试：请求体断言、结构化输出校验、规则超时、端口行数守恒、分层分布偏差、编辑器回写。
+
+**验收**
+
+- LLM 请求中能看到 tools 与 structured output 配置，非法输出有明确错误。
+- Validator 超时可中断，pass/reject 端口行数守恒。
+- Sampler 多端口输出行数守恒，分层比例在容差内。
+- Simulation 不编辑 Config JSON 也能完成 Tools/Rules/Script 配置。
+- 每个节点至少覆盖成功/失败/边界路径。
+
+### Round 16 — 发布与体验（P2）
+
+**目标**：达到可对外演示/分发的完成度。
+
+**交付**
+
+1. 画布 polish：节点尺寸手柄、边过渡动画、标签避让、自动布局间距/分组选项、Undo/Redo 菜单与属性修改撤销。
+2. 完整浅色主题，移除剩余硬编码颜色；状态栏内存定时刷新。
+3. 发布：MSIX/安装包、文件关联、单实例、命令行打开 Recipe、崩溃报告导出。
+4. 性能与文档：10M 行基线、CSV/Parquet 大规模基线、README 截图、示例 Recipe、发布说明。
+5. 工程质量：`.editorconfig`、分析器、警告即错误、文案统一。
+
+**验收**
+
+- 500 节点拖动/缩放/尺寸调整单帧 < 100ms（逐帧计时）。
+- 浅色主题下所有主视图无深色残留。
+- 干净环境安装启动，双击 `.recipe.json` 可打开，重复启动复用单实例。
+- 10M 行基线数据记录在文档中，README 截图与示例可直接使用。
+
+### 6.1 后续 backlog（暂不排期）
+
+- Tool Profile MCP（stdio/HTTP）、共享工具库与鉴权。
+- 容器级沙箱隔离、非 Windows 资源限制。
+- HuggingFace/HTTP 数据源。
+- 多语言 UI、插件化节点、云端执行。
+- 实时图表（LiveCharts2/OxyPlot）与执行指标面板。
 
 ---
 

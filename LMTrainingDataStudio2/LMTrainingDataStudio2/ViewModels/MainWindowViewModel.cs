@@ -193,12 +193,12 @@ public partial class MainWindowViewModel : ObservableObject
 
     private void InitializeBlockTemplates()
     {
-        BlockTemplates.Add(new BlockTemplateViewModel("Seed", BlockType.Seed, "Data input source (JSONL / CSV / Parquet / HuggingFace)"));
-        BlockTemplates.Add(new BlockTemplateViewModel("LLM / Model", BlockType.Llm, "Model call with structured output"));
-        BlockTemplates.Add(new BlockTemplateViewModel("Expression", BlockType.Expression, "Jinja2 field transformation"));
-        BlockTemplates.Add(new BlockTemplateViewModel("Validator", BlockType.Validator, "Code validation and filtering"));
+        BlockTemplates.Add(new BlockTemplateViewModel("Seed", BlockType.Seed, "Data input source (JSONL / CSV / Parquet)"));
+        BlockTemplates.Add(new BlockTemplateViewModel("LLM / Model", BlockType.Llm, "Per-row model call with Fluid prompt templates"));
+        BlockTemplates.Add(new BlockTemplateViewModel("Expression", BlockType.Expression, "Fluid template field transformation"));
+        BlockTemplates.Add(new BlockTemplateViewModel("Validator", BlockType.Validator, "Expression / JSON Schema validation and filtering"));
         BlockTemplates.Add(new BlockTemplateViewModel("Sampler", BlockType.Sampler, "Deterministic sampling and splitting"));
-        BlockTemplates.Add(new BlockTemplateViewModel("Tool Profile", BlockType.ToolProfile, "MCP tool configuration"));
+        BlockTemplates.Add(new BlockTemplateViewModel("Tool Profile", BlockType.ToolProfile, "OpenAI-compatible tool schema configuration"));
         BlockTemplates.Add(new BlockTemplateViewModel("Query Source", BlockType.QuerySource, "Simulated user queries (single or multiple groups)"));
         BlockTemplates.Add(new BlockTemplateViewModel("Simulation", BlockType.Simulation, "Mini harness: simulated model, tools, retries, timeouts"));
         BlockTemplates.Add(new BlockTemplateViewModel("Cleaner", BlockType.Cleaner, "Regex and formatting cleanup for OAI messages"));
