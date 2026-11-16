@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using LMTrainingDataStudio2.Commands;
 using LMTrainingDataStudio2.Models;
 using LMTrainingDataStudio2.Services;
+using LMTrainingDataStudio2.Services.Executors;
 using System.Collections.ObjectModel;
 
 namespace LMTrainingDataStudio2.ViewModels;
@@ -16,7 +17,9 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly DatasetValidationService _datasetValidation = new();
     private readonly DatasetFormatConverter _formatConverter = new();
     private readonly ISettingsStore _settingsStore;
+    private readonly ExecutionStore _executionStore = new();
     private AppSettings _settings;
+    private CancellationTokenSource? _runCancellation;
 
     [ObservableProperty]
     private string _recipeName = "Untitled Recipe";
@@ -43,6 +46,7 @@ public partial class MainWindowViewModel : ObservableObject
     private double _progress;
 
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(CancelRunCommand))]
     private bool _isRunning;
 
     [ObservableProperty]
@@ -80,6 +84,7 @@ public partial class MainWindowViewModel : ObservableObject
     public ObservableCollection<BlockTemplateViewModel> BlockTemplates { get; } = new();
     public ObservableCollection<string> LogMessages { get; } = new();
     public CommandHistory CommandHistory { get; } = new();
+    public ExecutionsViewModel Executions { get; }
 
     public MainWindowViewModel() : this(new SettingsStore())
     {
@@ -90,6 +95,7 @@ public partial class MainWindowViewModel : ObservableObject
         _settingsStore = settingsStore ?? throw new ArgumentNullException(nameof(settingsStore));
         var loadResult = _settingsStore.Load();
         _settings = loadResult.Settings;
+        Executions = new ExecutionsViewModel(_executionStore);
 
         LoadSettingsSnapshot();
         InitializeBlockTemplates();
@@ -227,33 +233,61 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private async Task RunRecipeAsync()
     {
+        if (IsRunning) return;
+
         IsRunning = true;
-        StatusText = "Running recipe...";
         Progress = 0;
+        StatusText = "Running recipe...";
         LogMessages.Clear();
         LogMessages.Add("[Info] Recipe execution started.");
 
-        // Simulate execution with progress
-        await Task.Run(async () =>
+        _runCancellation = new CancellationTokenSource();
+        var cancellationToken = _runCancellation.Token;
+
+        try
         {
-            for (int i = 0; i <= 100; i += 5)
+            var recipe = BuildRecipeFromViewModel();
+            var runner = CreateRecipeRunner();
+            var progress = new Progress<ExecutionProgress>(OnExecutionProgress);
+
+            var run = await Task.Run(() => runner.RunAsync(recipe, progress, cancellationToken));
+
+            try
             {
-                await Task.Delay(100);
-                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                {
-                    Progress = i / 100.0;
-                });
+                await _executionStore.SaveAsync(run, CancellationToken.None);
+                await Executions.RefreshAndSelectAsync(run.RunId);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                LogMessages.Add($"[Error] Failed to save execution record: {ex.Message}");
             }
 
-            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            Progress = 1.0;
+            StatusText = run.Status switch
             {
-                LogMessages.Add("[Info] Recipe execution completed.");
-                StatusText = "Execution complete ✓";
-                Progress = 1.0;
-                IsRunning = false;
-            });
-        });
+                RunStatus.Succeeded => "Execution complete ✓",
+                RunStatus.Cancelled => "Execution cancelled",
+                RunStatus.Failed => "Execution failed — see Executions for details",
+                _ => $"Execution {run.Status}"
+            };
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Execution error: {ex.Message}";
+            LogMessages.Add($"[Error] {ex.Message}");
+        }
+        finally
+        {
+            _runCancellation.Dispose();
+            _runCancellation = null;
+            IsRunning = false;
+        }
     }
+
+    [RelayCommand(CanExecute = nameof(CanCancelRun))]
+    private void CancelRun() => _runCancellation?.Cancel();
+
+    private bool CanCancelRun() => IsRunning;
 
     [RelayCommand]
     private void AddBlock(BlockType type)
@@ -308,9 +342,10 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void SwitchToExecutions()
+    private async Task SwitchToExecutionsAsync()
     {
         IsEditorView = false;
+        await Executions.RefreshAsync();
     }
 
     [RelayCommand]
@@ -413,6 +448,25 @@ public partial class MainWindowViewModel : ObservableObject
         }
 
         return recipe;
+    }
+
+    private RecipeRunner CreateRecipeRunner() => new(
+        _recipeValidation,
+        new IBlockExecutor[]
+        {
+            new SeedBlockExecutor(_settings),
+            new ExpressionBlockExecutor(),
+            new ValidatorBlockExecutor(),
+            new SamplerBlockExecutor()
+        });
+
+    private void OnExecutionProgress(ExecutionProgress progress)
+    {
+        Progress = progress.TotalBlocks == 0 ? 0 : (double)progress.CompletedBlocks / progress.TotalBlocks;
+        TotalLines = progress.ProcessedRows;
+        StatusText = progress.CurrentBlockName is null
+            ? "Running recipe..."
+            : $"Running {progress.CurrentBlockName} ({progress.CompletedBlocks}/{progress.TotalBlocks})";
     }
 
     private void UpdateMemoryUsage()

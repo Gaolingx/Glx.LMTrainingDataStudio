@@ -88,8 +88,10 @@
             </Grid>
         </Border>
 
+        <Grid>
         <!-- Main Content: Three-Column Layout -->
-        <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto">
+        <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto"
+              IsVisible="{Binding IsEditorView}">
 
             <!-- Block Sheet Panel (200px) -->
             <Grid Grid.Column="0">
@@ -230,6 +232,10 @@
                     </DockPanel>
                 </Border>
             </Grid>
+        </Grid>
+
+        <!-- Executions: run list + node/log details -->
+        <views:ExecutionsView IsVisible="{Binding !IsEditorView}" />
         </Grid>
     </DockPanel>
 

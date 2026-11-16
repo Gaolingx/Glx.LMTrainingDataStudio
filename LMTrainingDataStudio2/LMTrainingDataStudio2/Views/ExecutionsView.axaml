@@ -1,0 +1,163 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:LMTrainingDataStudio2.ViewModels"
+             xmlns:models="using:LMTrainingDataStudio2.Models"
+             mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="700"
+             x:Class="LMTrainingDataStudio2.Views.ExecutionsView"
+             x:DataType="vm:MainWindowViewModel">
+
+    <Grid ColumnDefinitions="380,Auto,*" Background="{StaticResource CanvasBackgroundBrush}">
+
+        <!-- Run list -->
+        <Border Grid.Column="0"
+                Background="{StaticResource PanelBackgroundBrush}"
+                BorderBrush="{StaticResource PanelBorderBrush}"
+                BorderThickness="0,0,1,0">
+            <DockPanel>
+                <Border DockPanel.Dock="Top" Height="44"
+                        Background="{StaticResource HeaderBackgroundBrush}"
+                        BorderBrush="{StaticResource PanelBorderBrush}"
+                        BorderThickness="0,0,0,1">
+                    <Grid ColumnDefinitions="*,Auto,Auto" Margin="12,0">
+                        <TextBlock Text="Executions" FontSize="12" FontWeight="SemiBold"
+                                   VerticalAlignment="Center" Foreground="#CCCCCC" />
+                        <ComboBox Grid.Column="1"
+                                  ItemsSource="{Binding Executions.StatusFilters}"
+                                  SelectedItem="{Binding Executions.StatusFilter, Mode=TwoWay}"
+                                  MinWidth="110" FontSize="11" VerticalAlignment="Center"
+                                  Margin="0,0,6,0" />
+                        <Button Grid.Column="2" Content="↻"
+                                Command="{Binding Executions.RefreshExecutionsCommand}"
+                                IsEnabled="{Binding !Executions.IsBusy}"
+                                Background="Transparent" Foreground="#AAAAAA"
+                                FontSize="12" Padding="8,4"
+                                ToolTip.Tip="Refresh executions" />
+                    </Grid>
+                </Border>
+
+                <TextBlock DockPanel.Dock="Bottom"
+                           Text="{Binding Executions.StatusText}"
+                           FontSize="10" Foreground="#777777"
+                           Margin="12,8" TextWrapping="Wrap" />
+
+                <ListBox ItemsSource="{Binding Executions.Runs}"
+                         SelectedItem="{Binding Executions.SelectedRunSummary, Mode=TwoWay}"
+                         Background="Transparent" BorderThickness="0" Margin="6">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="models:ExecutionRunSummary">
+                            <StackPanel Spacing="2" Margin="2,5">
+                                <TextBlock Text="{Binding RunId}" FontSize="12" FontWeight="SemiBold"
+                                           Foreground="#E0E0E0" TextTrimming="CharacterEllipsis" />
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <TextBlock Text="{Binding Status}" FontSize="10" Foreground="#AAAAAA" />
+                                    <TextBlock Text="{Binding StartedAt, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}"
+                                               FontSize="10" Foreground="#777777" />
+                                </StackPanel>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+        </Border>
+
+        <GridSplitter Grid.Column="1" Width="4" Background="Transparent" />
+
+        <!-- Run details -->
+        <DockPanel Grid.Column="2">
+            <Border DockPanel.Dock="Top" Height="44"
+                    Background="{StaticResource HeaderBackgroundBrush}"
+                    BorderBrush="{StaticResource PanelBorderBrush}"
+                    BorderThickness="0,0,0,1">
+                <Grid ColumnDefinitions="*,Auto" Margin="12,0">
+                    <StackPanel Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Executions.SelectedRunSummary.RunId, TargetNullValue='No run selected'}"
+                                   FontSize="12" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                        <TextBlock Text="{Binding Executions.SelectedRun.Status}"
+                                   FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{Binding Executions.SelectedRunSummary.RecipeId}"
+                                   FontSize="11" Foreground="#777777" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Content="Cancel"
+                            Command="{Binding CancelRunCommand}"
+                            IsVisible="{Binding IsRunning}"
+                            Padding="12,5" FontSize="11"
+                            Background="#3A2020" Foreground="#FF8080"
+                            VerticalAlignment="Center" />
+                </Grid>
+            </Border>
+
+            <!-- Empty state -->
+            <StackPanel IsVisible="{Binding Executions.SelectedRun, Converter={x:Static ObjectConverters.IsNull}}"
+                        VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="6">
+                <TextBlock Text="Select a run to inspect node states and logs."
+                           FontSize="12" Foreground="#888888" />
+                <TextBlock Text="Runs appear here after executing a recipe."
+                           FontSize="10" Foreground="#666666" />
+            </StackPanel>
+
+            <Grid IsVisible="{Binding Executions.SelectedRun, Converter={x:Static ObjectConverters.IsNotNull}}"
+                  RowDefinitions="Auto,Auto,2*,Auto,*" Margin="14">
+
+                <!-- Summary -->
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="24" Margin="0,2,0,10">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <TextBlock Text="Started:" FontSize="10" Foreground="#888888" />
+                        <TextBlock Text="{Binding Executions.SelectedRun.StartedAt, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}"
+                                   FontSize="10" Foreground="#CCCCCC" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <TextBlock Text="Finished:" FontSize="10" Foreground="#888888" />
+                        <TextBlock Text="{Binding Executions.SelectedRun.FinishedAt, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}"
+                                   FontSize="10" Foreground="#CCCCCC" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Node table header -->
+                <Grid Grid.Row="1" ColumnDefinitions="2*,110,80,80,2*" Margin="0,0,0,4">
+                    <TextBlock Text="Block" FontSize="10" Foreground="#888888" />
+                    <TextBlock Grid.Column="1" Text="Status" FontSize="10" Foreground="#888888" />
+                    <TextBlock Grid.Column="2" Text="In rows" FontSize="10" Foreground="#888888" />
+                    <TextBlock Grid.Column="3" Text="Out rows" FontSize="10" Foreground="#888888" />
+                    <TextBlock Grid.Column="4" Text="Error" FontSize="10" Foreground="#888888" />
+                </Grid>
+
+                <!-- Node table -->
+                <ScrollViewer Grid.Row="2">
+                    <ItemsControl ItemsSource="{Binding Executions.SelectedRun.Nodes}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="models:NodeExecutionResult">
+                                <Grid ColumnDefinitions="2*,110,80,80,2*" Margin="0,3">
+                                    <TextBlock Text="{Binding BlockName}" FontSize="11" Foreground="#E0E0E0"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Status}" FontSize="11" Foreground="#CCCCCC" />
+                                    <TextBlock Grid.Column="2" Text="{Binding InputRows}" FontSize="11" Foreground="#AAAAAA" />
+                                    <TextBlock Grid.Column="3" Text="{Binding OutputRows}" FontSize="11" Foreground="#AAAAAA" />
+                                    <TextBlock Grid.Column="4" Text="{Binding Error}" FontSize="10" Foreground="#FF8080"
+                                               TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <TextBlock Grid.Row="3" Text="Logs" FontSize="11" FontWeight="SemiBold"
+                           Foreground="#CCCCCC" Margin="0,10,0,4" />
+
+                <Border Grid.Row="4" Background="#1A1A2A" CornerRadius="4" Padding="8">
+                    <ScrollViewer>
+                        <ItemsControl ItemsSource="{Binding Executions.SelectedRun.Logs}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}" FontSize="10" Foreground="#AAAAAA"
+                                               TextWrapping="Wrap" Margin="0,1" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+        </DockPanel>
+    </Grid>
+</UserControl>
