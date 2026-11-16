@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using LMTrainingDataStudio2.Localization;
 using LMTrainingDataStudio2.ViewModels;
 
 namespace LMTrainingDataStudio2.Views;
@@ -59,6 +60,31 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OnPresetsSubmenuOpened(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm || sender is not MenuItem menu) return;
+
+        menu.Items.Clear();
+        foreach (var preset in vm.Presets)
+        {
+            var item = new MenuItem { Header = preset.Name };
+            ToolTip.SetTip(item, preset.Description);
+            item.Click += async (_, _) => await LoadPresetAsync(vm, preset);
+            menu.Items.Add(item);
+        }
+    }
+
+    private async void OnPresetPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not Control { DataContext: RecipePresetViewModel preset }) return;
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+
+        if (DataContext is MainWindowViewModel vm)
+        {
+            await LoadPresetAsync(vm, preset);
+        }
+    }
+
     private async void OnOpenRecipeClick(object? sender, RoutedEventArgs e)
     {
         if (DataContext is MainWindowViewModel vm)
@@ -90,7 +116,11 @@ public partial class MainWindow : Window
         menu.Items.Clear();
         if (vm.RecentFiles.Count == 0)
         {
-            menu.Items.Add(new MenuItem { Header = "No recent files", IsEnabled = false });
+            menu.Items.Add(new MenuItem
+            {
+                Header = LocalizationService.L("dialog.no_recent_files"),
+                IsEnabled = false
+            });
             return;
         }
 
@@ -149,8 +179,8 @@ public partial class MainWindow : Window
         {
             var result = await MessageDialog.ShowAsync(
                 this,
-                "Unsaved changes",
-                $"Save changes to '{vm.RecipeName}' before closing?",
+                LocalizationService.L("dialog.unsaved_changes.title"),
+                string.Format(LocalizationService.L("dialog.close.message_format"), vm.RecipeName),
                 MessageDialogButtons.SaveDiscardCancel);
 
             var canClose = result switch
@@ -173,13 +203,20 @@ public partial class MainWindow : Window
 
     private async Task NewDocumentAsync(MainWindowViewModel vm, bool withSample)
     {
-        if (!await EnsureCanDiscardAsync(vm, withSample ? "New from Sample" : "New Recipe")) return;
+        var actionKey = withSample ? "dialog.action.new_from_sample" : "dialog.action.new_recipe";
+        if (!await EnsureCanDiscardAsync(vm, actionKey)) return;
         await vm.NewRecipeAsync(withSample);
+    }
+
+    private async Task LoadPresetAsync(MainWindowViewModel vm, RecipePresetViewModel preset)
+    {
+        if (!await EnsureCanDiscardAsync(vm, "dialog.action.new_from_preset")) return;
+        await vm.NewRecipeFromPresetAsync(preset.Id);
     }
 
     private async Task OpenFromDialogAsync(MainWindowViewModel vm)
     {
-        if (!await EnsureCanDiscardAsync(vm, "Open Recipe")) return;
+        if (!await EnsureCanDiscardAsync(vm, "dialog.action.open_recipe")) return;
 
         var path = await PickOpenPathAsync();
         if (path is not null)
@@ -190,18 +227,18 @@ public partial class MainWindow : Window
 
     private async Task OpenRecentAsync(MainWindowViewModel vm, string path)
     {
-        if (!await EnsureCanDiscardAsync(vm, "Open Recent Recipe")) return;
+        if (!await EnsureCanDiscardAsync(vm, "dialog.action.open_recent_recipe")) return;
         await OpenRecipeAsync(vm, path);
     }
 
-    private async Task<bool> EnsureCanDiscardAsync(MainWindowViewModel vm, string action)
+    private async Task<bool> EnsureCanDiscardAsync(MainWindowViewModel vm, string actionKey)
     {
         if (!vm.IsDirty) return true;
 
         var result = await MessageDialog.ShowAsync(
             this,
-            action,
-            $"'{vm.RecipeName}' has unsaved changes. Save before continuing?",
+            LocalizationService.L(actionKey),
+            string.Format(LocalizationService.L("dialog.discard.message_format"), vm.RecipeName),
             MessageDialogButtons.SaveDiscardCancel);
 
         return result switch
@@ -227,7 +264,11 @@ public partial class MainWindow : Window
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            await MessageDialog.ShowAsync(this, "Save failed", ex.Message, MessageDialogButtons.Ok);
+            await MessageDialog.ShowAsync(
+                this,
+                LocalizationService.L("dialog.save_failed.title"),
+                ex.Message,
+                MessageDialogButtons.Ok);
             return false;
         }
     }
@@ -240,7 +281,11 @@ public partial class MainWindow : Window
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            await MessageDialog.ShowAsync(this, "Open failed", ex.Message, MessageDialogButtons.Ok);
+            await MessageDialog.ShowAsync(
+                this,
+                LocalizationService.L("dialog.open_failed.title"),
+                ex.Message,
+                MessageDialogButtons.Ok);
         }
     }
 
@@ -248,7 +293,7 @@ public partial class MainWindow : Window
     {
         var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "Open Recipe",
+            Title = LocalizationService.L("dialog.picker.open_recipe"),
             AllowMultiple = false,
             FileTypeFilter = new[] { RecipeFileType() }
         });
@@ -260,7 +305,7 @@ public partial class MainWindow : Window
     {
         var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = "Save Recipe",
+            Title = LocalizationService.L("dialog.picker.save_recipe"),
             SuggestedFileName = GetSuggestedFileName(vm.RecipeName),
             DefaultExtension = "json",
             ShowOverwritePrompt = true,
@@ -270,7 +315,7 @@ public partial class MainWindow : Window
         return file?.TryGetLocalPath();
     }
 
-    private static FilePickerFileType RecipeFileType() => new("Recipe JSON")
+    private static FilePickerFileType RecipeFileType() => new(LocalizationService.L("dialog.file_type.recipe_json"))
     {
         Patterns = new[] { "*.json" },
         MimeTypes = new[] { "application/json" }

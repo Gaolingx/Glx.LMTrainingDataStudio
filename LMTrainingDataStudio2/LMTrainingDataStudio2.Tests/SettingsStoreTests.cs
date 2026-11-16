@@ -47,6 +47,7 @@ public sealed class SettingsStoreTests
         Assert.That(result.Settings.EnableGridSnap, Is.EqualTo(defaults.EnableGridSnap));
         Assert.That(result.Settings.GridSnapSize, Is.EqualTo(defaults.GridSnapSize));
         Assert.That(result.Settings.IsDarkTheme, Is.EqualTo(defaults.IsDarkTheme));
+        Assert.That(result.Settings.Language, Is.EqualTo(defaults.Language));
         Assert.That(result.Warnings, Is.Empty);
     }
 
@@ -201,6 +202,28 @@ public sealed class SettingsStoreTests
 
         Assert.That(result.Settings.GridSnapSize, Is.EqualTo(24));
         Assert.That(File.Exists(_path + ".tmp"), Is.False);
+    }
+
+    [Test]
+    public async Task SaveAsync_ThenLoad_RestoresLanguage()
+    {
+        await _store.SaveAsync(new AppSettings { Language = "zh-CN" });
+        var result = _store.Load();
+
+        Assert.That(result.Settings.Language, Is.EqualTo("zh-CN"));
+        Assert.That(result.Warnings, Is.Empty);
+    }
+
+    [Test]
+    public async Task Load_UnsupportedLanguage_FallsBackToSystemWithWarning()
+    {
+        await File.WriteAllTextAsync(_path, """{"language":"fr-FR"}""");
+
+        var result = _store.Load();
+
+        Assert.That(result.Settings.Language, Is.EqualTo(new AppSettings().Language));
+        Assert.That(result.Warnings, Has.Count.EqualTo(1));
+        Assert.That(result.Warnings[0], Does.Contain("language"));
     }
 
     [Test]

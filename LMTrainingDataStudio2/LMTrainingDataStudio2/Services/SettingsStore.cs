@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using LMTrainingDataStudio2.Localization;
 using LMTrainingDataStudio2.Models;
 
 namespace LMTrainingDataStudio2.Services;
@@ -90,6 +91,20 @@ public sealed class SettingsStore : ISettingsStore
         else
         {
             settings.CacheDirectory = settings.CacheDirectory.Trim();
+        }
+
+        if (!LanguageCatalog.IsSupported(settings.Language))
+        {
+            warnings.Add(
+                $"language must be one of 'system', '{LocalizationService.Chinese}', '{LocalizationService.English}'; " +
+                $"found '{settings.Language}'. Using default '{defaults.Language}'.");
+            settings.Language = defaults.Language;
+        }
+        else
+        {
+            settings.Language = string.IsNullOrWhiteSpace(settings.Language)
+                ? defaults.Language
+                : settings.Language.Trim();
         }
 
         if (settings.MaxParallelism < MinParallelism || settings.MaxParallelism > MaxParallelism)

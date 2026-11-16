@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LMTrainingDataStudio2.Commands;
+using LMTrainingDataStudio2.Localization;
 using LMTrainingDataStudio2.Models;
 using LMTrainingDataStudio2.Services;
 using LMTrainingDataStudio2.Services.Executors;
@@ -56,8 +57,8 @@ public partial class MainWindowViewModel : ObservableObject
     private string _statusText = "Ready";
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TotalLinesText))]
     private long _totalLines;
-
     [ObservableProperty]
     private string _currentFilePath = string.Empty;
 
@@ -78,8 +79,9 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private string _memoryUsage = "0 MB";
 
-    [ObservableProperty]
-    private string _canvasZoomText = "Zoom: 100%";
+    private double _canvasZoomScale = 1;
+
+    public string CanvasZoomText => string.Format(LocalizationService.L("shell.zoom_format"), _canvasZoomScale);
 
     [ObservableProperty]
     private BlockNodeViewModel? _selectedBlock;
@@ -120,15 +122,30 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private string _anthropicApiKey = string.Empty;
 
+    [ObservableProperty]
+    private LanguageOption _selectedLanguageOption = LanguageCatalog.All[0];
+
     public ObservableCollection<BlockNodeViewModel> Blocks { get; } = new();
     public ObservableCollection<EdgeViewModel> Edges { get; } = new();
     public ObservableCollection<BlockTemplateViewModel> BlockTemplates { get; } = new();
+    public ObservableCollection<RecipePresetViewModel> Presets { get; } = new();
     public ObservableCollection<string> LogMessages { get; } = new();
     public ObservableCollection<string> RecentFiles { get; } = new();
     public ObservableCollection<ValidationIssueViewModel> ValidationIssues { get; } = new();
     public CommandHistory CommandHistory { get; } = new();
     public ExecutionsViewModel Executions { get; }
     public DataWorkbenchViewModel DataWorkbench { get; }
+    public IReadOnlyList<LanguageOption> LanguageOptions => LanguageCatalog.All;
+
+    public string TotalLinesText => string.Format(LocalizationService.L("shell.lines_format"), TotalLines);
+
+    public string SelectedBlockHelp => SelectedBlock is null
+        ? string.Empty
+        : BlockCatalog.GetHelp(SelectedBlock.Type);
+
+    public string SelectedBlockPorts => SelectedBlock is null
+        ? string.Empty
+        : BlockCatalog.DescribePorts(SelectedBlock.Type);
 
     /// <summary>Raised when the canvas must re-render without a collection change.</summary>
     public event Action? CanvasRenderRequested;
@@ -145,16 +162,19 @@ public partial class MainWindowViewModel : ObservableObject
         _recipeStore = recipeStore ?? new RecipeStore();
         var loadResult = _settingsStore.Load();
         _settings = loadResult.Settings;
+        LocalizationService.Instance.SetLanguage(_settings.Language);
         ThemeManager.Apply(_settings.IsDarkTheme);
         Executions = new ExecutionsViewModel(_executionStore);
         DataWorkbench = new DataWorkbenchViewModel(_settings);
 
         LoadSettingsSnapshot();
         InitializeBlockTemplates();
+        InitializePresets();
 
         Blocks.CollectionChanged += OnBlocksCollectionChanged;
         Edges.CollectionChanged += OnEdgesCollectionChanged;
         CommandHistory.HistoryChanged += OnHistoryChanged;
+        LocalizationService.Instance.LanguageChanged += OnLanguageChanged;
 
         LoadDocument(CreateBlankRecipe(), path: null, markDirty: false);
         UpdateMemoryUsage();
@@ -177,6 +197,7 @@ public partial class MainWindowViewModel : ObservableObject
         IsDarkTheme = _settings.IsDarkTheme;
         OpenAiApiKey = _settings.OpenAiApiKey ?? string.Empty;
         AnthropicApiKey = _settings.AnthropicApiKey ?? string.Empty;
+        SelectedLanguageOption = LanguageCatalog.Resolve(_settings.Language);
 
         RecentFiles.Clear();
         foreach (var path in _settings.RecentFiles)
@@ -193,16 +214,65 @@ public partial class MainWindowViewModel : ObservableObject
 
     private void InitializeBlockTemplates()
     {
-        BlockTemplates.Add(new BlockTemplateViewModel("Seed", BlockType.Seed, "Data input source (JSONL / CSV / Parquet)"));
-        BlockTemplates.Add(new BlockTemplateViewModel("LLM / Model", BlockType.Llm, "Per-row model call with Fluid prompt templates"));
-        BlockTemplates.Add(new BlockTemplateViewModel("Expression", BlockType.Expression, "Fluid template field transformation"));
-        BlockTemplates.Add(new BlockTemplateViewModel("Validator", BlockType.Validator, "Expression / JSON Schema validation and filtering"));
-        BlockTemplates.Add(new BlockTemplateViewModel("Sampler", BlockType.Sampler, "Deterministic sampling and splitting"));
-        BlockTemplates.Add(new BlockTemplateViewModel("Tool Profile", BlockType.ToolProfile, "OpenAI-compatible tool schema configuration"));
-        BlockTemplates.Add(new BlockTemplateViewModel("Query Source", BlockType.QuerySource, "Simulated user queries (single or multiple groups)"));
-        BlockTemplates.Add(new BlockTemplateViewModel("Simulation", BlockType.Simulation, "Mini harness: simulated model, tools, retries, timeouts"));
-        BlockTemplates.Add(new BlockTemplateViewModel("Cleaner", BlockType.Cleaner, "Regex and formatting cleanup for OAI messages"));
-        BlockTemplates.Add(new BlockTemplateViewModel("SFT Export", BlockType.SftExport, "Write OAI messages JSONL for SFT"));
+        foreach (var type in BlockCatalog.Types)
+        {
+            BlockTemplates.Add(new BlockTemplateViewModel(type));
+        }
+    }
+
+    private void InitializePresets()
+    {
+        foreach (var preset in RecipePresetCatalog.All)
+        {
+            Presets.Add(new RecipePresetViewModel(preset));
+        }
+    }
+
+    private void OnLanguageChanged(object? sender, EventArgs e)
+    {
+        OnPropertyChanged(nameof(TotalLinesText));
+        OnPropertyChanged(nameof(CanvasZoomText));
+        OnPropertyChanged(nameof(SelectedBlockHelp));
+        OnPropertyChanged(nameof(SelectedBlockPorts));
+
+        foreach (var template in BlockTemplates)
+        {
+            template.RefreshLocalization();
+        }
+
+        foreach (var preset in Presets)
+        {
+            preset.RefreshLocalization();
+        }
+
+        foreach (var block in Blocks)
+        {
+            block.RefreshLocalization();
+        }
+
+        foreach (var issue in ValidationIssues)
+        {
+            issue.RefreshLocalization();
+        }
+
+        DataWorkbench.RefreshLocalization();
+    }
+
+    partial void OnSelectedBlockChanged(BlockNodeViewModel? value)
+    {
+        OnPropertyChanged(nameof(SelectedBlockHelp));
+        OnPropertyChanged(nameof(SelectedBlockPorts));
+    }
+
+    public void SetCanvasZoomScale(double scale)
+    {
+        if (Math.Abs(_canvasZoomScale - scale) < 0.0001)
+        {
+            return;
+        }
+
+        _canvasZoomScale = scale;
+        OnPropertyChanged(nameof(CanvasZoomText));
     }
 
     #region Document lifecycle
@@ -217,6 +287,20 @@ public partial class MainWindowViewModel : ObservableObject
         LogMessages.Add(withSample
             ? "[Info] Loaded the sample recipe. Use File > Save As to keep it."
             : "[Info] Started a new recipe.");
+        await PersistDocumentStateAsync();
+    }
+
+    /// <summary>
+    /// Replaces the current document with a bundled workflow preset and marks it dirty.
+    /// </summary>
+    public async Task NewRecipeFromPresetAsync(string presetId)
+    {
+        var preset = RecipePresetCatalog.Find(presetId)
+                     ?? throw new ArgumentException($"Unknown recipe preset '{presetId}'.", nameof(presetId));
+
+        LoadDocument(preset.Create(), path: null, markDirty: true);
+        LogMessages.Clear();
+        LogMessages.Add($"[Info] Loaded workflow preset '{LocalizationService.L(preset.NameKey)}'.");
         await PersistDocumentStateAsync();
     }
 
@@ -1048,6 +1132,7 @@ public partial class MainWindowViewModel : ObservableObject
                 ? defaults.RunOutputDirectory
                 : RunOutputDirectory.Trim(),
             IsDarkTheme = IsDarkTheme,
+            Language = SelectedLanguageOption.Code,
             OpenAiApiKey = NullIfBlank(OpenAiApiKey),
             AnthropicApiKey = NullIfBlank(AnthropicApiKey),
             RecentFiles = RecentFiles.ToList(),
@@ -1059,6 +1144,7 @@ public partial class MainWindowViewModel : ObservableObject
             await _settingsStore.SaveAsync(settings);
             _settings = settings;
             ThemeManager.Apply(settings.IsDarkTheme);
+            LocalizationService.Instance.SetLanguage(settings.Language);
             DataWorkbench.ApplySettings(settings);
             LoadSettingsSnapshot();
             StatusText = "Settings saved ✓";

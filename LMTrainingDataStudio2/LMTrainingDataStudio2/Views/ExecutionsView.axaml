@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="using:LMTrainingDataStudio2.Localization"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:LMTrainingDataStudio2.ViewModels"
@@ -21,7 +22,7 @@
                         BorderBrush="{StaticResource PanelBorderBrush}"
                         BorderThickness="0,0,0,1">
                     <Grid ColumnDefinitions="*,Auto,Auto" Margin="12,0">
-                        <TextBlock Text="Executions" FontSize="12" FontWeight="SemiBold"
+                        <TextBlock Text="{loc:Loc common.executions}" FontSize="12" FontWeight="SemiBold"
                                    VerticalAlignment="Center" Foreground="#CCCCCC" />
                         <ComboBox Grid.Column="1"
                                   ItemsSource="{Binding Executions.StatusFilters}"
@@ -33,7 +34,7 @@
                                 IsEnabled="{Binding !Executions.IsBusy}"
                                 Background="Transparent" Foreground="#AAAAAA"
                                 FontSize="12" Padding="8,4"
-                                ToolTip.Tip="Refresh executions" />
+                                ToolTip.Tip="{loc:Loc executions.refresh_executions}" />
                     </Grid>
                 </Border>
 
@@ -79,7 +80,7 @@
                         <TextBlock Text="{Binding Executions.SelectedRunSummary.RecipeId}"
                                    FontSize="11" Foreground="#777777" />
                     </StackPanel>
-                    <Button Grid.Column="1" Content="Cancel"
+                    <Button Grid.Column="1" Content="{loc:Loc common.cancel}"
                             Command="{Binding CancelRunCommand}"
                             IsVisible="{Binding IsRunning}"
                             Padding="12,5" FontSize="11"
@@ -91,9 +92,9 @@
             <!-- Empty state -->
             <StackPanel IsVisible="{Binding Executions.SelectedRun, Converter={x:Static ObjectConverters.IsNull}}"
                         VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="6">
-                <TextBlock Text="Select a run to inspect node states and logs."
+                <TextBlock Text="{loc:Loc executions.select_a_run_to_inspect_node_states_and_logs}"
                            FontSize="12" Foreground="#888888" />
-                <TextBlock Text="Runs appear here after executing a recipe."
+                <TextBlock Text="{loc:Loc executions.runs_appear_here_after_executing_a_recipe}"
                            FontSize="10" Foreground="#666666" />
             </StackPanel>
 
@@ -103,17 +104,17 @@
                 <!-- Summary -->
                 <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="24" Margin="0,2,0,10">
                     <StackPanel Orientation="Horizontal" Spacing="4">
-                        <TextBlock Text="Started:" FontSize="10" Foreground="#888888" />
+                        <TextBlock Text="{loc:Loc executions.started}" FontSize="10" Foreground="#888888" />
                         <TextBlock Text="{Binding Executions.SelectedRun.StartedAt, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}"
                                    FontSize="10" Foreground="#CCCCCC" />
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="4">
-                        <TextBlock Text="Finished:" FontSize="10" Foreground="#888888" />
+                        <TextBlock Text="{loc:Loc executions.finished}" FontSize="10" Foreground="#888888" />
                         <TextBlock Text="{Binding Executions.SelectedRun.FinishedAt, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}"
                                    FontSize="10" Foreground="#CCCCCC" />
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="4">
-                        <TextBlock Text="Output:" FontSize="10" Foreground="#888888" />
+                        <TextBlock Text="{loc:Loc executions.output}" FontSize="10" Foreground="#888888" />
                         <TextBlock Text="{Binding Executions.SelectedRun.OutputDirectory, TargetNullValue='—'}"
                                    FontSize="10" Foreground="#CCCCCC"
                                    MaxWidth="420" TextTrimming="CharacterEllipsis"
@@ -123,11 +124,11 @@
 
                 <!-- Node table header -->
                 <Grid Grid.Row="1" ColumnDefinitions="2*,110,80,80,2*" Margin="0,0,0,4">
-                    <TextBlock Text="Block" FontSize="10" Foreground="#888888" />
-                    <TextBlock Grid.Column="1" Text="Status" FontSize="10" Foreground="#888888" />
-                    <TextBlock Grid.Column="2" Text="In rows" FontSize="10" Foreground="#888888" />
-                    <TextBlock Grid.Column="3" Text="Out rows" FontSize="10" Foreground="#888888" />
-                    <TextBlock Grid.Column="4" Text="Error" FontSize="10" Foreground="#888888" />
+                    <TextBlock Text="{loc:Loc executions.block}" FontSize="10" Foreground="#888888" />
+                    <TextBlock Grid.Column="1" Text="{loc:Loc common.status}" FontSize="10" Foreground="#888888" />
+                    <TextBlock Grid.Column="2" Text="{loc:Loc executions.in_rows}" FontSize="10" Foreground="#888888" />
+                    <TextBlock Grid.Column="3" Text="{loc:Loc executions.out_rows}" FontSize="10" Foreground="#888888" />
+                    <TextBlock Grid.Column="4" Text="{loc:Loc common.error}" FontSize="10" Foreground="#888888" />
                 </Grid>
 
                 <!-- Node table -->
@@ -149,7 +150,7 @@
                     </ItemsControl>
                 </ScrollViewer>
 
-                <TextBlock Grid.Row="3" Text="Logs" FontSize="11" FontWeight="SemiBold"
+                <TextBlock Grid.Row="3" Text="{loc:Loc common.logs}" FontSize="11" FontWeight="SemiBold"
                            Foreground="#CCCCCC" Margin="0,10,0,4" />
 
                 <Border Grid.Row="4" Background="#1A1A2A" CornerRadius="4" Padding="8">

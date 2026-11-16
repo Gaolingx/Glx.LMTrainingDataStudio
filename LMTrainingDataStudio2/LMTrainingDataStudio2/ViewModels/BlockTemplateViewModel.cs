@@ -1,27 +1,27 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using LMTrainingDataStudio2.Models;
+using LMTrainingDataStudio2.Services;
 
 namespace LMTrainingDataStudio2.ViewModels;
 
 /// <summary>
 /// ViewModel for a block template in the Block Sheet panel.
+/// Text is pulled from <see cref="BlockCatalog"/> and refreshed on language changes.
 /// </summary>
 public partial class BlockTemplateViewModel : ObservableObject
 {
-    [ObservableProperty]
-    private string _name;
+    public BlockTemplateViewModel(BlockType type) => Type = type;
 
-    [ObservableProperty]
-    private BlockType _type;
+    public BlockType Type { get; }
 
-    [ObservableProperty]
-    private string _description;
+    public string Name => BlockCatalog.GetName(Type);
 
-    public BlockTemplateViewModel(string name, BlockType type, string description)
+    public string Description => BlockCatalog.GetSummary(Type);
+
+    public void RefreshLocalization()
     {
-        _name = name;
-        _type = type;
-        _description = description;
+        OnPropertyChanged(nameof(Name));
+        OnPropertyChanged(nameof(Description));
     }
 
     /// <summary>

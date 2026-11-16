@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="using:LMTrainingDataStudio2.Localization"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:LMTrainingDataStudio2.ViewModels"
@@ -29,7 +30,7 @@
                 BorderBrush="{StaticResource PanelBorderBrush}"
                 BorderThickness="0,0,0,1">
             <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="12,0" ColumnSpacing="12">
-                <Button Grid.Column="0" Content="Open Dataset…"
+                <Button Grid.Column="0" Content="{loc:Loc data.open_dataset}"
                         Click="OnOpenDatasetClick"
                         IsEnabled="{Binding !IsBusy}"
                         Padding="12,6" FontSize="12"
@@ -37,7 +38,7 @@
                         VerticalAlignment="Center" />
 
                 <TextBlock Grid.Column="1"
-                           Text="{Binding SourcePath, TargetNullValue='No dataset opened'}"
+                           Text="{Binding SourcePathText}"
                            FontSize="11" Foreground="#AAAAAA"
                            VerticalAlignment="Center"
                            TextTrimming="CharacterEllipsis" />
@@ -47,7 +48,7 @@
                            VerticalAlignment="Center" />
 
                 <TextBlock Grid.Column="3"
-                           Text="{Binding TotalRows, StringFormat='{}{0:N0} rows'}"
+                           Text="{Binding TotalRowsText}"
                            FontSize="11" Foreground="#CCCCCC"
                            VerticalAlignment="Center" />
 
@@ -68,26 +69,26 @@
                             VerticalAlignment="Center">
                     <Button Content="⏮" Command="{Binding FirstPageCommand}"
                             Background="Transparent" Foreground="#CCCCCC" FontSize="12" Padding="8,4"
-                            ToolTip.Tip="First page" />
-                    <Button Content="◀ Prev" Command="{Binding PreviousPageCommand}"
+                            ToolTip.Tip="{loc:Loc data.first_page}" />
+                    <Button Content="{loc:Loc data.prev}" Command="{Binding PreviousPageCommand}"
                             Background="Transparent" Foreground="#CCCCCC" FontSize="11" Padding="8,4" />
                     <TextBlock Text="{Binding PositionText}" FontSize="11" Foreground="#AAAAAA"
                                VerticalAlignment="Center" Margin="4,0" />
-                    <Button Content="Next ▶" Command="{Binding NextPageCommand}"
+                    <Button Content="{loc:Loc data.next}" Command="{Binding NextPageCommand}"
                             Background="Transparent" Foreground="#CCCCCC" FontSize="11" Padding="8,4" />
                     <Button Content="⏭" Command="{Binding LastPageCommand}"
                             Background="Transparent" Foreground="#CCCCCC" FontSize="12" Padding="8,4"
-                            ToolTip.Tip="Last page" />
+                            ToolTip.Tip="{loc:Loc data.last_page}" />
                     <Border Width="1" Height="18" Background="#3A3A4E" Margin="6,0" />
-                    <TextBlock Text="Go to row" FontSize="10" Foreground="#888888"
+                    <TextBlock Text="{loc:Loc data.go_to_row}" FontSize="10" Foreground="#888888"
                                VerticalAlignment="Center" />
                     <TextBox Text="{Binding GoToRowText, Mode=TwoWay}"
                              Width="90" FontSize="11" VerticalAlignment="Center"
-                             Watermark="row" />
-                    <Button Content="Go" Command="{Binding GoToRowCommand}"
+                             Watermark="{loc:Loc data.row}" />
+                    <Button Content="{loc:Loc data.go}" Command="{Binding GoToRowCommand}"
                             Background="#3A3A4E" Foreground="#FFFFFF" FontSize="11" Padding="10,4" />
                     <Border Width="1" Height="18" Background="#3A3A4E" Margin="6,0" />
-                    <TextBlock Text="Page size" FontSize="10" Foreground="#888888"
+                    <TextBlock Text="{loc:Loc data.page_size}" FontSize="10" Foreground="#888888"
                                VerticalAlignment="Center" />
                     <ComboBox ItemsSource="{Binding AvailablePageSizes}"
                               SelectedItem="{Binding PageSize, Mode=TwoWay}"
@@ -102,9 +103,9 @@
             <!-- Empty state -->
             <StackPanel IsVisible="{Binding !IsDatasetOpen}"
                         VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="8">
-                <TextBlock Text="Open a dataset to preview it page by page."
+                <TextBlock Text="{loc:Loc data.open_a_dataset_to_preview_it_page_by_page}"
                            FontSize="13" Foreground="#888888" HorizontalAlignment="Center" />
-                <TextBlock Text="Right panel: convert, search/replace, dedup/shuffle/split, statistics and validation."
+                <TextBlock Text="{loc:Loc data.right_panel_convert_search_replace_dedup_shuffle}"
                            FontSize="10" Foreground="#666666" HorizontalAlignment="Center" />
             </StackPanel>
 
@@ -145,11 +146,11 @@
             <TabControl Padding="0" Background="Transparent">
 
                 <!-- Convert -->
-                <TabItem Header="Convert">
+                <TabItem Header="{loc:Loc common.convert}">
                     <ScrollViewer>
                         <StackPanel Margin="14" Spacing="14">
                             <StackPanel Spacing="6">
-                                <TextBlock Classes="sectionTitle" Text="Target format" />
+                                <TextBlock Classes="sectionTitle" Text="{loc:Loc data.target_format}" />
                                 <ComboBox ItemsSource="{Binding TargetFormats}"
                                           SelectedItem="{Binding SelectedTargetFormat, Mode=TwoWay}"
                                           FontSize="11" HorizontalAlignment="Stretch">
@@ -162,7 +163,7 @@
                             </StackPanel>
 
                             <StackPanel Spacing="6">
-                                <TextBlock Classes="sectionTitle" Text="Target file" />
+                                <TextBlock Classes="sectionTitle" Text="{loc:Loc data.target_file}" />
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
                                     <TextBox Text="{Binding TargetPath, Mode=TwoWay}"
                                              FontSize="10" Watermark="out.jsonl / out.csv / out.parquet" />
@@ -174,12 +175,12 @@
                             </StackPanel>
 
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                <Button Content="Convert"
+                                <Button Content="{loc:Loc common.convert}"
                                         Command="{Binding ConvertCommand}"
                                         IsEnabled="{Binding !IsConverting}"
                                         Background="#4A90D9" Foreground="#FFFFFF"
                                         FontSize="11" Padding="14,6" />
-                                <Button Content="Cancel"
+                                <Button Content="{loc:Loc common.cancel}"
                                         Command="{Binding CancelConversionCommand}"
                                         IsVisible="{Binding IsConverting}"
                                         Background="#3A2020" Foreground="#FF8080"
@@ -187,7 +188,7 @@
                             </StackPanel>
 
                             <StackPanel Spacing="4" IsVisible="{Binding IsConverting}">
-                                <TextBlock Classes="sectionTitle" Text="Progress" />
+                                <TextBlock Classes="sectionTitle" Text="{loc:Loc common.progress}" />
                                 <ProgressBar Value="{Binding ConversionProgress}" Minimum="0" Maximum="1" Height="4" />
                             </StackPanel>
 
@@ -195,7 +196,7 @@
                                        FontSize="10" Foreground="#AAAAAA" TextWrapping="Wrap" />
 
                             <StackPanel Spacing="6" IsVisible="{Binding HasConversionErrors}">
-                                <TextBlock Text="Failed rows" FontSize="10" Foreground="#FF8080" />
+                                <TextBlock Text="{loc:Loc data.failed_rows}" FontSize="10" Foreground="#FF8080" />
                                 <ListBox ItemsSource="{Binding ConversionErrors}"
                                          Background="#1E1E2E" BorderBrush="#2E2E42"
                                          MaxHeight="240" FontSize="10">
@@ -211,10 +212,10 @@
                             <Border Background="#1E1E2E" BorderBrush="#2E2E42" BorderThickness="1"
                                     CornerRadius="6" Padding="10">
                                 <StackPanel Spacing="4">
-                                    <TextBlock Classes="sectionTitle" Text="Supported conversions" />
-                                    <TextBlock Text="OpenAI ↔ ShareGPT ↔ Alpaca, chat → Pretrain, DPO → DPO, Pretrain → Pretrain."
+                                    <TextBlock Classes="sectionTitle" Text="{loc:Loc data.supported_conversions}" />
+                                    <TextBlock Text="{loc:Loc data.openai_sharegpt_alpaca_chat_pretrain_dpo_dpo_pre}"
                                                FontSize="10" Foreground="#AAAAAA" TextWrapping="Wrap" />
-                                    <TextBlock Text="Unsupported pairs fail explicitly and are listed in the .errors.jsonl report."
+                                    <TextBlock Text="{loc:Loc data.unsupported_pairs_fail_explicitly_and_are_listed}"
                                                FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
                                 </StackPanel>
                             </Border>
@@ -223,38 +224,38 @@
                 </TabItem>
 
                 <!-- Search / replace -->
-                <TabItem Header="Search">
+                <TabItem Header="{loc:Loc data.search}">
                     <ScrollViewer>
                         <StackPanel Margin="14" Spacing="10">
-                            <TextBlock Classes="sectionTitle" Text="Search / replace" />
+                            <TextBlock Classes="sectionTitle" Text="{loc:Loc data.search_replace}" />
 
                             <TextBox Text="{Binding Search.Query, Mode=TwoWay}"
-                                     FontSize="11" Watermark="Text or regular expression" />
+                                     FontSize="11" Watermark="{loc:Loc data.text_or_regular_expression}" />
                             <TextBox Text="{Binding Search.Replacement, Mode=TwoWay}"
-                                     FontSize="11" Watermark="Replacement ($1 groups in regex mode)" />
+                                     FontSize="11" Watermark="{loc:Loc data.replacement_1_groups_in_regex_mode}" />
 
                             <StackPanel Orientation="Horizontal" Spacing="12">
                                 <CheckBox IsChecked="{Binding Search.UseRegex, Mode=TwoWay}"
-                                          Content="Regex" FontSize="11" />
+                                          Content="{loc:Loc data.regex}" FontSize="11" />
                                 <CheckBox IsChecked="{Binding Search.CaseSensitive, Mode=TwoWay}"
-                                          Content="Case sensitive" FontSize="11" />
+                                          Content="{loc:Loc data.case_sensitive}" FontSize="11" />
                             </StackPanel>
 
                             <CheckBox IsChecked="{Binding Search.CurrentPageOnly, Mode=TwoWay}"
-                                      Content="Current page only" FontSize="11" />
+                                      Content="{loc:Loc data.current_page_only}" FontSize="11" />
 
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                <Button Content="Preview"
+                                <Button Content="{loc:Loc common.preview}"
                                         Command="{Binding Search.PreviewCommand}"
                                         IsEnabled="{Binding !Search.IsBusy}"
                                         Background="#4A90D9" Foreground="#FFFFFF"
                                         FontSize="11" Padding="14,6" />
-                                <Button Content="Replace to file"
+                                <Button Content="{loc:Loc data.replace_to_file}"
                                         Command="{Binding Search.ReplaceCommand}"
                                         IsEnabled="{Binding !Search.IsBusy}"
                                         Background="#3A3A4E" Foreground="#FFFFFF"
                                         FontSize="11" Padding="12,6" />
-                                <Button Content="Cancel"
+                                <Button Content="{loc:Loc common.cancel}"
                                         Command="{Binding Search.CancelCommand}"
                                         IsVisible="{Binding Search.IsCancellable}"
                                         Background="#3A2020" Foreground="#FF8080"
@@ -268,7 +269,7 @@
                                        Foreground="#AAAAAA" TextWrapping="Wrap" />
 
                             <StackPanel Spacing="6">
-                                <TextBlock Classes="sectionTitle" Text="Replacement target" />
+                                <TextBlock Classes="sectionTitle" Text="{loc:Loc data.replacement_target}" />
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
                                     <TextBox Text="{Binding Search.TargetPath, Mode=TwoWay}"
                                              FontSize="10" Watermark="replaced.jsonl" />
@@ -280,7 +281,7 @@
                             </StackPanel>
 
                             <TextBlock Classes="sectionTitle"
-                                       Text="Matches (double-click to jump)" />
+                                       Text="{loc:Loc data.matches_double_click_to_jump}" />
                             <ListBox ItemsSource="{Binding Search.Matches}"
                                      SelectedItem="{Binding Search.SelectedMatch, Mode=TwoWay}"
                                      DoubleTapped="OnSearchMatchDoubleTapped"
@@ -310,31 +311,31 @@
                 </TabItem>
 
                 <!-- Transform -->
-                <TabItem Header="Transform">
+                <TabItem Header="{loc:Loc data.transform}">
                     <ScrollViewer>
                         <StackPanel Margin="14" Spacing="10">
-                            <TextBlock Classes="sectionTitle" Text="Dedup / shuffle / split" />
+                            <TextBlock Classes="sectionTitle" Text="{loc:Loc data.dedup_shuffle_split}" />
 
                             <CheckBox IsChecked="{Binding Transform.Deduplicate, Mode=TwoWay}"
-                                      Content="Deduplicate (exact row hash)" FontSize="11" />
+                                      Content="{loc:Loc data.deduplicate_exact_row_hash}" FontSize="11" />
                             <CheckBox IsChecked="{Binding Transform.Shuffle, Mode=TwoWay}"
-                                      Content="Shuffle (deterministic seed)" FontSize="11" />
+                                      Content="{loc:Loc data.shuffle_deterministic_seed}" FontSize="11" />
 
                             <StackPanel Spacing="6">
-                                <TextBlock Classes="sectionTitle" Text="Seed" />
+                                <TextBlock Classes="sectionTitle" Text="{loc:Loc data.transform_seed}" />
                                 <TextBox Text="{Binding Transform.SeedText, Mode=TwoWay}"
                                          FontSize="11" Width="150" HorizontalAlignment="Left" />
                             </StackPanel>
 
                             <StackPanel Spacing="6">
                                 <TextBlock Classes="sectionTitle"
-                                           Text="Splits (optional, name:ratio or name:count)" />
+                                           Text="{loc:Loc data.splits_optional_name_ratio_or_name_count}" />
                                 <TextBox Text="{Binding Transform.SplitSpecsText, Mode=TwoWay}"
                                          FontSize="11" Watermark="train:0.8, valid:0.2" />
                             </StackPanel>
 
                             <StackPanel Spacing="6">
-                                <TextBlock Classes="sectionTitle" Text="Output file (no splits)" />
+                                <TextBlock Classes="sectionTitle" Text="{loc:Loc data.output_file_no_splits}" />
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
                                     <TextBox Text="{Binding Transform.OutputPath, Mode=TwoWay}"
                                              FontSize="10" Watermark="clean.jsonl" />
@@ -346,10 +347,10 @@
                             </StackPanel>
 
                             <StackPanel Spacing="6">
-                                <TextBlock Classes="sectionTitle" Text="Output directory (splits)" />
+                                <TextBlock Classes="sectionTitle" Text="{loc:Loc data.output_directory_splits}" />
                                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
                                     <TextBox Text="{Binding Transform.OutputDirectory, Mode=TwoWay}"
-                                             FontSize="10" Watermark="folder" />
+                                             FontSize="10" Watermark="{loc:Loc data.folder}" />
                                     <Button Grid.Column="1" Content="…"
                                             Click="OnBrowseTransformDirectoryClick"
                                             Background="#3A3A4E" Foreground="#FFFFFF"
@@ -358,12 +359,12 @@
                             </StackPanel>
 
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                <Button Content="Run"
+                                <Button Content="{loc:Loc common.run}"
                                         Command="{Binding Transform.RunCommand}"
                                         IsEnabled="{Binding !Transform.IsBusy}"
                                         Background="#4A90D9" Foreground="#FFFFFF"
                                         FontSize="11" Padding="16,6" />
-                                <Button Content="Cancel"
+                                <Button Content="{loc:Loc common.cancel}"
                                         Command="{Binding Transform.CancelCommand}"
                                         IsVisible="{Binding Transform.IsCancellable}"
                                         Background="#3A2020" Foreground="#FF8080"
@@ -376,7 +377,7 @@
                             <TextBlock Text="{Binding Transform.Summary}" FontSize="10"
                                        Foreground="#AAAAAA" TextWrapping="Wrap" />
 
-                            <TextBlock Classes="sectionTitle" Text="Results" />
+                            <TextBlock Classes="sectionTitle" Text="{loc:Loc common.results}" />
                             <ListBox ItemsSource="{Binding Transform.Results}"
                                      Background="#1E1E2E" BorderBrush="#2E2E42"
                                      MaxHeight="220" FontSize="10">
@@ -395,21 +396,21 @@
                 </TabItem>
 
                 <!-- Statistics -->
-                <TabItem Header="Stats">
+                <TabItem Header="{loc:Loc data.stats}">
                     <ScrollViewer>
                         <StackPanel Margin="14" Spacing="10">
-                            <TextBlock Classes="sectionTitle" Text="Dataset statistics" />
+                            <TextBlock Classes="sectionTitle" Text="{loc:Loc data.dataset_statistics}" />
 
                             <CheckBox IsChecked="{Binding Statistics.IncludeDuplicates, Mode=TwoWay}"
-                                      Content="Compute duplicate rate (slower)" FontSize="11" />
+                                      Content="{loc:Loc data.compute_duplicate_rate_slower}" FontSize="11" />
 
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                <Button Content="Compute"
+                                <Button Content="{loc:Loc data.compute}"
                                         Command="{Binding Statistics.ComputeCommand}"
                                         IsEnabled="{Binding !Statistics.IsBusy}"
                                         Background="#4A90D9" Foreground="#FFFFFF"
                                         FontSize="11" Padding="14,6" />
-                                <Button Content="Cancel"
+                                <Button Content="{loc:Loc common.cancel}"
                                         Command="{Binding Statistics.CancelCommand}"
                                         IsVisible="{Binding Statistics.IsCancellable}"
                                         Background="#3A2020" Foreground="#FF8080"
@@ -434,7 +435,7 @@
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
 
-                            <TextBlock Classes="sectionTitle" Text="Roles" />
+                            <TextBlock Classes="sectionTitle" Text="{loc:Loc data.roles}" />
                             <ItemsControl ItemsSource="{Binding Statistics.RoleCounts}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:DatasetMetric">
@@ -447,7 +448,7 @@
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
 
-                            <TextBlock Classes="sectionTitle" Text="Length buckets (characters)" />
+                            <TextBlock Classes="sectionTitle" Text="{loc:Loc data.length_buckets_characters}" />
                             <ItemsControl ItemsSource="{Binding Statistics.LengthBuckets}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:DatasetMetric">
@@ -460,7 +461,7 @@
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
 
-                            <TextBlock Classes="sectionTitle" Text="Formats" />
+                            <TextBlock Classes="sectionTitle" Text="{loc:Loc data.formats}" />
                             <ItemsControl ItemsSource="{Binding Statistics.FormatCounts}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:DatasetMetric">
@@ -480,25 +481,25 @@
                 </TabItem>
 
                 <!-- Validate -->
-                <TabItem Header="Validate">
+                <TabItem Header="{loc:Loc common.validate}">
                     <ScrollViewer>
                         <StackPanel Margin="14" Spacing="10">
-                            <TextBlock Classes="sectionTitle" Text="Quality validation" />
+                            <TextBlock Classes="sectionTitle" Text="{loc:Loc data.quality_validation}" />
 
                             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
-                                <TextBlock Text="Max issues" FontSize="10" Foreground="#888888"
+                                <TextBlock Text="{loc:Loc data.max_issues}" FontSize="10" Foreground="#888888"
                                            VerticalAlignment="Center" />
                                 <TextBox Grid.Column="1" Text="{Binding Validation.MaxIssuesText, Mode=TwoWay}"
                                          FontSize="11" Width="90" HorizontalAlignment="Left" />
                             </Grid>
 
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                <Button Content="Validate"
+                                <Button Content="{loc:Loc common.validate}"
                                         Command="{Binding Validation.ValidateCommand}"
                                         IsEnabled="{Binding !Validation.IsBusy}"
                                         Background="#4A90D9" Foreground="#FFFFFF"
                                         FontSize="11" Padding="14,6" />
-                                <Button Content="Cancel"
+                                <Button Content="{loc:Loc common.cancel}"
                                         Command="{Binding Validation.CancelCommand}"
                                         IsVisible="{Binding Validation.IsCancellable}"
                                         Background="#3A2020" Foreground="#FF8080"
@@ -512,7 +513,7 @@
                                        Foreground="#AAAAAA" TextWrapping="Wrap" />
 
                             <TextBlock Classes="sectionTitle"
-                                       Text="Issues (double-click to jump)" />
+                                       Text="{loc:Loc data.issues_double_click_to_jump}" />
                             <ListBox ItemsSource="{Binding Validation.Issues}"
                                      SelectedItem="{Binding Validation.SelectedIssue, Mode=TwoWay}"
                                      DoubleTapped="OnIssueDoubleTapped"
@@ -537,21 +538,21 @@
                                 </ListBox.ItemTemplate>
                             </ListBox>
 
-                            <TextBlock Text="Issue list is capped; totals keep counting after the cap."
+                            <TextBlock Text="{loc:Loc data.issue_list_is_capped_totals_keep_counting_after}"
                                        FontSize="9" Foreground="#666666"
                                        IsVisible="{Binding Validation.IssuesTruncated}" />
 
                             <Border Height="1" Background="#3A3A4E" Margin="0,4" />
 
-                            <TextBlock Classes="sectionTitle" Text="Auto-fix (JSONL only)" />
+                            <TextBlock Classes="sectionTitle" Text="{loc:Loc data.auto_fix_jsonl_only}" />
 
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                <Button Content="Preview fixes"
+                                <Button Content="{loc:Loc data.preview_fixes}"
                                         Command="{Binding Validation.PreviewFixesCommand}"
                                         IsEnabled="{Binding !Validation.IsBusy}"
                                         Background="#3A3A4E" Foreground="#FFFFFF"
                                         FontSize="11" Padding="12,6" />
-                                <Button Content="Write fixed copy"
+                                <Button Content="{loc:Loc data.write_fixed_copy}"
                                         Command="{Binding Validation.WriteFixesCommand}"
                                         IsEnabled="{Binding !Validation.IsBusy}"
                                         Background="#3A3A4E" Foreground="#FFFFFF"

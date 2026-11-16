@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Headless.NUnit;
 using Avalonia.Threading;
+using LMTrainingDataStudio2.Localization;
 using LMTrainingDataStudio2.Models;
 using LMTrainingDataStudio2.Services;
 using LMTrainingDataStudio2.ViewModels;
@@ -9,6 +10,7 @@ using LMTrainingDataStudio2.Views;
 namespace LMTrainingDataStudio2.Tests;
 
 [TestFixture]
+[NonParallelizable]
 public sealed class HeadlessUiTests
 {
     private string _directory = null!;
@@ -58,6 +60,61 @@ public sealed class HeadlessUiTests
         Assert.That(vm.Blocks[0].OutputPorts, Has.Count.GreaterThan(0));
 
         window.Close();
+    }
+
+    [AvaloniaTest]
+    public void LanguageSwitch_UpdatesStaticUiAndBlockLibrary()
+    {
+        var vm = new MainWindowViewModel(new SettingsStore(Path.Combine(_directory, "settings.json")));
+        var window = new MainWindow { DataContext = vm };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        try
+        {
+            LocalizationService.Instance.SetLanguage(LocalizationService.English);
+            Dispatcher.UIThread.RunJobs();
+
+            var header = window.FindControl<TextBlock>("BlocksHeader");
+            Assert.That(header?.Text, Is.EqualTo("Block Library"));
+            Assert.That(vm.BlockTemplates[0].Name, Is.EqualTo("Seed Source"));
+            Assert.That(vm.Presets, Has.Count.EqualTo(RecipePresetCatalog.All.Count));
+
+            LocalizationService.Instance.SetLanguage(LocalizationService.Chinese);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.That(header?.Text, Is.EqualTo("节点库"));
+            Assert.That(vm.BlockTemplates[0].Name, Is.EqualTo("Seed 数据源"));
+        }
+        finally
+        {
+            LocalizationService.Instance.SetLanguage(LocalizationService.English);
+            window.Close();
+        }
+    }
+
+    [AvaloniaTest]
+    public void SelectingBlock_ShowsLocalizedNodeGuide()
+    {
+        var vm = new MainWindowViewModel(new SettingsStore(Path.Combine(_directory, "settings.json")));
+        LocalizationService.Instance.SetLanguage(LocalizationService.Chinese);
+        var window = new MainWindow { DataContext = vm };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        try
+        {
+            vm.AddBlockCommand.Execute(BlockType.Seed);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.That(vm.SelectedBlockHelp, Does.Contain("入口节点"));
+            Assert.That(vm.SelectedBlockPorts, Does.Contain("rows"));
+        }
+        finally
+        {
+            LocalizationService.Instance.SetLanguage(LocalizationService.English);
+            window.Close();
+        }
     }
 
     [AvaloniaTest]

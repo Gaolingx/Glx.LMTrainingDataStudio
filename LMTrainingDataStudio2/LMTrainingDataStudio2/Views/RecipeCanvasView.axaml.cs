@@ -884,7 +884,7 @@ public partial class RecipeCanvasView : UserControl
 
     private void UpdateCanvasZoomText(MainWindowViewModel vm)
     {
-        vm.CanvasZoomText = $"Zoom: {_viewport.Scale:P0}";
+        vm.SetCanvasZoomScale(_viewport.Scale);
     }
 
     private IEnumerable<BlockNodeViewModel> GetSelectedBlocks()

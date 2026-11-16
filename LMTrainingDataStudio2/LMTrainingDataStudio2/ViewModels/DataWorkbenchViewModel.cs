@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using LMTrainingDataStudio2.Localization;
 using LMTrainingDataStudio2.Models;
 using LMTrainingDataStudio2.Services.Datasets;
 using System.Collections.ObjectModel;
@@ -33,13 +34,14 @@ public partial class DataWorkbenchViewModel : ObservableObject
     private bool _updatingTargetPath;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SourcePathText))]
     private string _sourcePath = string.Empty;
 
     [ObservableProperty]
     private string _sourceFileTypeText = string.Empty;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(TotalPages), nameof(PositionText))]
+    [NotifyPropertyChangedFor(nameof(TotalPages), nameof(PositionText), nameof(TotalRowsText))]
     private long _totalRows;
 
     [ObservableProperty]
@@ -93,10 +95,23 @@ public partial class DataWorkbenchViewModel : ObservableObject
     public DatasetStatisticsViewModel Statistics { get; }
 
     public string PositionText => IsDatasetOpen
-        ? $"Page {CurrentPage:N0} / {TotalPages:N0}"
-        : "No dataset";
+        ? string.Format(LocalizationService.L("data.position_format"), CurrentPage, TotalPages)
+        : LocalizationService.L("data.no_dataset");
+
+    public string TotalRowsText => string.Format(LocalizationService.L("data.total_rows_format"), TotalRows);
+
+    public string SourcePathText => string.IsNullOrWhiteSpace(SourcePath)
+        ? LocalizationService.L("data.no_dataset_opened")
+        : SourcePath;
 
     public long TotalPages => TotalRows == 0 ? 1 : (TotalRows + PageSize - 1) / PageSize;
+
+    public void RefreshLocalization()
+    {
+        OnPropertyChanged(nameof(PositionText));
+        OnPropertyChanged(nameof(TotalRowsText));
+        OnPropertyChanged(nameof(SourcePathText));
+    }
 
     public DataWorkbenchViewModel(AppSettings settings)
     {

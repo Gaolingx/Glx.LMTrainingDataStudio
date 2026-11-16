@@ -211,6 +211,13 @@ public partial class BlockNodeViewModel : ObservableObject
 
     public int ValidationIssueCount => ValidationErrorCount + ValidationWarningCount;
 
+    public string DescriptionText => BlockCatalog.GetSummary(Type);
+
+    public void RefreshLocalization()
+    {
+        OnPropertyChanged(nameof(DescriptionText));
+    }
+
     /// <summary>
     /// Replaces all ports with the schema required by <see cref="Type"/>.
     /// </summary>

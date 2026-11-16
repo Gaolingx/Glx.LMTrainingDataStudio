@@ -1,5 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:LMTrainingDataStudio2.Localization"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="using:LMTrainingDataStudio2.ViewModels"
@@ -28,14 +29,16 @@
             <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto">
                 <!-- File menu -->
                 <Menu Grid.Column="0" Background="Transparent" VerticalAlignment="Center" Margin="6,0,0,0">
-                    <MenuItem Header="File">
-                        <MenuItem Header="New" Click="OnNewRecipeClick" InputGesture="Ctrl+N" />
-                        <MenuItem Header="New from Sample" Click="OnNewFromSampleClick" />
-                        <MenuItem Header="Open…" Click="OnOpenRecipeClick" InputGesture="Ctrl+O" />
-                        <MenuItem x:Name="RecentFilesMenuItem" Header="Recent" SubmenuOpened="OnRecentFilesSubmenuOpened" />
+                    <MenuItem Header="{loc:Loc main.file}">
+                        <MenuItem Header="{loc:Loc main.new}" Click="OnNewRecipeClick" InputGesture="Ctrl+N" />
+                        <MenuItem Header="{loc:Loc main.new_from_sample}" Click="OnNewFromSampleClick" />
+                        <MenuItem x:Name="PresetsMenuItem" Header="{loc:Loc menu.new_from_preset}"
+                                  SubmenuOpened="OnPresetsSubmenuOpened" />
+                        <MenuItem Header="{loc:Loc main.open}" Click="OnOpenRecipeClick" InputGesture="Ctrl+O" />
+                        <MenuItem x:Name="RecentFilesMenuItem" Header="{loc:Loc main.recent}" SubmenuOpened="OnRecentFilesSubmenuOpened" />
                         <Separator />
-                        <MenuItem Header="Save" Click="OnSaveRecipeClick" InputGesture="Ctrl+S" />
-                        <MenuItem Header="Save As…" Click="OnSaveAsRecipeClick" InputGesture="Ctrl+Shift+S" />
+                        <MenuItem Header="{loc:Loc common.save}" Click="OnSaveRecipeClick" InputGesture="Ctrl+S" />
+                        <MenuItem Header="{loc:Loc main.save_as}" Click="OnSaveAsRecipeClick" InputGesture="Ctrl+Shift+S" />
                     </MenuItem>
                 </Menu>
 
@@ -51,7 +54,7 @@
                     <TextBlock Text="●" FontSize="10" Foreground="#F5A623"
                                VerticalAlignment="Center" Margin="6,0,0,0"
                                IsVisible="{Binding IsDirty}"
-                               ToolTip.Tip="Unsaved changes" />
+                               ToolTip.Tip="{loc:Loc main.unsaved_changes}" />
                 </StackPanel>
 
                 <!-- Spacer -->
@@ -59,13 +62,13 @@
 
                 <!-- Editor / Executions / Data Toggle -->
                 <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Spacing="2" Margin="0,0,12,0">
-                    <Button Content="Editor" Command="{Binding SwitchToEditorCommand}"
+                    <Button Content="{loc:Loc main.editor}" Command="{Binding SwitchToEditorCommand}"
                             Classes.accent="{Binding IsEditorView}"
                             Padding="12,6" FontSize="12" />
-                    <Button Content="Executions" Command="{Binding SwitchToExecutionsCommand}"
+                    <Button Content="{loc:Loc common.executions}" Command="{Binding SwitchToExecutionsCommand}"
                             Classes.accent="{Binding IsExecutionsView}"
                             Padding="12,6" FontSize="12" />
-                    <Button Content="Data" Command="{Binding SwitchToDataCommand}"
+                    <Button Content="{loc:Loc main.data}" Command="{Binding SwitchToDataCommand}"
                             Classes.accent="{Binding IsDataView}"
                             Padding="12,6" FontSize="12" />
                 </StackPanel>
@@ -88,7 +91,7 @@
                            FontSize="11" VerticalAlignment="Center" Margin="12,0"
                            Foreground="#AAAAAA" />
                 <TextBlock Grid.Column="1"
-                           Text="{Binding TotalLines, StringFormat='Lines: {0}'}"
+                           Text="{Binding TotalLinesText}"
                            FontSize="11" VerticalAlignment="Center" Margin="12,0"
                            Foreground="#888888" />
                 <ProgressBar Grid.Column="2" Value="{Binding Progress}"
@@ -125,7 +128,7 @@
                             Command="{Binding ToggleBlockSheetCommand}"
                             Background="Transparent" Foreground="#888888"
                             Padding="4,2" VerticalAlignment="Top" Margin="0,8,0,0"
-                            ToolTip.Tip="Show Blocks" />
+                            ToolTip.Tip="{loc:Loc main.show_blocks}" />
                 </Border>
 
                 <!-- Expanded state: full panel -->
@@ -138,40 +141,71 @@
                                 Background="{StaticResource HeaderBackgroundBrush}"
                                 BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="0,0,0,1">
                             <Grid ColumnDefinitions="*,Auto">
-                                <TextBlock Text="Blocks" FontSize="12" FontWeight="SemiBold"
+                                <TextBlock x:Name="BlocksHeader" Text="{loc:Loc shell.block_library}" FontSize="12" FontWeight="SemiBold"
                                            VerticalAlignment="Center" Margin="12,0"
                                            Foreground="#CCCCCC" />
                                 <Button Grid.Column="1" Content="◀" FontSize="10"
                                         Command="{Binding ToggleBlockSheetCommand}"
                                         Background="Transparent" Foreground="#888888"
                                         Padding="6,2" Margin="0,0,4,0"
-                                        ToolTip.Tip="Hide Blocks" />
+                                        ToolTip.Tip="{loc:Loc main.hide_blocks}" />
                             </Grid>
                         </Border>
 
                         <ScrollViewer>
-                            <ItemsControl ItemsSource="{Binding BlockTemplates}" Margin="8">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:BlockTemplateViewModel">
-                                        <Border Margin="0,4" Padding="10,8"
-                                                CornerRadius="6"
-                                                Background="#2A2A3E"
-                                                BorderBrush="#3A3A4E" BorderThickness="1"
-                                                Cursor="Hand"
-                                                PointerPressed="OnBlockTemplatePointerPressed">
-                                            <StackPanel Spacing="4">
-                                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                                    <TextBlock Text="{Binding IconText}" FontSize="14" />
-                                                    <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold"
-                                                               Foreground="#E0E0E0" />
+                            <StackPanel Margin="8">
+                                <TextBlock Text="{loc:Loc shell.workflow_presets}"
+                                           FontSize="10" FontWeight="SemiBold" Foreground="#888888"
+                                           Margin="4,2,4,4" />
+                                <ItemsControl ItemsSource="{Binding Presets}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:RecipePresetViewModel">
+                                            <Border Margin="0,3" Padding="10,7"
+                                                    CornerRadius="6"
+                                                    Background="#232336"
+                                                    BorderBrush="#34344A" BorderThickness="1"
+                                                    Cursor="Hand"
+                                                    ToolTip.Tip="{Binding Description}"
+                                                    PointerPressed="OnPresetPointerPressed">
+                                                <StackPanel Spacing="2">
+                                                    <TextBlock Text="{Binding Name}" FontSize="11"
+                                                               FontWeight="SemiBold" Foreground="#D8D8EE" />
+                                                    <TextBlock Text="{Binding Description}" FontSize="9"
+                                                               Foreground="#777788" TextWrapping="Wrap" />
                                                 </StackPanel>
-                                                <TextBlock Text="{Binding Description}" FontSize="10"
-                                                           Foreground="#888888" TextWrapping="Wrap" />
-                                            </StackPanel>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <Border Height="1" Background="#3A3A4E" Margin="2,8" />
+                                <TextBlock Text="{loc:Loc shell.building_blocks}"
+                                           FontSize="10" FontWeight="SemiBold" Foreground="#888888"
+                                           Margin="4,2,4,4" />
+
+                                <ItemsControl ItemsSource="{Binding BlockTemplates}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:BlockTemplateViewModel">
+                                            <Border Margin="0,4" Padding="10,8"
+                                                    CornerRadius="6"
+                                                    Background="#2A2A3E"
+                                                    BorderBrush="#3A3A4E" BorderThickness="1"
+                                                    Cursor="Hand"
+                                                    PointerPressed="OnBlockTemplatePointerPressed">
+                                                <StackPanel Spacing="4">
+                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                        <TextBlock Text="{Binding IconText}" FontSize="14" />
+                                                        <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold"
+                                                                   Foreground="#E0E0E0" />
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding Description}" FontSize="10"
+                                                               Foreground="#888888" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
                         </ScrollViewer>
                     </DockPanel>
                 </Border>
@@ -193,33 +227,33 @@
                 <StackPanel HorizontalAlignment="Right" VerticalAlignment="Bottom"
                             Orientation="Horizontal" Spacing="8"
                             Margin="0,0,16,16">
-                    <Button Content="⛶ Fit" Click="OnFitCanvasClick"
+                    <Button Content="{loc:Loc main.fit}" Click="OnFitCanvasClick"
                             Padding="12,8" FontSize="12"
                             Background="#2A3A4E" Foreground="#FFFFFF"
                             CornerRadius="6"
-                            ToolTip.Tip="Fit all blocks into view" />
-                    <Button Content="⇉ Layout" Command="{Binding AutoLayoutBlocksCommand}"
+                            ToolTip.Tip="{loc:Loc main.fit_all_blocks_into_view}" />
+                    <Button Content="{loc:Loc main.layout}" Command="{Binding AutoLayoutBlocksCommand}"
                             Padding="12,8" FontSize="12"
                             Background="#2A3A4E" Foreground="#FFFFFF"
                             CornerRadius="6"
-                            ToolTip.Tip="Auto layout by topological layers" />
-                    <Button Content="✓ Validate" Command="{Binding ValidateRecipeCommand}"
+                            ToolTip.Tip="{loc:Loc main.auto_layout_by_topological_layers}" />
+                    <Button Content="{loc:Loc main.validate}" Command="{Binding ValidateRecipeCommand}"
                             Padding="14,8" FontSize="12"
                             Background="#2D5A2D" Foreground="#FFFFFF"
                             CornerRadius="6"
                             IsEnabled="{Binding !IsRunning}" />
-                    <Button Content="⏸ Pause" Command="{Binding PauseRunCommand}"
+                    <Button Content="{loc:Loc main.pause}" Command="{Binding PauseRunCommand}"
                             Padding="12,8" FontSize="12"
                             Background="#3A3A4E" Foreground="#FFFFFF"
                             CornerRadius="6"
                             IsVisible="{Binding IsRunning}"
                             IsEnabled="{Binding !IsRunPaused}" />
-                    <Button Content="▶ Resume" Command="{Binding ResumeRunCommand}"
+                    <Button Content="{loc:Loc main.resume}" Command="{Binding ResumeRunCommand}"
                             Padding="12,8" FontSize="12"
                             Background="#2D5A2D" Foreground="#FFFFFF"
                             CornerRadius="6"
                             IsVisible="{Binding IsRunPaused}" />
-                    <Button Content="▶ Run" Command="{Binding RunRecipeCommand}"
+                    <Button Content="{loc:Loc main.run}" Command="{Binding RunRecipeCommand}"
                             Padding="14,8" FontSize="12"
                             Background="#4A90D9" Foreground="#FFFFFF"
                             CornerRadius="6"
@@ -244,7 +278,7 @@
                             Command="{Binding TogglePropertyPanelCommand}"
                             Background="Transparent" Foreground="#888888"
                             Padding="4,2" VerticalAlignment="Top" Margin="0,8,0,0"
-                            ToolTip.Tip="Show Properties" />
+                            ToolTip.Tip="{loc:Loc main.show_properties}" />
                 </Border>
 
                 <!-- Expanded state: full panel -->
@@ -261,8 +295,8 @@
                                         Command="{Binding TogglePropertyPanelCommand}"
                                         Background="Transparent" Foreground="#888888"
                                         Padding="6,2" Margin="4,0,0,0"
-                                        ToolTip.Tip="Hide Properties" />
-                                <TextBlock Grid.Column="1" Text="Properties" FontSize="12" FontWeight="SemiBold"
+                                        ToolTip.Tip="{loc:Loc main.hide_properties}" />
+                                <TextBlock Grid.Column="1" Text="{loc:Loc main.properties}" FontSize="12" FontWeight="SemiBold"
                                            VerticalAlignment="Center" Margin="8,0"
                                            Foreground="#CCCCCC" />
                             </Grid>
@@ -310,8 +344,8 @@
                             BorderThickness="0,0,0,1">
                         <Grid ColumnDefinitions="*,Auto" Margin="18,0,12,0">
                             <StackPanel VerticalAlignment="Center" Spacing="2">
-                                <TextBlock Text="Settings" FontSize="18" FontWeight="SemiBold" Foreground="#FFFFFF" />
-                                <TextBlock Text="Cache, theme and canvas interaction preferences" FontSize="11" Foreground="#9A9AAD" />
+                                <TextBlock Text="{loc:Loc main.settings}" FontSize="18" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                <TextBlock Text="{loc:Loc main.cache_theme_and_canvas_interaction_preferences}" FontSize="11" Foreground="#9A9AAD" />
                             </StackPanel>
                             <Button Grid.Column="1"
                                     Content="✕"
@@ -327,20 +361,20 @@
                     <StackPanel Margin="22" Spacing="18">
                         <Border Background="#1E1E2E" BorderBrush="#3A3A4E" BorderThickness="1" CornerRadius="8" Padding="16">
                             <StackPanel Spacing="12">
-                                <TextBlock Text="Index Cache" FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF" />
-                                <TextBlock Text="SQLite cache for large JSONL line offsets. Keep this on a fast local disk." FontSize="11" Foreground="#9A9AAD" TextWrapping="Wrap" />
+                                <TextBlock Text="{loc:Loc main.index_cache}" FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                <TextBlock Text="{loc:Loc main.sqlite_cache_for_large_jsonl_line_offsets_keep_t}" FontSize="11" Foreground="#9A9AAD" TextWrapping="Wrap" />
 
                                 <Grid ColumnDefinitions="180,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="12">
-                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Max cache size (MB)" VerticalAlignment="Center" Foreground="#CCCCCC" />
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="{loc:Loc main.max_cache_size_mb}" VerticalAlignment="Center" Foreground="#CCCCCC" />
                                     <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding MaxCacheSizeMb, Mode=TwoWay}" Watermark="512" />
 
-                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Cache directory" VerticalAlignment="Center" Foreground="#CCCCCC" />
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="{loc:Loc main.cache_directory}" VerticalAlignment="Center" Foreground="#CCCCCC" />
                                     <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding CacheDirectory, Mode=TwoWay}" Watermark="tmp/index-cache" />
 
-                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Current cache size" VerticalAlignment="Center" Foreground="#CCCCCC" />
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="{loc:Loc main.current_cache_size}" VerticalAlignment="Center" Foreground="#CCCCCC" />
                                     <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="10">
                                         <TextBlock Text="{Binding CacheSizeText}" VerticalAlignment="Center" Foreground="#AAAAAA" />
-                                        <Button Content="Clean Cache"
+                                        <Button Content="{loc:Loc main.clean_cache}"
                                                 Command="{Binding CleanIndexCacheCommand}"
                                                 Padding="10,5"
                                                 Background="#3A3A4E"
@@ -352,15 +386,15 @@
 
                         <Border Background="#1E1E2E" BorderBrush="#3A3A4E" BorderThickness="1" CornerRadius="8" Padding="16">
                             <StackPanel Spacing="12">
-                                <TextBlock Text="LLM API Keys" FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF" />
-                                <TextBlock Text="Stored in settings.json on this machine. Leave empty to use OPENAI_API_KEY / ANTHROPIC_API_KEY."
+                                <TextBlock Text="{loc:Loc main.llm_api_keys}" FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                <TextBlock Text="{loc:Loc main.stored_in_settings_json_on_this_machine_leave_em}"
                                            FontSize="11" Foreground="#9A9AAD" TextWrapping="Wrap" />
                                 <Grid ColumnDefinitions="180,*" RowDefinitions="Auto,Auto" RowSpacing="10" ColumnSpacing="12">
-                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="OpenAI API key"
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="{loc:Loc main.openai_api_key}"
                                                VerticalAlignment="Center" Foreground="#CCCCCC" />
                                     <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding OpenAiApiKey, Mode=TwoWay}"
                                              PasswordChar="●" Watermark="sk-..." />
-                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Anthropic API key"
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="{loc:Loc main.anthropic_api_key}"
                                                VerticalAlignment="Center" Foreground="#CCCCCC" />
                                     <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding AnthropicApiKey, Mode=TwoWay}"
                                              PasswordChar="●" Watermark="sk-ant-..." />
@@ -370,15 +404,15 @@
 
                         <Border Background="#1E1E2E" BorderBrush="#3A3A4E" BorderThickness="1" CornerRadius="8" Padding="16">
                             <StackPanel Spacing="12">
-                                <TextBlock Text="Execution" FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                <TextBlock Text="{loc:Loc main.execution}" FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF" />
                                 <Grid ColumnDefinitions="180,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="12">
-                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Layer parallelism" VerticalAlignment="Center" Foreground="#CCCCCC" />
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="{loc:Loc main.layer_parallelism}" VerticalAlignment="Center" Foreground="#CCCCCC" />
                                     <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding MaxParallelism, Mode=TwoWay}" Watermark="4" />
 
-                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Node retries" VerticalAlignment="Center" Foreground="#CCCCCC" />
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="{loc:Loc main.node_retries}" VerticalAlignment="Center" Foreground="#CCCCCC" />
                                     <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding NodeRetryCount, Mode=TwoWay}" Watermark="0" />
 
-                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Run summary directory" VerticalAlignment="Center" Foreground="#CCCCCC" />
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="{loc:Loc main.run_summary_directory}" VerticalAlignment="Center" Foreground="#CCCCCC" />
                                     <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding RunOutputDirectory, Mode=TwoWay}" Watermark="%TEMP%\LMTrainingDataStudio\runs" />
                                 </Grid>
                             </StackPanel>
@@ -386,12 +420,12 @@
 
                         <Border Background="#1E1E2E" BorderBrush="#3A3A4E" BorderThickness="1" CornerRadius="8" Padding="16">
                             <StackPanel Spacing="12">
-                                <TextBlock Text="Canvas" FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                <TextBlock Text="{loc:Loc main.canvas}" FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF" />
                                 <Grid ColumnDefinitions="180,*" RowDefinitions="Auto,Auto" RowSpacing="10" ColumnSpacing="12">
-                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Enable grid snap" VerticalAlignment="Center" Foreground="#CCCCCC" />
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="{loc:Loc main.enable_grid_snap}" VerticalAlignment="Center" Foreground="#CCCCCC" />
                                     <CheckBox Grid.Row="0" Grid.Column="1" IsChecked="{Binding EnableGridSnap, Mode=TwoWay}" />
 
-                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Grid snap size (px)" VerticalAlignment="Center" Foreground="#CCCCCC" />
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="{loc:Loc main.grid_snap_size_px}" VerticalAlignment="Center" Foreground="#CCCCCC" />
                                     <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding GridSnapSize, Mode=TwoWay}" Watermark="16" />
                                 </Grid>
                             </StackPanel>
@@ -399,18 +433,35 @@
 
                         <Border Background="#1E1E2E" BorderBrush="#3A3A4E" BorderThickness="1" CornerRadius="8" Padding="16">
                             <Grid ColumnDefinitions="180,*" ColumnSpacing="12">
-                                <TextBlock Grid.Column="0" Text="Dark theme" VerticalAlignment="Center" Foreground="#CCCCCC" />
+                                <TextBlock Grid.Column="0" Text="{loc:Loc settings.language}" VerticalAlignment="Center" Foreground="#CCCCCC" />
+                                <ComboBox x:Name="LanguagePicker"
+                                          Grid.Column="1"
+                                          ItemsSource="{Binding LanguageOptions}"
+                                          SelectedItem="{Binding SelectedLanguageOption, Mode=TwoWay}"
+                                          HorizontalAlignment="Stretch">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="loc:LanguageOption">
+                                            <TextBlock Text="{Binding DisplayName}" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </Grid>
+                        </Border>
+
+                        <Border Background="#1E1E2E" BorderBrush="#3A3A4E" BorderThickness="1" CornerRadius="8" Padding="16">
+                            <Grid ColumnDefinitions="180,*" ColumnSpacing="12">
+                                <TextBlock Grid.Column="0" Text="{loc:Loc main.dark_theme}" VerticalAlignment="Center" Foreground="#CCCCCC" />
                                 <CheckBox Grid.Column="1" IsChecked="{Binding IsDarkTheme, Mode=TwoWay}" />
                             </Grid>
                         </Border>
 
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
-                            <Button Content="Cancel"
+                            <Button Content="{loc:Loc common.cancel}"
                                     Command="{Binding CloseSettingsCommand}"
                                     Padding="14,7"
                                     Background="#3A3A4E"
                                     Foreground="#FFFFFF" />
-                            <Button Content="Apply"
+                            <Button Content="{loc:Loc common.apply}"
                                     Command="{Binding ApplySettingsCommand}"
                                     Padding="16,7"
                                     Background="#4A90D9"

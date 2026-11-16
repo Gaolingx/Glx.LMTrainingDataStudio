@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="using:LMTrainingDataStudio2.Localization"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:LMTrainingDataStudio2.ViewModels"
@@ -12,9 +13,9 @@
         <!-- No Selection State -->
         <StackPanel IsVisible="{Binding SelectedBlock, Converter={x:Static ObjectConverters.IsNull}}"
                     Spacing="8" Margin="0,20">
-            <TextBlock Text="No block selected" FontSize="13"
+            <TextBlock Text="{loc:Loc property.no_block_selected}" FontSize="13"
                        Foreground="#888888" HorizontalAlignment="Center" />
-            <TextBlock Text="Click a block on the canvas to view its properties."
+            <TextBlock Text="{loc:Loc property.click_a_block_on_the_canvas_to_view_its_properti}"
                        FontSize="11" Foreground="#666666"
                        TextWrapping="Wrap" HorizontalAlignment="Center"
                        TextAlignment="Center" />
@@ -33,9 +34,22 @@
                                    FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF" />
                     </StackPanel>
                     <TextBlock FontSize="11" Foreground="#AAAAAA">
-                        <Run Text="Type: " />
+                        <Run Text="{loc:Loc property.type_label}" />
                         <Run Text="{Binding SelectedBlock.Type}" />
                     </TextBlock>
+                </StackPanel>
+            </Border>
+
+            <!-- Node guide -->
+            <Border Background="#1E1E2E" BorderBrush="#3A3A4E" BorderThickness="1"
+                    CornerRadius="6" Padding="10,8">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="{loc:Loc property.node_help}" FontSize="11"
+                               FontWeight="SemiBold" Foreground="#CCCCCC" />
+                    <TextBlock Text="{Binding SelectedBlockHelp}" FontSize="10"
+                               Foreground="#AAAAAA" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding SelectedBlockPorts}" FontSize="10"
+                               Foreground="#888888" TextWrapping="Wrap" />
                 </StackPanel>
             </Border>
 
@@ -51,7 +65,7 @@
 
             <!-- Jinja Reference Name -->
             <StackPanel Spacing="4">
-                <TextBlock Text="Jinja Reference Name" FontSize="11" Foreground="#AAAAAA" />
+                <TextBlock Text="{loc:Loc property.jinja_reference_name}" FontSize="11" Foreground="#AAAAAA" />
                 <TextBox Text="{Binding SelectedBlock.Name, Mode=TwoWay}"
                          FontSize="12" Padding="8,6"
                          Watermark="e.g. seed_data" />
@@ -59,26 +73,26 @@
 
             <!-- Display Name -->
             <StackPanel Spacing="4">
-                <TextBlock Text="Display Name" FontSize="11" Foreground="#AAAAAA" />
+                <TextBlock Text="{loc:Loc property.display_name}" FontSize="11" Foreground="#AAAAAA" />
                 <TextBox Text="{Binding SelectedBlock.DisplayName, Mode=TwoWay}"
                          FontSize="12" Padding="8,6"
-                         Watermark="Block display name" />
+                         Watermark="{loc:Loc property.block_display_name}" />
             </StackPanel>
 
             <!-- Seed configuration -->
             <StackPanel Spacing="8"
                         IsVisible="{Binding SelectedBlock.SeedEditor, Converter={x:Static ObjectConverters.IsNotNull}}">
                 <Border Height="1" Background="#3A3A4E" />
-                <TextBlock Text="Seed Configuration" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                <TextBlock Text="{loc:Loc property.seed_configuration}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Data source" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.data_source}" FontSize="11" Foreground="#AAAAAA" />
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
                         <TextBox Grid.Column="0"
                                  Text="{Binding SelectedBlock.SeedEditor.SourcePath, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6"
                                  Watermark="path/to/data.jsonl" />
-                        <Button Grid.Column="1" Content="Browse…"
+                        <Button Grid.Column="1" Content="{loc:Loc property.browse}"
                                 Click="OnBrowseSeedSourceClick"
                                 Padding="10,6" FontSize="11"
                                 Background="#3A3A4E" Foreground="#FFFFFF" />
@@ -86,13 +100,13 @@
                 </StackPanel>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="File type" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.file_type}" FontSize="11" Foreground="#AAAAAA" />
                     <ComboBox ItemsSource="{Binding SelectedBlock.SeedEditor.FileTypes}"
                               SelectedItem="{Binding SelectedBlock.SeedEditor.FileType, Mode=TwoWay}"
                               FontSize="11" HorizontalAlignment="Stretch" />
                 </StackPanel>
 
-                <CheckBox Content="Use index cache"
+                <CheckBox Content="{loc:Loc property.use_index_cache}"
                           FontSize="11" Foreground="#CCCCCC"
                           IsChecked="{Binding SelectedBlock.SeedEditor.UseIndexCache, Mode=TwoWay}" />
             </StackPanel>
@@ -101,10 +115,10 @@
             <StackPanel Spacing="8"
                         IsVisible="{Binding SelectedBlock.LlmEditor, Converter={x:Static ObjectConverters.IsNotNull}}">
                 <Border Height="1" Background="#3A3A4E" />
-                <TextBlock Text="LLM Configuration" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                <TextBlock Text="{loc:Loc property.llm_configuration}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Provider" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc common.provider}" FontSize="11" Foreground="#AAAAAA" />
                     <ComboBox ItemsSource="{Binding SelectedBlock.LlmEditor.Providers}"
                               SelectedItem="{Binding SelectedBlock.LlmEditor.SelectedProvider, Mode=TwoWay}"
                               FontSize="11" HorizontalAlignment="Stretch">
@@ -117,7 +131,7 @@
                 </StackPanel>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Model" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc common.model}" FontSize="11" Foreground="#AAAAAA" />
                     <TextBox Text="{Binding SelectedBlock.LlmEditor.ModelAlias, Mode=TwoWay}"
                              FontSize="11" Padding="8,6"
                              Watermark="gpt-4o / claude-sonnet-4-5" />
@@ -125,12 +139,12 @@
 
                 <Grid ColumnDefinitions="*,8,*">
                     <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="Temperature" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc common.temperature}" FontSize="11" Foreground="#AAAAAA" />
                         <TextBox Text="{Binding SelectedBlock.LlmEditor.Temperature, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="0.7" />
                     </StackPanel>
                     <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="Max tokens" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc common.max_tokens}" FontSize="11" Foreground="#AAAAAA" />
                         <TextBox Text="{Binding SelectedBlock.LlmEditor.MaxTokens, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="2048" />
                     </StackPanel>
@@ -138,40 +152,40 @@
 
                 <Grid ColumnDefinitions="*,8,*">
                     <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="Timeout (s)" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc common.timeout_seconds}" FontSize="11" Foreground="#AAAAAA" />
                         <TextBox Text="{Binding SelectedBlock.LlmEditor.TimeoutSeconds, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="100" />
                     </StackPanel>
                     <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="Max retries" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.max_retries}" FontSize="11" Foreground="#AAAAAA" />
                         <TextBox Text="{Binding SelectedBlock.LlmEditor.MaxRetries, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="2" />
                     </StackPanel>
                 </Grid>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Endpoint (optional)" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc common.endpoint_optional}" FontSize="11" Foreground="#AAAAAA" />
                     <TextBox Text="{Binding SelectedBlock.LlmEditor.Endpoint, Mode=TwoWay}"
                              FontSize="11" Padding="8,6"
                              Watermark="https://api.openai.com/v1" />
                 </StackPanel>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Prompt" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.prompt}" FontSize="11" Foreground="#AAAAAA" />
                     <TextBox Text="{Binding SelectedBlock.LlmEditor.Prompt, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Height="90"
                              AcceptsReturn="True" TextWrapping="Wrap"
-                             Watermark="Empty sends raw row JSON. Supports {{ field }} placeholders." />
+                             Watermark="{loc:Loc property.empty_sends_raw_row_json_supports_field_placehol}" />
                 </StackPanel>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Tool profile (optional)" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc common.tool_profile_optional}" FontSize="11" Foreground="#AAAAAA" />
                     <TextBox Text="{Binding SelectedBlock.LlmEditor.ToolProfileName, Mode=TwoWay}"
                              FontSize="11" Padding="8,6"
-                             Watermark="Tool Profile block name" />
+                             Watermark="{loc:Loc property.tool_profile_block_name}" />
                 </StackPanel>
 
-                <TextBlock Text="API keys are read from OPENAI_API_KEY / ANTHROPIC_API_KEY."
+                <TextBlock Text="{loc:Loc property.api_keys_are_read_from_openai_api_key_anthropic}"
                            FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
             </StackPanel>
 
@@ -179,12 +193,12 @@
             <StackPanel Spacing="8"
                         IsVisible="{Binding SelectedBlock.ExpressionEditor, Converter={x:Static ObjectConverters.IsNotNull}}">
                 <Border Height="1" Background="#3A3A4E" />
-                <TextBlock Text="Expression Configuration" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
-                <TextBlock Text="Fluid template: variables, {% if %}, {% for %} and filters. Use {{ value | json }} to embed a value as JSON."
+                <TextBlock Text="{loc:Loc property.expression_configuration}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                <TextBlock Text="{loc:Loc property.fluid_template_variables_if_for_and_filters_use}"
                            FontSize="10" Foreground="#888888" TextWrapping="Wrap" />
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Template" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.template}" FontSize="11" Foreground="#AAAAAA" />
                     <TextBox Text="{Binding SelectedBlock.ExpressionEditor.Template, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Height="120"
                              AcceptsReturn="True" TextWrapping="NoWrap"
@@ -196,7 +210,7 @@
                 </StackPanel>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Field aliases (JSON: alias → path)" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.field_aliases_json_alias_path}" FontSize="11" Foreground="#AAAAAA" />
                     <TextBox Text="{Binding SelectedBlock.ExpressionEditor.FieldsJson, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Height="70"
                              AcceptsReturn="True" TextWrapping="NoWrap"
@@ -207,10 +221,10 @@
                 </StackPanel>
 
                 <Border Height="1" Background="#2F2F42" />
-                <TextBlock Text="Preview" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                <TextBlock Text="{loc:Loc common.preview}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Sample row JSON" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.sample_row_json}" FontSize="11" Foreground="#AAAAAA" />
                     <TextBox Text="{Binding SelectedBlock.ExpressionEditor.SampleJson, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Height="80"
                              AcceptsReturn="True" TextWrapping="NoWrap"
@@ -218,9 +232,9 @@
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Button Content="Validate" Command="{Binding SelectedBlock.ExpressionEditor.ValidateTemplateCommand}"
+                    <Button Content="{loc:Loc common.validate}" Command="{Binding SelectedBlock.ExpressionEditor.ValidateTemplateCommand}"
                             Padding="10,5" Background="#3A3A4E" Foreground="#FFFFFF" />
-                    <Button Content="Render Preview" Command="{Binding SelectedBlock.ExpressionEditor.RenderPreviewCommand}"
+                    <Button Content="{loc:Loc property.render_preview}" Command="{Binding SelectedBlock.ExpressionEditor.RenderPreviewCommand}"
                             Padding="10,5" Background="#4A90D9" Foreground="#FFFFFF" />
                 </StackPanel>
 
@@ -240,10 +254,10 @@
             <StackPanel Spacing="8"
                         IsVisible="{Binding SelectedBlock.ValidatorEditor, Converter={x:Static ObjectConverters.IsNotNull}}">
                 <Border Height="1" Background="#3A3A4E" />
-                <TextBlock Text="Validator Configuration" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                <TextBlock Text="{loc:Loc property.validator_configuration}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Rule kind" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.rule_kind}" FontSize="11" Foreground="#AAAAAA" />
                     <ComboBox ItemsSource="{Binding SelectedBlock.ValidatorEditor.RuleKinds}"
                               SelectedItem="{Binding SelectedBlock.ValidatorEditor.SelectedRuleKind, Mode=TwoWay}"
                               FontSize="11" HorizontalAlignment="Stretch">
@@ -256,7 +270,7 @@
                 </StackPanel>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Rule / Schema" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.rule_schema}" FontSize="11" Foreground="#AAAAAA" />
                     <TextBox Text="{Binding SelectedBlock.ValidatorEditor.Rule, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Height="130"
                              AcceptsReturn="True" TextWrapping="NoWrap"
@@ -265,24 +279,24 @@
                     <TextBlock Text="{Binding SelectedBlock.ValidatorEditor.RuleError}"
                                FontSize="10" Foreground="#FF6666" TextWrapping="Wrap"
                                IsVisible="{Binding SelectedBlock.ValidatorEditor.RuleError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                    <Button Content="Validate rule" Command="{Binding SelectedBlock.ValidatorEditor.ValidateRuleCommand}"
+                    <Button Content="{loc:Loc property.validate_rule}" Command="{Binding SelectedBlock.ValidatorEditor.ValidateRuleCommand}"
                             HorizontalAlignment="Left" Padding="10,5"
                             Background="#3A3A4E" Foreground="#FFFFFF" />
                 </StackPanel>
 
-                <CheckBox Content="Reject invalid rows"
+                <CheckBox Content="{loc:Loc property.reject_invalid_rows}"
                           FontSize="11" Foreground="#CCCCCC"
                           IsChecked="{Binding SelectedBlock.ValidatorEditor.RejectOnFailure, Mode=TwoWay}" />
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Reject output path (optional)" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.reject_output_path_optional}" FontSize="11" Foreground="#AAAAAA" />
                     <TextBox Text="{Binding SelectedBlock.ValidatorEditor.RejectOutputPath, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Watermark="out/rejected.jsonl" />
-                    <TextBlock Text="Rejected rows are written as { lineNumber, reason, data } JSONL."
+                    <TextBlock Text="{loc:Loc property.rejected_rows_are_written_as_linenumber_reason_d}"
                                FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
                 </StackPanel>
 
-                <TextBlock Text="Cleanup rules remain in Config JSON below."
+                <TextBlock Text="{loc:Loc property.cleanup_rules_remain_in_config_json_below}"
                            FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
             </StackPanel>
 
@@ -290,29 +304,29 @@
             <StackPanel Spacing="8"
                         IsVisible="{Binding SelectedBlock.SamplerEditor, Converter={x:Static ObjectConverters.IsNotNull}}">
                 <Border Height="1" Background="#3A3A4E" />
-                <TextBlock Text="Sampler Configuration" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                <TextBlock Text="{loc:Loc property.sampler_configuration}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
 
                 <Grid ColumnDefinitions="*,8,*">
                     <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="Count" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.count}" FontSize="11" Foreground="#AAAAAA" />
                         <TextBox Text="{Binding SelectedBlock.SamplerEditor.CountText, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="100" />
                     </StackPanel>
                     <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="Ratio (0–1)" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.ratio_0_1}" FontSize="11" Foreground="#AAAAAA" />
                         <TextBox Text="{Binding SelectedBlock.SamplerEditor.RatioText, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="0.1" />
                     </StackPanel>
                 </Grid>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Seed" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.sampler_seed}" FontSize="11" Foreground="#AAAAAA" />
                     <TextBox Text="{Binding SelectedBlock.SamplerEditor.Seed, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Watermark="42" />
                 </StackPanel>
 
                 <Border Height="1" Background="#2F2F42" />
-                <TextBlock Text="Splits (one per line: train:0.8 or valid:100)"
+                <TextBlock Text="{loc:Loc property.splits_one_per_line_train_0_8_or_valid_100}"
                            FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
                 <TextBox Text="{Binding SelectedBlock.SamplerEditor.SplitsText, Mode=TwoWay}"
                          FontSize="11" Padding="8,6" Height="90"
@@ -321,7 +335,7 @@
                          Watermark="train:0.8&#10;valid:0.1&#10;test:0.1" />
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Split output directory" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.split_output_directory}" FontSize="11" Foreground="#AAAAAA" />
                     <TextBox Text="{Binding SelectedBlock.SamplerEditor.OutputDirectory, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Watermark="out/splits" />
                 </StackPanel>
@@ -330,7 +344,7 @@
                            FontSize="10" Foreground="#FF6666" TextWrapping="Wrap"
                            IsVisible="{Binding SelectedBlock.SamplerEditor.ValidationError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
-                <TextBlock Text="Splits pass all rows downstream and write one JSONL per split. Count/ratio are ignored when splits are set."
+                <TextBlock Text="{loc:Loc property.splits_pass_all_rows_downstream_and_write_one_js}"
                            FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
             </StackPanel>
 
@@ -338,19 +352,19 @@
             <StackPanel Spacing="8"
                         IsVisible="{Binding SelectedBlock.QuerySourceEditor, Converter={x:Static ObjectConverters.IsNotNull}}">
                 <Border Height="1" Background="#3A3A4E" />
-                <TextBlock Text="Query Source Configuration" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                <TextBlock Text="{loc:Loc property.query_source_configuration}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Queries (one per line)" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.queries_one_per_line}" FontSize="11" Foreground="#AAAAAA" />
                     <TextBox Text="{Binding SelectedBlock.QuerySourceEditor.QueriesText, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Height="100"
                              AcceptsReturn="True" TextWrapping="Wrap"
-                             Watermark="Analyze the TCP handshake" />
+                             Watermark="{loc:Loc property.analyze_the_tcp_handshake}" />
                 </StackPanel>
 
                 <Grid ColumnDefinitions="*,8,*">
                     <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="Expansion mode" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.expansion_mode}" FontSize="11" Foreground="#AAAAAA" />
                         <ComboBox ItemsSource="{Binding SelectedBlock.QuerySourceEditor.Modes}"
                                   SelectedItem="{Binding SelectedBlock.QuerySourceEditor.SelectedMode, Mode=TwoWay}"
                                   FontSize="11" HorizontalAlignment="Stretch">
@@ -362,14 +376,14 @@
                         </ComboBox>
                     </StackPanel>
                     <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="Repeat" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.repeat}" FontSize="11" Foreground="#AAAAAA" />
                         <TextBox Text="{Binding SelectedBlock.QuerySourceEditor.Repeat, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="1" />
                     </StackPanel>
                 </Grid>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="System prompt (optional)" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc common.system_prompt_optional}" FontSize="11" Foreground="#AAAAAA" />
                     <TextBox Text="{Binding SelectedBlock.QuerySourceEditor.SystemPrompt, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Height="60"
                              AcceptsReturn="True" TextWrapping="Wrap" />
@@ -380,10 +394,10 @@
             <StackPanel Spacing="8"
                         IsVisible="{Binding SelectedBlock.SimulationEditor, Converter={x:Static ObjectConverters.IsNotNull}}">
                 <Border Height="1" Background="#3A3A4E" />
-                <TextBlock Text="Simulation Configuration" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                <TextBlock Text="{loc:Loc property.simulation_configuration}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Model transport" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.model_transport}" FontSize="11" Foreground="#AAAAAA" />
                     <ComboBox ItemsSource="{Binding SelectedBlock.SimulationEditor.ModelModes}"
                               SelectedItem="{Binding SelectedBlock.SimulationEditor.SelectedModelMode, Mode=TwoWay}"
                               FontSize="11" HorizontalAlignment="Stretch">
@@ -396,7 +410,7 @@
                 </StackPanel>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Provider" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc common.provider}" FontSize="11" Foreground="#AAAAAA" />
                     <ComboBox ItemsSource="{Binding SelectedBlock.SimulationEditor.Providers}"
                               SelectedItem="{Binding SelectedBlock.SimulationEditor.SelectedProvider, Mode=TwoWay}"
                               FontSize="11" HorizontalAlignment="Stretch">
@@ -409,7 +423,7 @@
                 </StackPanel>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Tool execution" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.tool_execution}" FontSize="11" Foreground="#AAAAAA" />
                     <ComboBox ItemsSource="{Binding SelectedBlock.SimulationEditor.ToolModes}"
                               SelectedItem="{Binding SelectedBlock.SimulationEditor.SelectedToolMode, Mode=TwoWay}"
                               FontSize="11" HorizontalAlignment="Stretch">
@@ -422,19 +436,19 @@
                 </StackPanel>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Model" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc common.model}" FontSize="11" Foreground="#AAAAAA" />
                     <TextBox Text="{Binding SelectedBlock.SimulationEditor.ModelAlias, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Watermark="gpt-4o / claude-sonnet-4-5" />
                 </StackPanel>
 
                 <Grid ColumnDefinitions="*,8,*">
                     <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="Max rounds" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.max_rounds}" FontSize="11" Foreground="#AAAAAA" />
                         <TextBox Text="{Binding SelectedBlock.SimulationEditor.MaxRounds, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="8" />
                     </StackPanel>
                     <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="Concurrency" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.concurrency}" FontSize="11" Foreground="#AAAAAA" />
                         <TextBox Text="{Binding SelectedBlock.SimulationEditor.MaxConcurrency, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="1" />
                     </StackPanel>
@@ -442,12 +456,12 @@
 
                 <Grid ColumnDefinitions="*,8,*">
                     <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="Temperature" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc common.temperature}" FontSize="11" Foreground="#AAAAAA" />
                         <TextBox Text="{Binding SelectedBlock.SimulationEditor.Temperature, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="0.7" />
                     </StackPanel>
                     <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="Max tokens" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc common.max_tokens}" FontSize="11" Foreground="#AAAAAA" />
                         <TextBox Text="{Binding SelectedBlock.SimulationEditor.MaxTokens, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="2048" />
                     </StackPanel>
@@ -455,80 +469,80 @@
 
                 <Grid ColumnDefinitions="*,8,*">
                     <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="Timeout (s)" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc common.timeout_seconds}" FontSize="11" Foreground="#AAAAAA" />
                         <TextBox Text="{Binding SelectedBlock.SimulationEditor.TimeoutSeconds, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="100" />
                     </StackPanel>
                     <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="Model retries" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.model_retries}" FontSize="11" Foreground="#AAAAAA" />
                         <TextBox Text="{Binding SelectedBlock.SimulationEditor.ModelMaxRetries, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="0" />
                     </StackPanel>
                 </Grid>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Endpoint (optional)" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc common.endpoint_optional}" FontSize="11" Foreground="#AAAAAA" />
                     <TextBox Text="{Binding SelectedBlock.SimulationEditor.Endpoint, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Watermark="https://api.openai.com/v1" />
                 </StackPanel>
 
-                <CheckBox Content="Emit incomplete trajectories"
+                <CheckBox Content="{loc:Loc property.emit_incomplete_trajectories}"
                           FontSize="11" Foreground="#CCCCCC"
                           IsChecked="{Binding SelectedBlock.SimulationEditor.EmitIncompleteTrajectories, Mode=TwoWay}" />
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="System prompt (optional)" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc common.system_prompt_optional}" FontSize="11" Foreground="#AAAAAA" />
                     <TextBox Text="{Binding SelectedBlock.SimulationEditor.SystemPrompt, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Height="60"
                              AcceptsReturn="True" TextWrapping="Wrap" />
                 </StackPanel>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Final content (scripted mode)" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.final_content_scripted_mode}" FontSize="11" Foreground="#AAAAAA" />
                     <TextBox Text="{Binding SelectedBlock.SimulationEditor.FinalContent, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Height="50"
                              AcceptsReturn="True" TextWrapping="Wrap" />
                 </StackPanel>
 
                 <Border Height="1" Background="#2F2F42" />
-                <TextBlock Text="Failure samples" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                <TextBlock Text="{loc:Loc property.failure_samples}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Failure JSONL path (optional)" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.failure_jsonl_path_optional}" FontSize="11" Foreground="#AAAAAA" />
                     <TextBox Text="{Binding SelectedBlock.SimulationEditor.FailureOutputPath, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Watermark="out/failed.jsonl" />
                 </StackPanel>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Max failure samples (0 = unlimited)" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.max_failure_samples_0_unlimited}" FontSize="11" Foreground="#AAAAAA" />
                     <TextBox Text="{Binding SelectedBlock.SimulationEditor.MaxFailureSamples, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Watermark="100" />
                 </StackPanel>
 
                 <Grid ColumnDefinitions="*,8,*">
                     <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="Input cost / 1M" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.input_cost_1m}" FontSize="11" Foreground="#AAAAAA" />
                         <TextBox Text="{Binding SelectedBlock.SimulationEditor.InputCostPerMillionTokens, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="0" />
                     </StackPanel>
                     <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="Output cost / 1M" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.output_cost_1m}" FontSize="11" Foreground="#AAAAAA" />
                         <TextBox Text="{Binding SelectedBlock.SimulationEditor.OutputCostPerMillionTokens, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="0" />
                     </StackPanel>
                 </Grid>
 
                 <Border Height="1" Background="#2F2F42" />
-                <TextBlock Text="Real sandbox" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                <TextBlock Text="{loc:Loc property.real_sandbox}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
 
                 <Grid ColumnDefinitions="*,8,*">
                     <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="Process timeout (ms)" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.process_timeout_ms}" FontSize="11" Foreground="#AAAAAA" />
                         <TextBox Text="{Binding SelectedBlock.SimulationEditor.SandboxTimeoutMs, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="30000" />
                     </StackPanel>
                     <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="Max output bytes" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.max_output_bytes}" FontSize="11" Foreground="#AAAAAA" />
                         <TextBox Text="{Binding SelectedBlock.SimulationEditor.SandboxMaxOutputBytes, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="65536" />
                     </StackPanel>
@@ -536,50 +550,50 @@
 
                 <Grid ColumnDefinitions="*,8,*">
                     <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="Memory limit (MB)" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.memory_limit_mb}" FontSize="11" Foreground="#AAAAAA" />
                         <TextBox Text="{Binding SelectedBlock.SimulationEditor.SandboxMaxMemoryMb, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="512" />
                     </StackPanel>
                     <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="Max processes" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.max_processes}" FontSize="11" Foreground="#AAAAAA" />
                         <TextBox Text="{Binding SelectedBlock.SimulationEditor.SandboxMaxProcesses, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="8" />
                     </StackPanel>
                 </Grid>
 
-                <CheckBox Content="Allow web_fetch network access"
+                <CheckBox Content="{loc:Loc property.allow_web_fetch_network_access}"
                           FontSize="11" Foreground="#CCCCCC"
                           IsChecked="{Binding SelectedBlock.SimulationEditor.SandboxAllowNetwork, Mode=TwoWay}" />
-                <CheckBox Content="Allow private network addresses"
+                <CheckBox Content="{loc:Loc property.allow_private_network_addresses}"
                           FontSize="11" Foreground="#CCCCCC"
                           IsChecked="{Binding SelectedBlock.SimulationEditor.SandboxAllowPrivateNetwork, Mode=TwoWay}" />
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Python executable" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.python_executable}" FontSize="11" Foreground="#AAAAAA" />
                     <TextBox Text="{Binding SelectedBlock.SimulationEditor.PythonExecutable, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Watermark="python" />
                 </StackPanel>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="PowerShell executable" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.powershell_executable}" FontSize="11" Foreground="#AAAAAA" />
                     <TextBox Text="{Binding SelectedBlock.SimulationEditor.PowerShellExecutable, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Watermark="powershell / pwsh" />
                 </StackPanel>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Bash executable" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.bash_executable}" FontSize="11" Foreground="#AAAAAA" />
                     <TextBox Text="{Binding SelectedBlock.SimulationEditor.BashExecutable, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Watermark="bash" />
                 </StackPanel>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Tool profile (optional)" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc common.tool_profile_optional}" FontSize="11" Foreground="#AAAAAA" />
                     <TextBox Text="{Binding SelectedBlock.SimulationEditor.ToolProfileName, Mode=TwoWay}"
                              FontSize="11" Padding="8,6"
-                             Watermark="Tool Profile block name" />
+                             Watermark="{loc:Loc property.tool_profile_block_name}" />
                 </StackPanel>
 
-                <TextBlock Text="Tools, harness rules and scripts are edited in Config JSON below."
+                <TextBlock Text="{loc:Loc property.tools_harness_rules_and_scripts_are_edited_in_co}"
                            FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
             </StackPanel>
 
@@ -587,20 +601,20 @@
             <StackPanel Spacing="6"
                         IsVisible="{Binding SelectedBlock.CleanerEditor, Converter={x:Static ObjectConverters.IsNotNull}}">
                 <Border Height="1" Background="#3A3A4E" />
-                <TextBlock Text="Cleaner Configuration" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                <TextBlock Text="{loc:Loc property.cleaner_configuration}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
 
-                <CheckBox Content="Normalize whitespace" FontSize="11" Foreground="#CCCCCC"
+                <CheckBox Content="{loc:Loc property.normalize_whitespace}" FontSize="11" Foreground="#CCCCCC"
                           IsChecked="{Binding SelectedBlock.CleanerEditor.NormalizeWhitespace, Mode=TwoWay}" />
-                <CheckBox Content="Normalize newlines" FontSize="11" Foreground="#CCCCCC"
+                <CheckBox Content="{loc:Loc property.normalize_newlines}" FontSize="11" Foreground="#CCCCCC"
                           IsChecked="{Binding SelectedBlock.CleanerEditor.NormalizeNewlines, Mode=TwoWay}" />
-                <CheckBox Content="Strip ANSI escapes" FontSize="11" Foreground="#CCCCCC"
+                <CheckBox Content="{loc:Loc property.strip_ansi_escapes}" FontSize="11" Foreground="#CCCCCC"
                           IsChecked="{Binding SelectedBlock.CleanerEditor.StripAnsi, Mode=TwoWay}" />
-                <CheckBox Content="Remove reasoning_content" FontSize="11" Foreground="#CCCCCC"
+                <CheckBox Content="{loc:Loc property.remove_reasoning_content}" FontSize="11" Foreground="#CCCCCC"
                           IsChecked="{Binding SelectedBlock.CleanerEditor.RemoveReasoningContent, Mode=TwoWay}" />
-                <CheckBox Content="Drop empty messages" FontSize="11" Foreground="#CCCCCC"
+                <CheckBox Content="{loc:Loc property.drop_empty_messages}" FontSize="11" Foreground="#CCCCCC"
                           IsChecked="{Binding SelectedBlock.CleanerEditor.DropEmptyMessages, Mode=TwoWay}" />
 
-                <TextBlock Text="Regex replacements remain in Config JSON below."
+                <TextBlock Text="{loc:Loc property.regex_replacements_remain_in_config_json_below}"
                            FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
             </StackPanel>
 
@@ -608,9 +622,9 @@
             <StackPanel Spacing="6"
                         IsVisible="{Binding SelectedBlock.SftExportEditor, Converter={x:Static ObjectConverters.IsNotNull}}">
                 <Border Height="1" Background="#3A3A4E" />
-                <TextBlock Text="SFT Export Configuration" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                <TextBlock Text="{loc:Loc property.sft_export_configuration}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Output JSONL path" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.output_jsonl_path}" FontSize="11" Foreground="#AAAAAA" />
                     <TextBox Text="{Binding SelectedBlock.SftExportEditor.OutputPath, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Watermark="out/sft.jsonl" />
                 </StackPanel>
@@ -620,15 +634,15 @@
             <StackPanel Spacing="8"
                         IsVisible="{Binding SelectedBlock.ToolProfileEditor, Converter={x:Static ObjectConverters.IsNotNull}}">
                 <Border Height="1" Background="#3A3A4E" />
-                <TextBlock Text="Tool Profile" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                <TextBlock Text="{loc:Loc property.tool_profile}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Profile name" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.profile_name}" FontSize="11" Foreground="#AAAAAA" />
                     <TextBox Text="{Binding SelectedBlock.ToolProfileEditor.Name, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Watermark="agent_tools" />
                 </StackPanel>
 
-                <TextBlock Text="Tools" FontSize="11" Foreground="#AAAAAA" />
+                <TextBlock Text="{loc:Loc common.tools}" FontSize="11" Foreground="#AAAAAA" />
                 <ListBox ItemsSource="{Binding SelectedBlock.ToolProfileEditor.Tools}"
                          SelectedItem="{Binding SelectedBlock.ToolProfileEditor.SelectedTool, Mode=TwoWay}"
                          Height="100" Background="#1E1E2E">
@@ -640,29 +654,29 @@
                 </ListBox>
 
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Button Content="Add Tool" Command="{Binding SelectedBlock.ToolProfileEditor.AddToolCommand}"
+                    <Button Content="{loc:Loc property.add_tool}" Command="{Binding SelectedBlock.ToolProfileEditor.AddToolCommand}"
                             Padding="10,5" Background="#3A3A4E" Foreground="#FFFFFF" />
-                    <Button Content="Remove Tool" Command="{Binding SelectedBlock.ToolProfileEditor.RemoveSelectedToolCommand}"
+                    <Button Content="{loc:Loc property.remove_tool}" Command="{Binding SelectedBlock.ToolProfileEditor.RemoveSelectedToolCommand}"
                             Padding="10,5" Background="#3A2020" Foreground="#FF6666" />
                 </StackPanel>
 
                 <StackPanel Spacing="6"
                             IsVisible="{Binding SelectedBlock.ToolProfileEditor.SelectedTool, Converter={x:Static ObjectConverters.IsNotNull}}">
                     <StackPanel Spacing="4">
-                        <TextBlock Text="Tool name" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.tool_name}" FontSize="11" Foreground="#AAAAAA" />
                         <TextBox Text="{Binding SelectedBlock.ToolProfileEditor.SelectedTool.Name, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" />
                     </StackPanel>
 
                     <StackPanel Spacing="4">
-                        <TextBlock Text="Description" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc common.description}" FontSize="11" Foreground="#AAAAAA" />
                         <TextBox Text="{Binding SelectedBlock.ToolProfileEditor.SelectedTool.Description, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Height="50"
                                  AcceptsReturn="True" TextWrapping="Wrap" />
                     </StackPanel>
 
                     <StackPanel Spacing="4">
-                        <TextBlock Text="Parameters JSON Schema" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.parameters_json_schema}" FontSize="11" Foreground="#AAAAAA" />
                         <TextBox Text="{Binding SelectedBlock.ToolProfileEditor.SelectedTool.ParametersJson, Mode=TwoWay}"
                                  FontSize="10" Padding="8,6" Height="100"
                                  AcceptsReturn="True" TextWrapping="NoWrap"
@@ -673,8 +687,8 @@
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <TextBlock Text="Parameter tree" FontSize="11" Foreground="#AAAAAA" VerticalAlignment="Center" />
-                        <Button Content="Add parameter"
+                        <TextBlock Text="{loc:Loc property.parameter_tree}" FontSize="11" Foreground="#AAAAAA" VerticalAlignment="Center" />
+                        <Button Content="{loc:Loc property.add_parameter}"
                                 Command="{Binding SelectedBlock.ToolProfileEditor.SelectedTool.AddParameterCommand}"
                                 Padding="8,4" Background="#3A3A4E" Foreground="#FFFFFF" />
                     </StackPanel>
@@ -690,10 +704,10 @@
                                     <ComboBox ItemsSource="{Binding Types}"
                                               SelectedItem="{Binding Type, Mode=TwoWay}"
                                               Width="90" FontSize="10" />
-                                    <CheckBox Content="Req" IsChecked="{Binding IsRequired, Mode=TwoWay}"
+                                    <CheckBox Content="{loc:Loc property.req}" IsChecked="{Binding IsRequired, Mode=TwoWay}"
                                               FontSize="10" Foreground="#CCCCCC" />
                                     <TextBox Text="{Binding Description, Mode=TwoWay}" Width="120"
-                                             FontSize="10" Padding="4,2" Watermark="description" />
+                                             FontSize="10" Padding="4,2" Watermark="{loc:Loc property.description}" />
                                     <Button Content="+" Command="{Binding AddChildCommand}"
                                             Padding="5,2" Background="#3A3A4E" Foreground="#FFFFFF" />
                                     <Button Content="×" Command="{Binding RemoveCommand}"
@@ -705,7 +719,7 @@
                 </StackPanel>
 
                 <Border Height="1" Background="#2F2F42" />
-                <TextBlock Text="Profile JSON (import / export)" FontSize="11" Foreground="#AAAAAA" />
+                <TextBlock Text="{loc:Loc property.profile_json_import_export}" FontSize="11" Foreground="#AAAAAA" />
                 <TextBox Text="{Binding SelectedBlock.ToolProfileEditor.ProfileJson, Mode=TwoWay}"
                          FontSize="10" Padding="8,6" Height="130"
                          AcceptsReturn="True" TextWrapping="NoWrap"
@@ -714,29 +728,29 @@
                            FontSize="10" Foreground="#FF6666" TextWrapping="Wrap"
                            IsVisible="{Binding SelectedBlock.ToolProfileEditor.ProfileJsonError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Button Content="Import JSON" Command="{Binding SelectedBlock.ToolProfileEditor.ImportJsonCommand}"
+                    <Button Content="{loc:Loc property.import_json}" Command="{Binding SelectedBlock.ToolProfileEditor.ImportJsonCommand}"
                             Padding="10,5" Background="#4A90D9" Foreground="#FFFFFF" />
-                    <Button Content="Export JSON" Command="{Binding SelectedBlock.ToolProfileEditor.ExportJsonCommand}"
+                    <Button Content="{loc:Loc property.export_json}" Command="{Binding SelectedBlock.ToolProfileEditor.ExportJsonCommand}"
                             Padding="10,5" Background="#3A3A4E" Foreground="#FFFFFF" />
                 </StackPanel>
 
-                <TextBlock Text="Simulation / LLM blocks reference this profile by Tool Profile block name or profile name."
+                <TextBlock Text="{loc:Loc property.simulation_llm_blocks_reference_this_profile_by}"
                            FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
             </StackPanel>
 
             <!-- Generic JSON configuration editor -->
             <StackPanel Spacing="8">
                 <Border Height="1" Background="#3A3A4E" />
-                <TextBlock Text="Config JSON (advanced)" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                <TextBlock Text="{loc:Loc property.config_json_advanced}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
                 <TextBox Text="{Binding SelectedBlock.ConfigJson, Mode=TwoWay}"
                          FontSize="11" Padding="8,6" Height="150"
                          AcceptsReturn="True" TextWrapping="NoWrap"
                          FontFamily="Consolas"
-                         Watermark="Edit the block config as JSON and press Apply." />
+                         Watermark="{loc:Loc property.edit_the_block_config_as_json_and_press_apply}" />
                 <TextBlock Text="{Binding SelectedBlock.ConfigJsonError}"
                            FontSize="11" Foreground="#FF6666" TextWrapping="Wrap"
                            IsVisible="{Binding SelectedBlock.ConfigJsonError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                <Button Content="Apply config JSON"
+                <Button Content="{loc:Loc property.apply_config_json}"
                         Command="{Binding ApplyBlockConfigJsonCommand}"
                         HorizontalAlignment="Stretch"
                         Padding="10,6" FontSize="11"
@@ -746,7 +760,7 @@
 
             <!-- Position -->
             <StackPanel Spacing="4">
-                <TextBlock Text="Position" FontSize="11" Foreground="#AAAAAA" />
+                <TextBlock Text="{loc:Loc property.position}" FontSize="11" Foreground="#AAAAAA" />
                 <Grid ColumnDefinitions="*,8,*">
                     <TextBox Grid.Column="0" Text="{Binding SelectedBlock.X, Mode=TwoWay}"
                              FontSize="11" Padding="6,4" Watermark="X" />
@@ -760,7 +774,7 @@
 
             <!-- Output Ports -->
             <StackPanel Spacing="4">
-                <TextBlock Text="Output Ports" FontSize="11" Foreground="#AAAAAA" FontWeight="SemiBold" />
+                <TextBlock Text="{loc:Loc property.output_ports}" FontSize="11" Foreground="#AAAAAA" FontWeight="SemiBold" />
                 <ItemsControl ItemsSource="{Binding SelectedBlock.OutputPorts}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:PortViewModel">
@@ -778,7 +792,7 @@
 
             <!-- Input Ports -->
             <StackPanel Spacing="4">
-                <TextBlock Text="Input Ports" FontSize="11" Foreground="#AAAAAA" FontWeight="SemiBold" />
+                <TextBlock Text="{loc:Loc property.input_ports}" FontSize="11" Foreground="#AAAAAA" FontWeight="SemiBold" />
                 <ItemsControl ItemsSource="{Binding SelectedBlock.InputPorts}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:PortViewModel">
@@ -799,7 +813,7 @@
 
             <!-- Actions -->
             <StackPanel Spacing="6">
-                <Button Content="🗑 Delete Block" Command="{Binding DeleteSelectedBlockCommand}"
+                <Button Content="{loc:Loc property.delete_block}" Command="{Binding DeleteSelectedBlockCommand}"
                         HorizontalAlignment="Stretch"
                         Padding="8,6" FontSize="11"
                         Background="#3A2020" Foreground="#FF6666"
@@ -812,7 +826,7 @@
 
         <!-- Recipe validation issues -->
         <StackPanel Spacing="4" IsVisible="{Binding HasValidationIssues}">
-            <TextBlock Text="Validation Issues" FontSize="11" Foreground="#AAAAAA" FontWeight="SemiBold" />
+            <TextBlock Text="{loc:Loc property.validation_issues}" FontSize="11" Foreground="#AAAAAA" FontWeight="SemiBold" />
             <ItemsControl ItemsSource="{Binding ValidationIssues}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:ValidationIssueViewModel">
@@ -823,7 +837,7 @@
                                 Background="#1E1E2E"
                                 BorderBrush="#3A3A4E" BorderThickness="1"
                                 CornerRadius="4"
-                                ToolTip.Tip="Select the block that owns this issue">
+                                ToolTip.Tip="{loc:Loc property.select_the_block_that_owns_this_issue}">
                             <StackPanel Spacing="2">
                                 <TextBlock Text="{Binding SeverityText}" FontSize="9" FontWeight="SemiBold"
                                            Foreground="#FF6666" IsVisible="{Binding IsError}" />
@@ -845,7 +859,7 @@
 
         <!-- Log Messages -->
         <StackPanel Spacing="4">
-            <TextBlock Text="Logs" FontSize="11" Foreground="#AAAAAA" FontWeight="SemiBold" />
+            <TextBlock Text="{loc:Loc common.logs}" FontSize="11" Foreground="#AAAAAA" FontWeight="SemiBold" />
             <Border Background="#1A1A2A" CornerRadius="4" Padding="8" MinHeight="80" MaxHeight="200">
                 <ScrollViewer>
                     <ItemsControl ItemsSource="{Binding LogMessages}">

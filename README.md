@@ -32,12 +32,61 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - 真实沙箱工具：python / PowerShell / bash / web_fetch；环境白名单、临时目录、超时杀进程树、输出上限，Windows 额外限制内存与进程数
 - Simulation 支持并发 query（输出保序）与失败轨迹独立 JSONL 输出
 - Query Source / Simulation / Cleaner / SFT Export / Expression / Validator / Sampler / Tool Profile 专属属性面板
+- 内置 6 个基础工作流预设，可从 File → New from Preset 或节点库一键加载
+- 中英文界面本地化（zh-CN / en-US，可在设置中切换），节点库、属性面板与画布悬停提示包含完整节点说明
 - 通用 Block Config JSON 编辑器，可直接配置所有节点类型
 
 > 注意：当前仍是开发版。**数据逐行编辑 CRUD、搜索命中高亮、10M 实测、节点间溢写磁盘、节点尺寸手柄/边过渡动画、MSIX 安装包、README 截图、完整浅色主题、LLM 请求侧 tools/结构化输出、Validator 代码规则/超时、Sampler 多输出端口、SFT Export 字段裁剪、MCP 适配尚未实现**；应用默认启动空白 Recipe，可通过 File → New from Sample 加载 4 节点示例，或恢复上次打开的文件。
 >
 > - 完整功能清单与节点能力矩阵：[PLAN/STATUS.md](PLAN/STATUS.md)
 > - 分阶段实施计划、阶段目标与验收标准：[PLAN/TODO.md](PLAN/TODO.md)
+
+## 工作流预设与节点说明
+
+### 内置工作流预设
+
+预设会创建一份全新的 Recipe 并标记为未保存；如果当前文档有改动，会先询问是否保存。每个预设都可以直接作为起点，随后在画布上修改节点配置。
+
+| 预设 | 流水线 | 适用场景 |
+| --- | --- | --- |
+| LLM 批量生成 | Seed → LLM → SFT Export | 读取 JSONL/CSV/Parquet，逐行调用模型并导出 assistant 消息 |
+| OAI 轨迹清洗 | Seed → Cleaner → SFT Export | 清理已有的 OpenAI messages 数据：空白、ANSI、reasoning、空消息 |
+| 字段映射转换 | Seed → Expression → SFT Export | 用 Fluid 模板把原始字段映射为 `messages` 结构 |
+| 校验与切分 | Seed → Validator → Sampler → SFT Export | 过滤无效行、输出 reject JSONL，并按比例切分 train/valid/test |
+| 模拟 Agent 轨迹 | Query Source → Simulation → Cleaner → SFT Export | 离线、可复现的多轮工具调用轨迹 |
+| 真实工具调用 | Query Source → Simulation（真实模型 + 沙箱）→ Cleaner → SFT Export | 生成真实 provider + python 沙箱轨迹；需要 API Key |
+
+访问方式：
+
+- 菜单 **File → New from Preset**。
+- 左侧节点库顶部的 **Workflow Presets** 列表，点击即可加载。
+
+### 节点说明
+
+节点库卡片显示一句话简介；选中画布节点后，属性面板顶部会显示 **Node Guide**，其中包含该节点的用途、关键行为、输入/输出端口与使用建议。鼠标悬停在画布节点上也会显示同样的简介。
+
+| 节点 | 输入 → 输出 | 说明 |
+| --- | --- | --- |
+| Seed Source | 无 → rows | 读取 JSONL / CSV / Parquet，作为流水线入口 |
+| LLM Model Call | input → output | 逐行调用模型，Fluid 提示词，输出 `messages` |
+| Expression Transform | input → output | Fluid 模板或字段映射，重塑每行 JSON |
+| Validator | input → output | 表达式 / JSON Schema 校验，可输出 reject JSONL |
+| Sampler | input → output | 确定性采样或写出多份切分文件 |
+| Tool Profile | 无数据端口 | 可复用的 OpenAI 兼容工具 Schema 配置 |
+| Query Source | 无 → queries | 生成模拟用户 query，驱动轨迹生成 |
+| Simulation | input → output | mini harness，多轮模型 / 工具循环 |
+| Cleaner | input → output | 清洗 OpenAI messages 的格式与噪声 |
+| SFT Export | input → 无 | 原子写出最终 SFT JSONL |
+
+### 界面语言
+
+设置面板中的 **Language / 界面语言** 支持：
+
+- **跟随系统 / System**：Windows 中文环境使用 zh-CN，其余使用 en-US。
+- **简体中文**。
+- **English**。
+
+切换后菜单、按钮、属性面板、节点库、预设名称、文件对话框等静态 UI 会即时刷新；运行日志、执行状态与数据集统计摘要仍保留英文技术文本，便于检索和跨语言排障。
 
 ## 技术栈
 
@@ -500,7 +549,7 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 - [ ] LiveCharts2 或 OxyPlot 进度图表
 - [x] 执行层内并行、暂停/恢复、节点重试、output 目录摘要
 - [x] 滚动日志、全局异常、CI、win-x64 单文件发布、Headless UI 测试、MIT LICENSE、应用图标
-- [x] 单元测试与集成测试（390 个：386 自动化通过 + 4 个 gated：2 个真实 provider 冒烟 + 2 个性能）
+- [x] 单元测试与集成测试（406 个：402 自动化通过 + 4 个 gated：2 个真实 provider 冒烟 + 2 个性能）
 - [x] Round 8：Recipe 新建/打开/保存、脏标记、最近文件、按类型端口契约
 - [x] Round 9：Expression/Validator/Sampler/Tool Profile 节点能力补齐
 - [x] Round 10：数据预览、CSV/Parquet、格式转换、DPO/Pretrain

@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="using:LMTrainingDataStudio2.Localization"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:LMTrainingDataStudio2.ViewModels"
@@ -61,7 +62,8 @@
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:BlockNodeViewModel">
                         <Border Classes="block-node"
-                                Classes.block-node-selected="{Binding IsSelected}">
+                                Classes.block-node-selected="{Binding IsSelected}"
+                                ToolTip.Tip="{Binding DescriptionText}">
                             <StackPanel>
                                 <!-- Header with type color -->
                                 <Border Height="28" CornerRadius="8,8,0,0"
@@ -78,7 +80,7 @@
                                 <StackPanel Margin="10,6,10,8" Spacing="4">
                                     <!-- Jinja reference name -->
                                     <TextBlock FontSize="10" Foreground="#AAAAAA">
-                                        <Run Text="Name: {{ " /><Run Text="{Binding Name}" /><Run Text=" }}" />
+                                        <Run Text="{loc:Loc canvas.name_prefix}" /><Run Text="{Binding Name}" /><Run Text="{loc:Loc canvas.name_suffix}" />
                                     </TextBlock>
 
                                     <!-- Separator -->
@@ -124,7 +126,7 @@
         </Canvas>
 
         <!-- Empty state hint -->
-        <TextBlock Text="Double-click to add a block, or drag from the Block Sheet"
+        <TextBlock Text="{loc:Loc canvas.double_click_to_add_a_block_or_drag_from_the_blo}"
                    FontSize="12" Foreground="#555555"
                    HorizontalAlignment="Center" VerticalAlignment="Center"
                    IsVisible="{Binding !Blocks.Count}" />

@@ -14,6 +14,9 @@ public sealed class AppSettings
     /// <summary>Whether to use dark theme.</summary>
     public bool IsDarkTheme { get; set; } = true;
 
+    /// <summary>UI language code; "system" follows the OS UI culture.</summary>
+    public string Language { get; set; } = "system";
+
     /// <summary>Canvas grid snap size in pixels.</summary>
     public int GridSnapSize { get; set; } = 16;
 

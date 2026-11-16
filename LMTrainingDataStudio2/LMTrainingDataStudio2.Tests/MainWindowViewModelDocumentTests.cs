@@ -44,6 +44,30 @@ public sealed class MainWindowViewModelDocumentTests
     }
 
     [Test]
+    public async Task NewFromPreset_LoadsWorkflowAndMarksDirty()
+    {
+        Assert.That(_viewModel.Presets.Any(preset => preset.Id == "llm_batch"), Is.True);
+
+        await _viewModel.NewRecipeFromPresetAsync("llm_batch");
+
+        Assert.That(_viewModel.Blocks, Has.Count.EqualTo(3));
+        Assert.That(_viewModel.Edges, Has.Count.EqualTo(2));
+        Assert.That(_viewModel.IsDirty, Is.True);
+        Assert.That(_viewModel.DocumentTitle, Does.EndWith("*"));
+
+        _viewModel.ValidateRecipeCommand.Execute(null);
+
+        Assert.That(_viewModel.ValidationIssues.Any(issue => issue.IsError), Is.False);
+    }
+
+    [Test]
+    public void NewRecipeFromPreset_UnknownId_Throws()
+    {
+        Assert.ThrowsAsync<ArgumentException>(
+            async () => await _viewModel.NewRecipeFromPresetAsync("does_not_exist"));
+    }
+
+    [Test]
     public async Task NewFromSample_CreatesValidPipeline_AndMarksDirty()
     {
         await _viewModel.NewRecipeAsync(withSample: true);
