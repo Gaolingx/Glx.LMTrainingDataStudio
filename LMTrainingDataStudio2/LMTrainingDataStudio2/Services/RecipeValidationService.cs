@@ -247,6 +247,15 @@ public sealed class RecipeValidationService
                     });
                     break;
 
+                case SeedBlockConfig seed when seed.FileType != DataFileType.Jsonl:
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Seed block '{block.Name}' uses {seed.FileType}; only JSONL is executable at the moment.",
+                        BlockId = block.Id
+                    });
+                    break;
+
                 case LlmBlockConfig llm when string.IsNullOrWhiteSpace(llm.ModelAlias):
                     result.Issues.Add(new ValidationIssue
                     {

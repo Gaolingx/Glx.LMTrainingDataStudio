@@ -101,6 +101,19 @@ public sealed class RecipeValidationServiceTests
     }
 
     [Test]
+    public void Validate_SeedWithNonJsonlFile_ReportsWarning()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("seed1", BlockType.Seed, "seed_data",
+            new SeedBlockConfig("data.csv", DataFileType.Csv, Streaming: false, UseIndexCache: true)));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Severity == ValidationSeverity.Warning && i.Message.Contains("only JSONL is executable")), Is.True);
+    }
+
+    [Test]
     public void Validate_LlmWithoutModelAlias_ReportsWarning()
     {
         var recipe = new Recipe();

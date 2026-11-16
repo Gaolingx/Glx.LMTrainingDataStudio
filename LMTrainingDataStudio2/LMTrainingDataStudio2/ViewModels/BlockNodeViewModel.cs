@@ -39,6 +39,9 @@ public partial class BlockNodeViewModel : ObservableObject
     [ObservableProperty]
     private string? _configError;
 
+    [ObservableProperty]
+    private SeedConfigEditorViewModel? _seedEditor;
+
     private BlockConfig _config = null!;
 
     /// <summary>
@@ -47,7 +50,23 @@ public partial class BlockNodeViewModel : ObservableObject
     public required BlockConfig Config
     {
         get => _config;
-        set => SetProperty(ref _config, value);
+        set
+        {
+            if (!SetProperty(ref _config, value)) return;
+
+            SeedEditor = value is SeedBlockConfig seed
+                ? new SeedConfigEditorViewModel(seed, ApplySeedConfig)
+                : null;
+        }
+    }
+
+    private void ApplySeedConfig(SeedBlockConfig config)
+    {
+        if (_config.Equals(config)) return;
+
+        _config = config;
+        OnPropertyChanged(nameof(Config));
+        ConfigError = null;
     }
 
     public ObservableCollection<PortViewModel> InputPorts { get; } = new();

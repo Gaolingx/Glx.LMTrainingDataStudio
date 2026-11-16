@@ -60,6 +60,38 @@
                          Watermark="Block display name" />
             </StackPanel>
 
+            <!-- Seed configuration -->
+            <StackPanel Spacing="8"
+                        IsVisible="{Binding SelectedBlock.SeedEditor, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <Border Height="1" Background="#3A3A4E" />
+                <TextBlock Text="Seed Configuration" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Data source" FontSize="11" Foreground="#AAAAAA" />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                        <TextBox Grid.Column="0"
+                                 Text="{Binding SelectedBlock.SeedEditor.SourcePath, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6"
+                                 Watermark="path/to/data.jsonl" />
+                        <Button Grid.Column="1" Content="Browse…"
+                                Click="OnBrowseSeedSourceClick"
+                                Padding="10,6" FontSize="11"
+                                Background="#3A3A4E" Foreground="#FFFFFF" />
+                    </Grid>
+                </StackPanel>
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="File type" FontSize="11" Foreground="#AAAAAA" />
+                    <ComboBox ItemsSource="{Binding SelectedBlock.SeedEditor.FileTypes}"
+                              SelectedItem="{Binding SelectedBlock.SeedEditor.FileType, Mode=TwoWay}"
+                              FontSize="11" HorizontalAlignment="Stretch" />
+                </StackPanel>
+
+                <CheckBox Content="Use index cache"
+                          FontSize="11" Foreground="#CCCCCC"
+                          IsChecked="{Binding SelectedBlock.SeedEditor.UseIndexCache, Mode=TwoWay}" />
+            </StackPanel>
+
             <!-- Position -->
             <StackPanel Spacing="4">
                 <TextBlock Text="Position" FontSize="11" Foreground="#AAAAAA" />
