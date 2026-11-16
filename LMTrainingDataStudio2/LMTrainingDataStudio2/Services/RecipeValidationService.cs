@@ -27,6 +27,7 @@ public sealed class RecipeValidationService
 
         ValidateBlockNames(recipe, result);
         ValidateEdgeConnections(recipe, result);
+        ValidateIsolatedBlocks(recipe, result);
         ValidateCycles(recipe, result);
         ValidateBlockConfigurations(recipe, result);
 
@@ -61,48 +62,117 @@ public sealed class RecipeValidationService
 
     private void ValidateEdgeConnections(Recipe recipe, ValidationResult result)
     {
-        var blockIds = recipe.Blocks.Select(b => b.Id).ToHashSet();
-        var portIds = recipe.Blocks
-            .SelectMany(b => b.InputPorts.Concat(b.OutputPorts))
-            .Select(p => p.Id)
-            .ToHashSet();
+        var blocks = recipe.Blocks.ToDictionary(b => b.Id);
+        var ports = new Dictionary<string, (RecipeBlock Block, BlockPort Port)>();
+        foreach (var block in recipe.Blocks)
+        {
+            foreach (var port in block.InputPorts.Concat(block.OutputPorts))
+            {
+                ports.TryAdd(port.Id, (block, port));
+            }
+        }
+
+        var seenEdges = new HashSet<(string SourceBlock, string SourcePort, string TargetBlock, string TargetPort)>();
 
         foreach (var edge in recipe.Edges)
         {
-            if (!blockIds.Contains(edge.SourceBlockId))
+            var sourceBlockExists = blocks.TryGetValue(edge.SourceBlockId, out var sourceBlock);
+            if (!sourceBlockExists)
             {
-                result.Issues.Add(new ValidationIssue
-                {
-                    Severity = ValidationSeverity.Error,
-                    Message = $"Edge references non-existent source block: {edge.SourceBlockId}"
-                });
+                AddError(result, $"Edge references non-existent source block: {edge.SourceBlockId}");
             }
-            if (!blockIds.Contains(edge.TargetBlockId))
+
+            var targetBlockExists = blocks.TryGetValue(edge.TargetBlockId, out var targetBlock);
+            if (!targetBlockExists)
             {
-                result.Issues.Add(new ValidationIssue
-                {
-                    Severity = ValidationSeverity.Error,
-                    Message = $"Edge references non-existent target block: {edge.TargetBlockId}"
-                });
+                AddError(result, $"Edge references non-existent target block: {edge.TargetBlockId}");
             }
-            if (!portIds.Contains(edge.SourcePortId))
+
+            var sourcePortExists = ports.TryGetValue(edge.SourcePortId, out var sourcePort);
+            if (!sourcePortExists)
             {
-                result.Issues.Add(new ValidationIssue
-                {
-                    Severity = ValidationSeverity.Error,
-                    Message = $"Edge references non-existent source port: {edge.SourcePortId}"
-                });
+                AddError(result, $"Edge references non-existent source port: {edge.SourcePortId}");
             }
-            if (!portIds.Contains(edge.TargetPortId))
+
+            var targetPortExists = ports.TryGetValue(edge.TargetPortId, out var targetPort);
+            if (!targetPortExists)
             {
-                result.Issues.Add(new ValidationIssue
+                AddError(result, $"Edge references non-existent target port: {edge.TargetPortId}");
+            }
+
+            if (sourceBlockExists && sourcePortExists)
+            {
+                if (sourcePort.Block.Id != sourceBlock!.Id)
                 {
-                    Severity = ValidationSeverity.Error,
-                    Message = $"Edge references non-existent target port: {edge.TargetPortId}"
-                });
+                    AddError(result, $"Source port '{edge.SourcePortId}' does not belong to block '{sourceBlock.Name}'.");
+                }
+                else if (sourcePort.Port.Direction != PortDirection.Output)
+                {
+                    AddError(result, $"Source port '{sourcePort.Port.Name}' on block '{sourceBlock.Name}' must be an output port.");
+                }
+            }
+
+            if (targetBlockExists && targetPortExists)
+            {
+                if (targetPort.Block.Id != targetBlock!.Id)
+                {
+                    AddError(result, $"Target port '{edge.TargetPortId}' does not belong to block '{targetBlock.Name}'.");
+                }
+                else if (targetPort.Port.Direction != PortDirection.Input)
+                {
+                    AddError(result, $"Target port '{targetPort.Port.Name}' on block '{targetBlock.Name}' must be an input port.");
+                }
+            }
+
+            if (!seenEdges.Add((edge.SourceBlockId, edge.SourcePortId, edge.TargetBlockId, edge.TargetPortId)))
+            {
+                AddError(result, $"Duplicate edge from '{edge.SourceBlockId}' to '{edge.TargetBlockId}'.");
+            }
+
+            if (sourcePortExists && targetPortExists &&
+                !ArePortTypesCompatible(sourcePort.Port.DataType, targetPort.Port.DataType))
+            {
+                AddError(result,
+                    $"Port type mismatch: '{sourcePort.Port.DataType}' cannot connect to '{targetPort.Port.DataType}'.");
             }
         }
     }
+
+    private void ValidateIsolatedBlocks(Recipe recipe, ValidationResult result)
+    {
+        if (recipe.Blocks.Count <= 1) return;
+
+        var connectedIds = new HashSet<string>();
+        foreach (var edge in recipe.Edges)
+        {
+            connectedIds.Add(edge.SourceBlockId);
+            connectedIds.Add(edge.TargetBlockId);
+        }
+
+        foreach (var block in recipe.Blocks)
+        {
+            if (connectedIds.Contains(block.Id)) continue;
+
+            result.Issues.Add(new ValidationIssue
+            {
+                Severity = ValidationSeverity.Warning,
+                Message = $"Block '{block.Name}' is not connected to any edge.",
+                BlockId = block.Id
+            });
+        }
+    }
+
+    private static void AddError(ValidationResult result, string message) =>
+        result.Issues.Add(new ValidationIssue
+        {
+            Severity = ValidationSeverity.Error,
+            Message = message
+        });
+
+    private static bool ArePortTypesCompatible(string sourceType, string targetType) =>
+        sourceType.Equals("any", StringComparison.OrdinalIgnoreCase) ||
+        targetType.Equals("any", StringComparison.OrdinalIgnoreCase) ||
+        sourceType.Equals(targetType, StringComparison.OrdinalIgnoreCase);
 
     private void ValidateCycles(Recipe recipe, ValidationResult result)
     {

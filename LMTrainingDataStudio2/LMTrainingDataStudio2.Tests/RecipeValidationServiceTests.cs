@@ -188,6 +188,126 @@ public sealed class RecipeValidationServiceTests
             i.Severity == ValidationSeverity.Warning && i.Message.Contains("no tools")), Is.True);
     }
 
+    [Test]
+    public void Validate_IsolatedBlock_ReportsWarning()
+    {
+        var recipe = new Recipe();
+        var source = CreateBlock("a", BlockType.Validator, "a");
+        source.OutputPorts.Add(CreatePort("a_out", PortDirection.Output));
+        var sink = CreateBlock("b", BlockType.Validator, "b");
+        sink.InputPorts.Add(CreatePort("b_in", PortDirection.Input));
+        var isolated = CreateBlock("c", BlockType.Validator, "c");
+
+        recipe.Blocks.AddRange(new[] { source, sink, isolated });
+        recipe.Edges.Add(CreateEdge("e1", "a", "a_out", "b", "b_in"));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Severity == ValidationSeverity.Warning &&
+            i.BlockId == "c" &&
+            i.Message.Contains("not connected")), Is.True);
+    }
+
+    [Test]
+    public void Validate_DuplicateEdge_ReportsError()
+    {
+        var recipe = new Recipe();
+        var source = CreateBlock("a", BlockType.Validator, "a");
+        source.OutputPorts.Add(CreatePort("a_out", PortDirection.Output));
+        var sink = CreateBlock("b", BlockType.Validator, "b");
+        sink.InputPorts.Add(CreatePort("b_in", PortDirection.Input));
+
+        recipe.Blocks.AddRange(new[] { source, sink });
+        var edge = CreateEdge("e1", "a", "a_out", "b", "b_in");
+        recipe.Edges.Add(edge);
+        recipe.Edges.Add(new RecipeEdge
+        {
+            Id = "e2",
+            SourceBlockId = edge.SourceBlockId,
+            SourcePortId = edge.SourcePortId,
+            TargetBlockId = edge.TargetBlockId,
+            TargetPortId = edge.TargetPortId
+        });
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Severity == ValidationSeverity.Error && i.Message.Contains("Duplicate edge")), Is.True);
+    }
+
+    [Test]
+    public void Validate_WrongPortDirections_ReportErrors()
+    {
+        var recipe = new Recipe();
+        var source = CreateBlock("a", BlockType.Validator, "a");
+        source.InputPorts.Add(CreatePort("a_in", PortDirection.Input));
+        var sink = CreateBlock("b", BlockType.Validator, "b");
+        sink.OutputPorts.Add(CreatePort("b_out", PortDirection.Output));
+
+        recipe.Blocks.AddRange(new[] { source, sink });
+        recipe.Edges.Add(CreateEdge("e1", "a", "a_in", "b", "b_out"));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i => i.Message.Contains("must be an output")), Is.True);
+        Assert.That(result.Issues.Any(i => i.Message.Contains("must be an input")), Is.True);
+    }
+
+    [Test]
+    public void Validate_PortFromOtherBlock_ReportsError()
+    {
+        var recipe = new Recipe();
+        var source = CreateBlock("a", BlockType.Validator, "a");
+        source.InputPorts.Add(CreatePort("a_in", PortDirection.Input));
+        var sink = CreateBlock("b", BlockType.Validator, "b");
+        sink.InputPorts.Add(CreatePort("b_in", PortDirection.Input));
+        sink.OutputPorts.Add(CreatePort("b_out", PortDirection.Output));
+
+        recipe.Blocks.AddRange(new[] { source, sink });
+        recipe.Edges.Add(CreateEdge("e1", "a", "b_out", "b", "b_in"));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Severity == ValidationSeverity.Error && i.Message.Contains("does not belong")), Is.True);
+    }
+
+    [Test]
+    public void Validate_IncompatiblePortTypes_ReportsError()
+    {
+        var recipe = new Recipe();
+        var source = CreateBlock("a", BlockType.Validator, "a");
+        source.OutputPorts.Add(CreatePort("a_out", PortDirection.Output, "jsonl"));
+        var sink = CreateBlock("b", BlockType.Validator, "b");
+        sink.InputPorts.Add(CreatePort("b_in", PortDirection.Input, "messages[]"));
+
+        recipe.Blocks.AddRange(new[] { source, sink });
+        recipe.Edges.Add(CreateEdge("e1", "a", "a_out", "b", "b_in"));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Severity == ValidationSeverity.Error && i.Message.Contains("Port type mismatch")), Is.True);
+    }
+
+    [Test]
+    public void Validate_AnyPortType_IsCompatible()
+    {
+        var recipe = new Recipe();
+        var source = CreateBlock("a", BlockType.Validator, "a");
+        source.OutputPorts.Add(CreatePort("a_out", PortDirection.Output, "jsonl"));
+        var sink = CreateBlock("b", BlockType.Validator, "b");
+        sink.InputPorts.Add(CreatePort("b_in", PortDirection.Input));
+
+        recipe.Blocks.AddRange(new[] { source, sink });
+        recipe.Edges.Add(CreateEdge("e1", "a", "a_out", "b", "b_in"));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i => i.Message.Contains("Port type mismatch")), Is.False);
+    }
+
     private static RecipeBlock CreateBlock(string id, BlockType type, string name, BlockConfig? config = null) => new()
     {
         Id = id,
@@ -197,11 +317,12 @@ public sealed class RecipeValidationServiceTests
         Config = config ?? BlockConfig.CreateDefault(type)
     };
 
-    private static BlockPort CreatePort(string id, PortDirection direction) => new()
+    private static BlockPort CreatePort(string id, PortDirection direction, string dataType = "any") => new()
     {
         Id = id,
         Name = id,
-        Direction = direction
+        Direction = direction,
+        DataType = dataType
     };
 
     private static RecipeEdge CreateEdge(string id, string sourceBlock, string sourcePort, string targetBlock, string targetPort) => new()

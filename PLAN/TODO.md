@@ -170,7 +170,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 - [x] Recipe 持久化：`RecipeStore` 原子写入、camelCase 多态 JSON、`SchemaVersion` 校验、`RecipeFormatException` 带路径与位置。
 - [x] 设置持久化：`ISettingsStore`/`SettingsStore`，默认 `%AppData%/LMTrainingDataStudio/settings.json`，范围校验与回退警告、原子保存；`ApplySettings` 已落盘。
 - [x] JSONL 数据读取器：`JsonlDatasetReader` 分页/单行读取；索引指纹失效、LRU 容量清理、BOM/CRLF 字节偏移与超长行读取。
-- [ ] 校验器补强（孤立节点、端口方向/类型、重复边）。
+- [x] 校验器补强：孤立节点警告、重复边、端口归属/方向、DataType 兼容；示例 Recipe 端口类型已修正。
 
 #### 范围与实现方式
 
@@ -520,7 +520,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 - [ ] Sampler：数量/比例、随机种子、切分、多输出、分层采样。
 - [ ] Tool Profile：`ToolSchemaNode`/`ToolProfile` 全文件未被引用；树形编辑器、JSON 导入导出、MCP。
 - [ ] 节点配置校验覆盖所有类型。
-- [ ] 环、孤立节点、重复边、端口方向/类型兼容校验。
+- [x] 环、孤立节点、重复边、端口方向/类型兼容校验（Round 3）。
 
 ### 4.4 编辑器 UI / Canvas
 
@@ -601,6 +601,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 - [x] `RecipeStore`：保存/加载往返、JSON 格式、覆盖写与临时文件清理、坏 JSON/缺失配置/版本校验、取消（9 个）。
 - [x] `SettingsStore`：默认路径/默认值、保存加载往返、非法值回退与警告、坏 JSON、覆盖写、取消（9 个）。
 - [x] JSONL 读取与索引：分页/单行、末行无换行、CRLF/BOM、超长行、源文件变更重建、容量 LRU 清理、空文件与边界（14 个）。
+- [x] 校验器补强：孤立节点、重复边、端口归属/方向、DataType 兼容（6 个）。
 - [ ] 格式转换扩展测试：DPO、Pretrain、多轮 Alpaca、extra fields。
 - [ ] 索引缓存边界：缓存失效、容量清理、并发打开、超长行。
 - [ ] Recipe 执行引擎单测：拓扑、fail-fast、取消、进度。

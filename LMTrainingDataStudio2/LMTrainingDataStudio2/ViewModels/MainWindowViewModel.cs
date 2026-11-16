@@ -151,7 +151,7 @@ public partial class MainWindowViewModel : ObservableObject
             Y = 120,
             Config = new LlmBlockConfig("openai", "gpt-4o", Temperature: 0.7, MaxTokens: 2048, Prompt: null)
         };
-        llmBlock.InputPorts.Add(new PortViewModel { Id = "llm1_in", Name = "input", DataType = "messages[]" });
+        llmBlock.InputPorts.Add(new PortViewModel { Id = "llm1_in", Name = "input", DataType = "jsonl" });
         llmBlock.OutputPorts.Add(new PortViewModel { Id = "llm1_out", Name = "output", DataType = "messages[]" });
 
         var validatorBlock = new BlockNodeViewModel
