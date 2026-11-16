@@ -412,6 +412,39 @@ public sealed class RecipeValidationServiceTests
     }
 
     [Test]
+    public void Validate_SimulationProviderAndSandboxSettings_ReportWarnings()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("sim1", BlockType.Simulation, "sim_endpoint",
+            new SimulationBlockConfig(
+                "model",
+                ModelMode: SimulationModelMode.Provider,
+                Endpoint: "not-a-url")));
+        recipe.Blocks.Add(CreateBlock("sim2", BlockType.Simulation, "sim_concurrency",
+            new SimulationBlockConfig("model", MaxConcurrency: 0)));
+        recipe.Blocks.Add(CreateBlock("sim3", BlockType.Simulation, "sim_failure_samples",
+            new SimulationBlockConfig("model", MaxFailureSamples: -1)));
+        recipe.Blocks.Add(CreateBlock("sim4", BlockType.Simulation, "sim_sandbox",
+            new SimulationBlockConfig(
+                "model",
+                ToolMode: ToolExecutionMode.Real,
+                Sandbox: new SandboxLimits { TimeoutMs = -1 })));
+        recipe.Blocks.Add(CreateBlock("sim5", BlockType.Simulation, "sim_real_tools",
+            new SimulationBlockConfig(
+                "model",
+                ToolMode: ToolExecutionMode.Real,
+                Tools: new[] { new SimulatedToolRule { Name = "python" }, new SimulatedToolRule { Name = "custom" } })));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i => i.Message.Contains("absolute http(s) URL")), Is.True);
+        Assert.That(result.Issues.Any(i => i.Message.Contains("max concurrency")), Is.True);
+        Assert.That(result.Issues.Any(i => i.Message.Contains("max failure samples")), Is.True);
+        Assert.That(result.Issues.Any(i => i.Message.Contains("negative sandbox limits")), Is.True);
+        Assert.That(result.Issues.Any(i => i.Message.Contains("without a real sandbox executor")), Is.True);
+    }
+
+    [Test]
     public void Validate_CleanerWithoutRules_ReportsWarning()
     {
         var recipe = new Recipe();

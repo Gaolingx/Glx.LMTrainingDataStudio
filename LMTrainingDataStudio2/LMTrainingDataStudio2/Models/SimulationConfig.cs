@@ -73,7 +73,7 @@ public sealed record ToolHarnessRules
     public string[]? AllowedTools { get; init; }
 
     /// <summary>Timeout applied to a single tool attempt.</summary>
-    public int DefaultTimeoutMs { get; init; } = 5000;
+    public int DefaultTimeoutMs { get; init; } = 30_000;
 
     /// <summary>Retries after the first failed tool attempt.</summary>
     public int MaxRetries { get; init; } = 1;
@@ -95,6 +95,18 @@ public sealed record SimulatedTurn(string? Content, SimulatedToolCallSpec[]? Too
 public sealed record SimulatedToolCallSpec(string Name, string ArgumentsJson = "{}");
 
 /// <summary>
+/// Selects the chat-completion transport used by a simulation block.
+/// </summary>
+public enum SimulationModelMode
+{
+    /// <summary>Deterministic scripted turns; no network access.</summary>
+    Scripted,
+
+    /// <summary>Real provider HTTP calls with tool calling.</summary>
+    Provider
+}
+
+/// <summary>
 /// Simulated API + mini harness node. Runs a multi-round model/tool loop per query
 /// and emits OpenAI chat messages ready for SFT export.
 /// </summary>
@@ -111,7 +123,16 @@ public sealed record SimulationBlockConfig(
     int MaxTokens = 2048,
     int TimeoutSeconds = 100,
     int ModelMaxRetries = 0,
-    bool EmitIncompleteTrajectories = false) : BlockConfig;
+    bool EmitIncompleteTrajectories = false,
+    SimulationModelMode ModelMode = SimulationModelMode.Scripted,
+    ToolExecutionMode ToolMode = ToolExecutionMode.Simulated,
+    SandboxLimits? Sandbox = null,
+    string? Endpoint = null,
+    int MaxConcurrency = 1,
+    string? FailureOutputPath = null,
+    int MaxFailureSamples = 100,
+    double InputCostPerMillionTokens = 0,
+    double OutputCostPerMillionTokens = 0) : BlockConfig;
 
 /// <summary>
 /// Standalone cleanup node for OAI message rows.
@@ -132,7 +153,7 @@ public static class SimulatedToolCatalog
     public static SimulatedToolRule Python() => new()
     {
         Name = "python",
-        Description = "Execute Python source code in a sandbox (simulated).",
+        Description = "Execute Python source code and return its output.",
         ParametersJson =
             """{"type":"object","properties":{"code":{"type":"string","description":"Python source to execute."}},"required":["code"]}""",
         ResponseTemplate = "[simulated python] executed: {{arguments}}"
@@ -141,7 +162,7 @@ public static class SimulatedToolCatalog
     public static SimulatedToolRule WebFetch() => new()
     {
         Name = "web_fetch",
-        Description = "Fetch a URL and return its text content (simulated).",
+        Description = "Fetch a URL and return its text content.",
         ParametersJson =
             """{"type":"object","properties":{"url":{"type":"string","description":"Absolute URL to fetch."}},"required":["url"]}""",
         ResponseTemplate = "[simulated web_fetch] fetched: {{arguments}}"
@@ -150,7 +171,7 @@ public static class SimulatedToolCatalog
     public static SimulatedToolRule PowerShell() => new()
     {
         Name = "powershell",
-        Description = "Run a PowerShell command (simulated).",
+        Description = "Run a PowerShell command.",
         ParametersJson =
             """{"type":"object","properties":{"command":{"type":"string","description":"Command to execute."}},"required":["command"]}""",
         ResponseTemplate = "[simulated powershell] completed: {{arguments}}"
@@ -159,7 +180,7 @@ public static class SimulatedToolCatalog
     public static SimulatedToolRule Bash() => new()
     {
         Name = "bash",
-        Description = "Run a bash command (simulated).",
+        Description = "Run a bash command.",
         ParametersJson =
             """{"type":"object","properties":{"command":{"type":"string","description":"Command to execute."}},"required":["command"]}""",
         ResponseTemplate = "[simulated bash] completed: {{arguments}}"

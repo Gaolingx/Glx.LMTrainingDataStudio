@@ -85,6 +85,7 @@ public abstract record BlockConfig
         SimulationBlockConfig simulation => simulation with
         {
             Tools = simulation.Tools?.Select(tool => tool with { }).ToArray(),
+            Sandbox = simulation.Sandbox is null ? null : simulation.Sandbox with { },
             Rules = simulation.Rules is null
                 ? null
                 : simulation.Rules with

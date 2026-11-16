@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using LMTrainingDataStudio2.Models;
 
@@ -95,10 +96,11 @@ public sealed class SimulationHarness
                 config.MaxTokens,
                 round);
 
-            var response = await CompleteWithRetryAsync(request, config, rules, log, cancellationToken);
-            result.Messages.Add(response.Message);
+            var completion = await CompleteWithRetryAsync(request, config, rules, log, cancellationToken);
+            RecordUsage(result, completion, config);
+            result.Messages.Add(completion.Response.Message);
 
-            var toolCalls = response.Message.ToolCalls;
+            var toolCalls = completion.Response.Message.ToolCalls;
             if (toolCalls is not { Count: > 0 })
             {
                 log?.Invoke($"Round {round}: model finished.");
@@ -147,7 +149,7 @@ public sealed class SimulationHarness
         return result;
     }
 
-    private async Task<ChatCompletionResponse> CompleteWithRetryAsync(
+    private async Task<(ChatCompletionResponse Response, TimeSpan Latency)> CompleteWithRetryAsync(
         ChatCompletionRequest request,
         SimulationBlockConfig config,
         ToolHarnessRules rules,
@@ -156,6 +158,7 @@ public sealed class SimulationHarness
     {
         var attempts = config.ModelMaxRetries + 1;
         Exception? lastFailure = null;
+        var stopwatch = Stopwatch.StartNew();
 
         for (var attempt = 0; attempt < attempts; attempt++)
         {
@@ -166,7 +169,8 @@ public sealed class SimulationHarness
 
             try
             {
-                return await _client.CompleteAsync(request, timeoutCts.Token);
+                var response = await _client.CompleteAsync(request, timeoutCts.Token);
+                return (response, stopwatch.Elapsed);
             }
             catch (OperationCanceledException) when (!ct.IsCancellationRequested)
             {
@@ -242,6 +246,27 @@ public sealed class SimulationHarness
         }
 
         return new ToolOutcome(false, null, lastFailure?.Message ?? "unknown error", attempts);
+    }
+
+    private static void RecordUsage(
+        TrajectoryResult result,
+        (ChatCompletionResponse Response, TimeSpan Latency) completion,
+        SimulationBlockConfig config)
+    {
+        result.ModelCalls++;
+        result.ModelLatency += completion.Latency;
+
+        var usage = completion.Response.Usage;
+        if (usage is null)
+        {
+            return;
+        }
+
+        result.PromptTokens += usage.PromptTokens;
+        result.CompletionTokens += usage.CompletionTokens;
+        result.EstimatedCost +=
+            usage.PromptTokens / 1_000_000m * (decimal)config.InputCostPerMillionTokens +
+            usage.CompletionTokens / 1_000_000m * (decimal)config.OutputCostPerMillionTokens;
     }
 
     private static SimulatedToolRule[] ValidateTools(SimulatedToolRule[] tools)

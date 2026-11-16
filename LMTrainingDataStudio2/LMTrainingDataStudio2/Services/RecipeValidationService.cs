@@ -8,6 +8,11 @@ namespace LMTrainingDataStudio2.Services;
 /// </summary>
 public sealed class RecipeValidationService
 {
+    private static readonly HashSet<string> RealSandboxTools = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "python", "powershell", "bash", "web_fetch"
+    };
+
     /// <summary>
     /// Validates the entire recipe graph.
     /// </summary>
@@ -432,6 +437,60 @@ public sealed class RecipeValidationService
                     });
                     break;
 
+                case SimulationBlockConfig simulation when simulation.MaxConcurrency < 1:
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Simulation block '{block.Name}' max concurrency must be at least 1.",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case SimulationBlockConfig simulation when simulation.MaxFailureSamples < 0:
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Simulation block '{block.Name}' max failure samples must not be negative.",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case SimulationBlockConfig simulation when
+                    simulation.ModelMode == SimulationModelMode.Provider &&
+                    !IsValidEndpoint(simulation.Endpoint):
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Simulation block '{block.Name}' endpoint must be an absolute http(s) URL.",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case SimulationBlockConfig simulation when
+                    simulation.Sandbox is { } sandbox && HasNegativeSandboxLimit(sandbox):
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Simulation block '{block.Name}' has negative sandbox limits.",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case SimulationBlockConfig simulation when
+                    simulation.ToolMode == ToolExecutionMode.Real &&
+                    simulation.Tools is { Length: > 0 } realTools &&
+                    realTools.Any(tool => !RealSandboxTools.Contains(tool.Name)):
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Simulation block '{block.Name}' has tools without a real sandbox executor: " +
+                                  string.Join(", ", realTools
+                                      .Where(tool => !RealSandboxTools.Contains(tool.Name))
+                                      .Select(tool => tool.Name)) + ".",
+                        BlockId = block.Id
+                    });
+                    break;
+
                 case CleanerBlockConfig cleaner when !cleaner.Rules.HasAnyRule:
                     result.Issues.Add(new ValidationIssue
                     {
@@ -452,4 +511,16 @@ public sealed class RecipeValidationService
             }
         }
     }
+
+    private static bool IsValidEndpoint(string? endpoint) =>
+        string.IsNullOrWhiteSpace(endpoint) ||
+        (Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) &&
+         (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps));
+
+    private static bool HasNegativeSandboxLimit(SandboxLimits sandbox) =>
+        sandbox.TimeoutMs < 0 ||
+        sandbox.MaxOutputBytes < 0 ||
+        sandbox.MaxMemoryMb < 0 ||
+        sandbox.MaxProcesses < 0 ||
+        sandbox.MaxFetchBytes < 0;
 }

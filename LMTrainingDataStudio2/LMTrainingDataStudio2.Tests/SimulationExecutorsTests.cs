@@ -2,6 +2,7 @@ using System.Text.Json;
 using LMTrainingDataStudio2.Models;
 using LMTrainingDataStudio2.Services;
 using LMTrainingDataStudio2.Services.Executors;
+using LMTrainingDataStudio2.Services.Simulation;
 
 namespace LMTrainingDataStudio2.Tests;
 
@@ -356,6 +357,203 @@ public sealed class SimulationExecutorsTests
             .GetProperty("function").GetProperty("name").GetString(), Is.EqualTo("python"));
     }
 
+    [Test]
+    public async Task Simulation_FailureOutputPath_WritesIncompleteTrajectories()
+    {
+        var failurePath = Path.Combine(_directory, "failures", "failed.jsonl");
+        var config = CreateSimulationConfig() with
+        {
+            MaxRounds = 1,
+            FailureOutputPath = failurePath
+        };
+        var block = CreateBlock(BlockType.Simulation, "sim", config);
+        var input = new[] { new DatasetRow(0, """{"query":"loop"}""") };
+
+        var rows = await CollectAsync(
+            (await new SimulationBlockExecutor().ExecuteAsync(
+                CreateContext(block, input), CancellationToken.None)).Output);
+
+        Assert.That(rows, Is.Empty);
+        Assert.That(File.Exists(failurePath), Is.True);
+        Assert.That(File.Exists(failurePath + ".tmp"), Is.False);
+
+        var lines = await File.ReadAllLinesAsync(failurePath);
+        Assert.That(lines, Has.Length.EqualTo(1));
+
+        using var document = JsonDocument.Parse(lines[0]);
+        var root = document.RootElement;
+        Assert.That(root.GetProperty("query").GetString(), Is.EqualTo("loop"));
+        Assert.That(root.GetProperty("status").GetString(), Is.EqualTo("MaxRoundsExceeded"));
+        Assert.That(root.GetProperty("error").GetString(), Does.Contain("maximum of 1 round"));
+        Assert.That(root.GetProperty("messages").GetArrayLength(), Is.GreaterThan(0));
+        Assert.That(root.GetProperty("tools")[0].GetProperty("function").GetProperty("name").GetString(),
+            Is.EqualTo("python"));
+    }
+
+    [Test]
+    public async Task Simulation_MaxFailureSamples_LimitsFailureFile()
+    {
+        var failurePath = Path.Combine(_directory, "failures", "limited.jsonl");
+        var config = CreateSimulationConfig() with
+        {
+            MaxRounds = 1,
+            FailureOutputPath = failurePath,
+            MaxFailureSamples = 1
+        };
+        var block = CreateBlock(BlockType.Simulation, "sim", config);
+        var input = new[]
+        {
+            new DatasetRow(0, """{"query":"loop-1"}"""),
+            new DatasetRow(1, """{"query":"loop-2"}""")
+        };
+
+        await CollectAsync(
+            (await new SimulationBlockExecutor().ExecuteAsync(
+                CreateContext(block, input), CancellationToken.None)).Output);
+
+        var lines = await File.ReadAllLinesAsync(failurePath);
+        Assert.That(lines, Has.Length.EqualTo(1));
+        using var document = JsonDocument.Parse(lines[0]);
+        Assert.That(document.RootElement.GetProperty("query").GetString(), Is.EqualTo("loop-1"));
+    }
+
+    [Test]
+    public async Task Simulation_MaxConcurrency_PreservesInputOrderAndRunsInParallel()
+    {
+        var tracker = new ConcurrencyTracker();
+        var executor = new SimulationBlockExecutor(
+            chatClientFactory: _ => new EchoChatClient(tracker));
+
+        var config = new SimulationBlockConfig(
+            "sim-model",
+            MaxRounds: 2,
+            Tools: null,
+            Rules: new ToolHarnessRules { MaxRetries = 0 },
+            FinalContent: "done",
+            TimeoutSeconds: 5,
+            MaxConcurrency: 4);
+        var block = CreateBlock(BlockType.Simulation, "sim", config);
+        var input = new[]
+        {
+            new DatasetRow(0, """{"query":"slow-0"}"""),
+            new DatasetRow(1, """{"query":"fast-1"}"""),
+            new DatasetRow(2, """{"query":"slow-2"}"""),
+            new DatasetRow(3, """{"query":"fast-3"}""")
+        };
+
+        var rows = await CollectAsync(
+            (await executor.ExecuteAsync(CreateContext(block, input), CancellationToken.None)).Output);
+
+        Assert.That(rows, Has.Count.EqualTo(4));
+        var queries = rows.Select(row =>
+        {
+            using var document = JsonDocument.Parse(row.Json);
+            var messages = document.RootElement.GetProperty("messages");
+            return messages[messages.GetArrayLength() - 1].GetProperty("content").GetString();
+        });
+        Assert.That(queries, Is.EqualTo(input.Select(row =>
+        {
+            using var document = JsonDocument.Parse(row.Json);
+            return document.RootElement.GetProperty("query").GetString();
+        })));
+        Assert.That(tracker.MaxActive, Is.GreaterThan(1));
+    }
+
+    [Test]
+    public async Task Simulation_RealToolMode_UsesInjectedRuntime()
+    {
+        var runtimeCalls = 0;
+        var executor = new SimulationBlockExecutor(
+            chatClientFactory: _ => new ScriptedChatClient(
+                new[] { new SimulatedTurn(null, new[] { new SimulatedToolCallSpec("python") }) },
+                "done"),
+            toolRuntimeFactory: _ =>
+            {
+                runtimeCalls++;
+                return new FixedToolRuntime("real-output");
+            });
+
+        var config = CreateSimulationConfig() with { ToolMode = ToolExecutionMode.Real };
+        var block = CreateBlock(BlockType.Simulation, "sim", config);
+        var input = new[] { new DatasetRow(0, """{"query":"run"}""") };
+
+        var rows = await CollectAsync(
+            (await executor.ExecuteAsync(CreateContext(block, input), CancellationToken.None)).Output);
+
+        Assert.That(runtimeCalls, Is.EqualTo(1));
+        Assert.That(rows, Has.Count.EqualTo(1));
+        using var document = JsonDocument.Parse(rows[0].Json);
+        Assert.That(
+            document.RootElement.GetProperty("messages")[2].GetProperty("content").GetString(),
+            Is.EqualTo("real-output"));
+    }
+
+    [Test]
+    public void Simulation_ProviderModeWithoutCredentials_Throws()
+    {
+        var config = CreateSimulationConfig() with { ModelMode = SimulationModelMode.Provider };
+        var block = CreateBlock(BlockType.Simulation, "sim", config);
+        var input = new[] { new DatasetRow(0, """{"query":"run"}""") };
+
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await new SimulationBlockExecutor()
+                .ExecuteAsync(CreateContext(block, input), CancellationToken.None));
+
+        Assert.That(exception!.Message, Does.Contain("provider"));
+        Assert.That(exception.Message, Does.Contain("credentials"));
+    }
+
+    [Test]
+    public async Task Simulation_ProviderMode_LogsUsageAndCost()
+    {
+        var executor = new SimulationBlockExecutor(
+            chatClientFactory: _ => new UsageChatClient(10, 4));
+        var config = new SimulationBlockConfig(
+            "sim-model",
+            MaxRounds: 2,
+            Tools: null,
+            Rules: new ToolHarnessRules { MaxRetries = 0 },
+            TimeoutSeconds: 5,
+            ModelMode: SimulationModelMode.Provider,
+            InputCostPerMillionTokens: 1,
+            OutputCostPerMillionTokens: 1);
+        var block = CreateBlock(BlockType.Simulation, "sim", config);
+        var input = new[] { new DatasetRow(0, """{"query":"run"}""") };
+        var logs = new List<string>();
+
+        var rows = await CollectAsync(
+            (await executor.ExecuteAsync(CreateContext(block, input, logs), CancellationToken.None)).Output);
+
+        Assert.That(rows, Has.Count.EqualTo(1));
+        Assert.That(logs, Has.Some.Contains("tokens 10+4"));
+        Assert.That(logs, Has.Some.Contains("estimated cost: 0.000014"));
+    }
+
+    [Test]
+    public void Simulation_Cancelled_DoesNotWriteFailureFile()
+    {
+        var failurePath = Path.Combine(_directory, "failures", "cancelled.jsonl");
+        var config = CreateSimulationConfig() with
+        {
+            MaxRounds = 1,
+            FailureOutputPath = failurePath
+        };
+        var block = CreateBlock(BlockType.Simulation, "sim", config);
+        var context = new BlockExecutionContext
+        {
+            Block = block,
+            Input = CancelAfterFirstRowAsync(),
+            Log = _ => { }
+        };
+
+        Assert.ThrowsAsync<OperationCanceledException>(
+            async () => await CollectAsync(
+                (await new SimulationBlockExecutor().ExecuteAsync(context, CancellationToken.None)).Output));
+
+        Assert.That(File.Exists(failurePath), Is.False);
+        Assert.That(File.Exists(failurePath + ".tmp"), Is.False);
+    }
+
     private static SimulationBlockConfig CreateSimulationConfig() => new(
         "sim-model",
         MaxRounds: 4,
@@ -424,6 +622,13 @@ public sealed class SimulationExecutorsTests
         throw new OperationCanceledException();
     }
 
+    private static async IAsyncEnumerable<DatasetRow> CancelAfterFirstRowAsync()
+    {
+        await Task.Yield();
+        yield return new DatasetRow(0, """{"query":"loop"}""");
+        throw new OperationCanceledException();
+    }
+
     private static async Task<List<DatasetRow>> CollectAsync(IAsyncEnumerable<DatasetRow> rows)
     {
         var result = new List<DatasetRow>();
@@ -433,5 +638,87 @@ public sealed class SimulationExecutorsTests
         }
 
         return result;
+    }
+
+    private sealed class EchoChatClient : IChatCompletionClient
+    {
+        private readonly ConcurrencyTracker _tracker;
+
+        public EchoChatClient(ConcurrencyTracker tracker) => _tracker = tracker;
+
+        public async Task<ChatCompletionResponse> CompleteAsync(
+            ChatCompletionRequest request,
+            CancellationToken cancellationToken)
+        {
+            _tracker.Enter();
+            try
+            {
+                var query = request.Messages
+                    .Last(message => message.Role == "user")
+                    .Content?.ToString() ?? string.Empty;
+                await Task.Delay(query.StartsWith("slow", StringComparison.Ordinal) ? 80 : 10,
+                    cancellationToken);
+                return new ChatCompletionResponse(new ChatMessage
+                {
+                    Role = "assistant",
+                    Content = query
+                });
+            }
+            finally
+            {
+                _tracker.Exit();
+            }
+        }
+    }
+
+    private sealed class UsageChatClient : IChatCompletionClient
+    {
+        private readonly int _promptTokens;
+        private readonly int _completionTokens;
+
+        public UsageChatClient(int promptTokens, int completionTokens)
+        {
+            _promptTokens = promptTokens;
+            _completionTokens = completionTokens;
+        }
+
+        public Task<ChatCompletionResponse> CompleteAsync(
+            ChatCompletionRequest request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new ChatCompletionResponse(
+                new ChatMessage { Role = "assistant", Content = "done" },
+                "stop",
+                new ChatCompletionUsage(_promptTokens, _completionTokens)));
+    }
+
+    private sealed class FixedToolRuntime(string output) : IToolRuntime
+    {
+        public Task<string> ExecuteAsync(
+            SimulatedToolRule rule,
+            ToolCall call,
+            CancellationToken cancellationToken) => Task.FromResult(output);
+    }
+
+    private sealed class ConcurrencyTracker
+    {
+        private int _active;
+        private int _maxActive;
+
+        public int MaxActive => Volatile.Read(ref _maxActive);
+
+        public void Enter()
+        {
+            var active = Interlocked.Increment(ref _active);
+            int current;
+            while (active > (current = Volatile.Read(ref _maxActive)))
+            {
+                if (Interlocked.CompareExchange(ref _maxActive, active, current) == current)
+                {
+                    break;
+                }
+            }
+        }
+
+        public void Exit() => Interlocked.Decrement(ref _active);
     }
 }

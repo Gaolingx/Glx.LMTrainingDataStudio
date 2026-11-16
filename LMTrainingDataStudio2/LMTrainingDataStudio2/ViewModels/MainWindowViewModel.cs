@@ -491,7 +491,7 @@ public partial class MainWindowViewModel : ObservableObject
             new SamplerBlockExecutor(),
             new LlmBlockExecutor(new LlmApiClient(_llmHttpClient, new LlmCredentials(_settings))),
             new QuerySourceBlockExecutor(),
-            new SimulationBlockExecutor(),
+            new SimulationBlockExecutor(new LlmCredentials(_settings), _llmHttpClient),
             new CleanerBlockExecutor(),
             new SftExportBlockExecutor()
         });

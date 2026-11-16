@@ -208,7 +208,28 @@ public sealed class BlockConfigSerializationTests
             MaxTokens: 512,
             TimeoutSeconds: 30,
             ModelMaxRetries: 1,
-            EmitIncompleteTrajectories: true);
+            EmitIncompleteTrajectories: true,
+            ModelMode: SimulationModelMode.Provider,
+            ToolMode: ToolExecutionMode.Real,
+            Sandbox: new SandboxLimits
+            {
+                TimeoutMs = 5000,
+                MaxOutputBytes = 4096,
+                MaxMemoryMb = 256,
+                MaxProcesses = 4,
+                AllowNetwork = true,
+                AllowPrivateNetwork = true,
+                MaxFetchBytes = 8192,
+                PythonExecutable = "python3",
+                PowerShellExecutable = "pwsh",
+                BashExecutable = "bash"
+            },
+            Endpoint: "https://proxy.example/v1",
+            MaxConcurrency: 6,
+            FailureOutputPath: "failures/out.jsonl",
+            MaxFailureSamples: 25,
+            InputCostPerMillionTokens: 1.5,
+            OutputCostPerMillionTokens: 3.5);
 
         var loaded = (SimulationBlockConfig)RoundTrip(config);
 
@@ -218,6 +239,26 @@ public sealed class BlockConfigSerializationTests
         Assert.That(loaded.TimeoutSeconds, Is.EqualTo(30));
         Assert.That(loaded.ModelMaxRetries, Is.EqualTo(1));
         Assert.That(loaded.EmitIncompleteTrajectories, Is.True);
+        Assert.That(loaded.ModelMode, Is.EqualTo(SimulationModelMode.Provider));
+        Assert.That(loaded.ToolMode, Is.EqualTo(ToolExecutionMode.Real));
+        Assert.That(loaded.Endpoint, Is.EqualTo("https://proxy.example/v1"));
+        Assert.That(loaded.MaxConcurrency, Is.EqualTo(6));
+        Assert.That(loaded.FailureOutputPath, Is.EqualTo("failures/out.jsonl"));
+        Assert.That(loaded.MaxFailureSamples, Is.EqualTo(25));
+        Assert.That(loaded.InputCostPerMillionTokens, Is.EqualTo(1.5));
+        Assert.That(loaded.OutputCostPerMillionTokens, Is.EqualTo(3.5));
+
+        Assert.That(loaded.Sandbox, Is.Not.Null);
+        Assert.That(loaded.Sandbox!.TimeoutMs, Is.EqualTo(5000));
+        Assert.That(loaded.Sandbox.MaxOutputBytes, Is.EqualTo(4096));
+        Assert.That(loaded.Sandbox.MaxMemoryMb, Is.EqualTo(256));
+        Assert.That(loaded.Sandbox.MaxProcesses, Is.EqualTo(4));
+        Assert.That(loaded.Sandbox.AllowNetwork, Is.True);
+        Assert.That(loaded.Sandbox.AllowPrivateNetwork, Is.True);
+        Assert.That(loaded.Sandbox.MaxFetchBytes, Is.EqualTo(8192));
+        Assert.That(loaded.Sandbox.PythonExecutable, Is.EqualTo("python3"));
+        Assert.That(loaded.Sandbox.PowerShellExecutable, Is.EqualTo("pwsh"));
+        Assert.That(loaded.Sandbox.BashExecutable, Is.EqualTo("bash"));
 
         Assert.That(loaded.Tools, Has.Length.EqualTo(1));
         Assert.That(loaded.Tools![0].Name, Is.EqualTo("python"));
@@ -274,12 +315,14 @@ public sealed class BlockConfigSerializationTests
             "sim",
             Tools: new[] { new SimulatedToolRule { Name = "python" } },
             Rules: new ToolHarnessRules { AllowedTools = new[] { "python" } },
+            Sandbox: new SandboxLimits { TimeoutMs = 1000 },
             Script: new[] { new SimulatedTurn(null, new[] { new SimulatedToolCallSpec("python") }) });
 
         var clone = (SimulationBlockConfig)config.DeepClone();
 
         Assert.That(clone.Tools, Is.Not.SameAs(config.Tools));
         Assert.That(clone.Rules, Is.Not.SameAs(config.Rules));
+        Assert.That(clone.Sandbox, Is.Not.SameAs(config.Sandbox));
         Assert.That(clone.Rules!.AllowedTools, Is.Not.SameAs(config.Rules!.AllowedTools));
         Assert.That(clone.Script, Is.Not.SameAs(config.Script));
         Assert.That(clone.Script![0].ToolCalls, Is.Not.SameAs(config.Script![0].ToolCalls));
