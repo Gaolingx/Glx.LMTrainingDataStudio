@@ -97,7 +97,7 @@ public sealed record ExpressionBlockConfig(
     Dictionary<string, string> Fields) : BlockConfig;
 
 public sealed record ValidatorBlockConfig(
-    string Kind,
+    string RuleKind,
     string Rule,
     bool RejectOnFailure) : BlockConfig;
 

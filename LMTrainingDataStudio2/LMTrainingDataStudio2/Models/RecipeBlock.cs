@@ -66,6 +66,9 @@ public sealed class RecipeEdge
 /// </summary>
 public sealed class Recipe
 {
+    public const int CurrentSchemaVersion = 1;
+
+    public int SchemaVersion { get; set; } = CurrentSchemaVersion;
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string Name { get; set; } = "Untitled Recipe";
     public List<RecipeBlock> Blocks { get; set; } = new();

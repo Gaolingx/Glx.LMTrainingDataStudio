@@ -167,7 +167,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 #### 当前进度（Round 2，2026-11-16）
 
 - [x] 强类型节点配置：`BlockConfig` 多态层级、`RecipeBlock.Config` 必填、ViewModel 配置与错误提示、校验服务按配置类型检查；新增 19 个测试。
-- [ ] Recipe 持久化（`RecipeStore`、`SchemaVersion`）。
+- [x] Recipe 持久化：`RecipeStore` 原子写入、camelCase 多态 JSON、`SchemaVersion` 校验、`RecipeFormatException` 带路径与位置。
 - [ ] 设置持久化（`ISettingsStore`、`SettingsStore`）。
 - [ ] JSONL 数据读取器（`JsonlDatasetReader`、索引失效与容量）。
 - [ ] 校验器补强（孤立节点、端口方向/类型、重复边）。
@@ -189,7 +189,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
      public sealed record SeedBlockConfig(string SourcePath, DataFileType FileType, bool Streaming, bool UseIndexCache) : BlockConfig;
      public sealed record LlmBlockConfig(string Provider, string ModelAlias, double Temperature, int MaxTokens, string? Prompt) : BlockConfig;
      public sealed record ExpressionBlockConfig(string Template, Dictionary<string, string> Fields) : BlockConfig;
-     public sealed record ValidatorBlockConfig(string Kind, string Rule, bool RejectOnFailure) : BlockConfig;
+     public sealed record ValidatorBlockConfig(string RuleKind, string Rule, bool RejectOnFailure) : BlockConfig;
      public sealed record SamplerBlockConfig(long? Count, double? Ratio, int Seed, string[] Splits) : BlockConfig;
      public sealed record ToolProfileBlockConfig(ToolProfile Profile) : BlockConfig;
      ```
@@ -511,7 +511,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 - [x] 节点配置模型：`BlockConfig` 多态层级 + `RecipeBlock.Config`，校验按配置类型检查（Round 2）。
 - [ ] 节点端口类型化（当前固定 input/output + any）。
 - [ ] 端口增删、改名、改类型（属性面板只读展示）。
-- [ ] Recipe 序列化 / 反序列化 / schema 版本。
+- [x] Recipe 序列化 / 反序列化 / schema 版本（`RecipeStore`，Round 2）。
 - [ ] 节点状态与错误徽标。
 - [ ] Seed：数据源、文件类型、Streaming、Index Cache、预览、过滤。
 - [ ] LLM：Provider、ModelAlias、Endpoint/Key、温度、max tokens、Prompt、结构化输出、并发/超时/重试。
@@ -598,6 +598,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 - [x] 测试项目建立，加入解决方案。
 - [x] core 最小单测：格式转换、JSONL 校验、Recipe 校验、索引缓存、Undo 历史（29 个）。
 - [x] `BlockConfig` 多态序列化、默认工厂、深拷贝、类型/配置匹配校验（19 个）。
+- [x] `RecipeStore`：保存/加载往返、JSON 格式、覆盖写与临时文件清理、坏 JSON/缺失配置/版本校验、取消（9 个）。
 - [ ] 格式转换扩展测试：DPO、Pretrain、多轮 Alpaca、extra fields。
 - [ ] 索引缓存边界：缓存失效、容量清理、并发打开、超长行。
 - [ ] Recipe 执行引擎单测：拓扑、fail-fast、取消、进度。
