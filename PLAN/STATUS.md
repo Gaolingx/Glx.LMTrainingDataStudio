@@ -1,7 +1,7 @@
 # STATUS — 功能清单、节点能力矩阵与下一阶段规划
 
-> 最后核对：2026-11-17，Round 10 完成后（工作区）
-> 验证基线：`dotnet build` 0 警告 0 错误；`dotnet test` 331 通过 + 3 个 gated 测试（2 个真实 provider 冒烟 + 1 个 1M 行性能，默认跳过）；1M 行 JSONL 基线已通过（索引 8.8s、分页 10.9ms、内存增量 14MB）。
+> 最后核对：2026-11-17，Round 11 完成后（工作区）
+> 验证基线：`dotnet build` 0 警告 0 错误；`dotnet test` 368 通过 + 4 个 gated 测试（2 个真实 provider 冒烟 + 2 个 1M 行/质量操作性能，默认跳过）；1M 行 JSONL 基线已通过（索引 8.8s、分页 10.9ms、内存增量 14MB）；1M 行质量操作基线通过（去重+混洗+切分 124.2s、统计 63.6s、托管内存增量 2MB）。
 >
 > 图例：`[x]` 已完成并有测试/验证；`[部分]` 可用但有明确缺口；`[ ]` 未实现。
 
@@ -20,18 +20,20 @@
 - 统一数据集 IO：JSONL / CSV / Parquet 随机分页读取与原子写出；Seed 节点支持三种格式。
 - 数据工作台（Data 视图）：分页预览、行号跳转、页面大小切换，JSONL 走 SQLite 索引，CSV 走记录边界索引，Parquet 按 row group 读取。
 - 批量格式转换：OpenAI / ShareGPT / Alpaca / DPO / Pretrain，支持进度、取消、失败行 `.errors.jsonl` 与原子目标写入。
+- 数据治理：校验问题列表（级别/行号/JSON 路径/错误码）与跳行；JSONL 自动修复预览与“写修复副本”（原文件不变）；搜索/正则替换（当前页/全文件/预览/取消）；去重、固定 seed 混洗、比例/份数切分；角色/长度/空样本/重复率/工具调用统计。
 - 1M 行 JSONL 验收通过：索引 8.8s（≤10s）、100 行分页 10.9ms（≤100ms）、转换 66.9s、内存增量 14MB（≤300MB）。
+- 1M 行质量操作验收通过：去重+混洗+切分 124.2s（50 万保留/50 万重复）、统计 63.6s、托管内存增量 2MB（≤300MB）。
 - JSONL 流式读取、SQLite 行索引缓存、分页读取。
 - DAG 校验、拓扑分层、顺序执行、fail-fast、下游 Skipped、取消、进度、日志、执行记录持久化与 Executions UI。
 - 10 种节点类型全部接入 Block Sheet、画布、默认配置与 Recipe JSON。
 - Query Source → Simulation → Cleaner → SFT Export 端到端 SFT 轨迹生成可用（脚本/真实 provider、模拟/真实工具均可切换）。
 - 真实 provider tool-calling（OpenAI Chat/Responses、Anthropic）与真实沙箱工具（python/PowerShell/bash/web_fetch）。
-- 331 个自动化测试 + 3 个 gated 测试（2 个真实 provider 冒烟 + 1 个 1M 行性能）。
+- 368 个自动化测试 + 4 个 gated 测试（2 个真实 provider 冒烟 + 2 个 1M 行/质量操作性能）。
 
 ### 1.2 当前最大缺口
 
 1. **节点能力仍有边界**：Validator 暂无代码规则/超时；Sampler 有 Splits 多文件但无多输出端口与分层采样；Tool Profile 无 MCP 适配；LLM 仍不发送 tool definitions 给 provider。
-2. **数据治理未接 UI**：数据编辑、搜索/正则替换、去重/混洗/切分、数据集统计、校验修复流程都还没有界面；CSV/Parquet 尚无 1M 行性能基线。
+2. **数据治理仍有缺口**：逐行 CRUD/单元格编辑、命中高亮、问题分组未做；CSV/Parquet 与 10M 行质量操作尚无实测基线（1M JSONL 已通过）。
 3. **画布体验缺口**：网格背景/吸附、缩放锚点、Fit、自动布局、Mini-map 视口/点击、复制携带连线、可调分栏等。
 4. **发布工程化缺口**：Headless UI 测试、10M 性能验收、CI、打包、主题切换、日志/崩溃处理、LICENSE/Assets。
 
@@ -198,8 +200,10 @@
 - [x] Tool Profile：参数树编辑、JSON 导入导出、配置型执行器、Simulation/LLM 引用复用。
 - [x] 统一数据集读写（JSONL / CSV / Parquet）与临时文件 + 原子替换写出。
 - [x] 数据工作台：分页预览、行号跳转、页面大小切换、批量格式转换与失败行报告。
+- [x] 数据质量与治理（Round 11）：校验问题列表（级别/行号/路径/错误码）与跳行、JSONL 自动修复预览与写副本、搜索/正则替换、去重、确定性混洗、比例/份数切分、数据集统计。
 - [x] DPO / Pretrain 格式检测、规范化与转换矩阵；不支持组合显式失败。
 - [x] 1M 行 JSONL 性能与内存基线（Round 10）。
+- [x] 1M 行质量操作基线（Round 11：去重+混洗+切分 124.2s、统计 63.6s、托管内存增量 2MB）。
 - [x] JSONL 读取、索引缓存、LRU 容量清理、源文件指纹失效。
 - [x] DAG 校验：空 Recipe、重名、环、悬空边、孤立节点、重复边、端口归属/方向、DataType 兼容、节点配置告警。
 - [x] 执行引擎：拓扑分层、层内串行、fail-fast、下游 Skipped、取消、进度、日志。
@@ -222,12 +226,13 @@
 
 ### 3.3 未实现
 
-- [x] 数据集分页预览与行号跳转（Round 10）；数据编辑、搜索/正则替换未做。
+- [x] 数据集分页预览与行号跳转（Round 10）；数据逐行 CRUD/单元格编辑未做。
 - [x] CSV / Parquet 读写与格式转换 UI（Round 10）。
 - [x] DPO / Pretrain 格式检测与批量转换（Round 10；SFT Export 节点未直接输出）。
-- [ ] 数据校验自动修复；批量转换已提供失败行 `.errors.jsonl`。
-- [ ] 去重 / 混洗 / 切分。
-- [x] 1M 行 JSONL 性能与内存验收（Round 10）；10M 未做。
+- [x] 数据校验问题列表、自动修复、搜索/正则替换（Round 11）。
+- [x] 去重 / 混洗 / 切分、数据集统计（Round 11）。
+- [ ] 搜索命中高亮、问题分组、数据编辑撤销/重做。
+- [x] 1M 行 JSONL 性能与内存验收（Round 10）、1M 行质量操作验收（Round 11）；10M 未做。
 - [ ] Headless UI 测试、CI、打包、安装包、LICENSE/Assets。
 - [ ] 主题切换真正生效、硬编码颜色资源化。
 - [ ] 全局异常处理、滚动日志、崩溃报告。
@@ -328,6 +333,8 @@
 - 自动修复只改目标文件，原文件不变。
 - 1M/10M 行处理不崩溃，内存与耗时记录在案。
 
+> 完成情况（2026-11-17）：`ValidateAsync` 字节级 JSONL 校验（严格 UTF-8/超长行/BOM）与 CSV/Parquet 结构校验、问题码/路径/错误上限；JSONL 自动修复预览与写副本；搜索/正则替换（当前页/全文件/预览/取消）；SHA256 + SQLite 去重、固定 seed 外排混洗、比例/份数切分；统计（角色/长度/空样本/重复率/工具调用）。Data 视图新增 Search/Transform/Stats/Validate 标签页。新增 37 个常规测试 + 1 个 gated 质量操作基线；1M 行（256B/行）实测去重+混洗+切分 124.2s、统计 63.6s、托管内存增量 2MB。未做：数据逐行 CRUD、命中高亮、10M 实测（提供 `LMTDS_PERF_ROWS=10000000` 入口）、CSV/Parquet 1M 质量基线。
+
 ### Round 12 — 画布、执行体验与发布工程化（P1/P2）
 
 **交付**
@@ -344,15 +351,13 @@
 
 ## 六、建议的下一步
 
-Round 10 已完成，建议进入 **Round 11（数据工作台 B）**，按以下顺序落地：
+Round 11 已完成，建议进入 **Round 12（画布、执行与发布）**，按以下顺序落地：
 
-1. **校验与修复**：`DatasetValidationService` 接线到 Data 视图，问题列表（级别/行号/路径）、行号跳转、自动修复预览与另存。
-2. **搜索 / 正则替换**：当前页与全文件、匹配预览、取消、写新文件。
-3. **去重 / 混洗 / 切分**：哈希 + SQLite/外排、固定 seed、行数守恒。
-4. **数据集统计**：角色分布、长度分布、空样本、重复率、工具调用数。
-5. **坏行 fixtures**：截断 JSON、超长行、非法 UTF-8、错误上限。
+1. **画布体验**：网格背景/吸附（Alt 临时关闭）、鼠标中心缩放、Fit to View、自动布局、Mini-map 视口与点击导航、双击空白添加、复制携带内部连线、可拖动分栏、真实端口坐标。
+2. **执行体验**：层内并行、暂停/重试、节点间流式或溢写磁盘、输出目录/命名/摘要、中断恢复与临时文件清理。
+3. **发布工程化**：Headless UI 测试、1M/10M 基准、CI、打包/单文件/安装包、主题切换、滚动日志/全局异常、LICENSE/Assets/README 截图。
 
-理由：分页预览与格式转换已打通，数据治理（校验、搜索、去重、统计）是下一块用户可见能力，并且可直接复用本轮建立的统一读写与错误报告管线。
+理由：数据工作台的预览、转换与质量治理已形成闭环；下一块最大缺口是画布交互、执行韧性与可发布性，直接决定手工使用体验与交付质量。
 
 ---
 
@@ -361,6 +366,14 @@ Round 10 已完成，建议进入 **Round 11（数据工作台 B）**，按以�
 ```powershell
 dotnet build LMTrainingDataStudio2/LMTrainingDataStudio2.slnx
 dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx
+```
+
+1M 行质量操作基线（可把 `LMTDS_PERF_ROWS` 改为 `10000000` 跑 10M）：
+
+```powershell
+$env:LMTDS_PERF_TESTS = "1"
+$env:LMTDS_PERF_ROWS = "1000000"
+dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx --filter QualityOperations_LargeInput
 ```
 
 真实 provider 冒烟（可选，Key 只放环境变量）：

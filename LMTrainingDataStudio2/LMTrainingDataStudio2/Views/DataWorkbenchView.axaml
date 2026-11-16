@@ -3,11 +3,25 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:LMTrainingDataStudio2.ViewModels"
-             mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="700"
+             xmlns:services="using:LMTrainingDataStudio2.Services"
+             mc:Ignorable="d" d:DesignWidth="1400" d:DesignHeight="760"
              x:Class="LMTrainingDataStudio2.Views.DataWorkbenchView"
              x:DataType="vm:DataWorkbenchViewModel">
 
-    <Grid ColumnDefinitions="*,360" RowDefinitions="Auto,*" Background="{StaticResource CanvasBackgroundBrush}">
+    <UserControl.Styles>
+        <Style Selector="TextBlock.issueError">
+            <Setter Property="Foreground" Value="#FF8080" />
+        </Style>
+        <Style Selector="TextBlock.issueWarning">
+            <Setter Property="Foreground" Value="#E0C060" />
+        </Style>
+        <Style Selector="TextBlock.sectionTitle">
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Foreground" Value="#888888" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid ColumnDefinitions="*,420" RowDefinitions="Auto,*" Background="{StaticResource CanvasBackgroundBrush}">
 
         <!-- Header -->
         <Border Grid.Row="0" Grid.ColumnSpan="2" Height="48"
@@ -90,7 +104,7 @@
                         VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="8">
                 <TextBlock Text="Open a dataset to preview it page by page."
                            FontSize="13" Foreground="#888888" HorizontalAlignment="Center" />
-                <TextBlock Text="JSONL uses the SQLite line index; CSV and Parquet are read by record/row-group offsets."
+                <TextBlock Text="Right panel: convert, search/replace, dedup/shuffle/split, statistics and validation."
                            FontSize="10" Foreground="#666666" HorizontalAlignment="Center" />
             </StackPanel>
 
@@ -123,96 +137,462 @@
             </ListBox>
         </DockPanel>
 
-        <!-- Conversion panel -->
+        <!-- Tool tabs -->
         <Border Grid.Row="1" Grid.Column="1"
                 Background="{StaticResource PanelBackgroundBrush}"
                 BorderBrush="{StaticResource PanelBorderBrush}"
                 BorderThickness="1,0,0,0">
-            <DockPanel>
-                <Border DockPanel.Dock="Top" Height="40"
-                        Background="{StaticResource HeaderBackgroundBrush}"
-                        BorderBrush="{StaticResource PanelBorderBrush}"
-                        BorderThickness="0,0,0,1">
-                    <TextBlock Text="Format Conversion" FontSize="12" FontWeight="SemiBold"
-                               Foreground="#CCCCCC" VerticalAlignment="Center" Margin="12,0" />
-                </Border>
+            <TabControl Padding="0" Background="Transparent">
 
-                <ScrollViewer>
-                    <StackPanel Margin="14" Spacing="14">
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="Target format" FontSize="10" Foreground="#888888" />
-                            <ComboBox ItemsSource="{Binding TargetFormats}"
-                                      SelectedItem="{Binding SelectedTargetFormat, Mode=TwoWay}"
-                                      FontSize="11" HorizontalAlignment="Stretch">
-                                <ComboBox.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:DatasetFormatOption">
-                                        <TextBlock Text="{Binding Name}" FontSize="11" />
-                                    </DataTemplate>
-                                </ComboBox.ItemTemplate>
-                            </ComboBox>
+                <!-- Convert -->
+                <TabItem Header="Convert">
+                    <ScrollViewer>
+                        <StackPanel Margin="14" Spacing="14">
+                            <StackPanel Spacing="6">
+                                <TextBlock Classes="sectionTitle" Text="Target format" />
+                                <ComboBox ItemsSource="{Binding TargetFormats}"
+                                          SelectedItem="{Binding SelectedTargetFormat, Mode=TwoWay}"
+                                          FontSize="11" HorizontalAlignment="Stretch">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:DatasetFormatOption">
+                                            <TextBlock Text="{Binding Name}" FontSize="11" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </StackPanel>
+
+                            <StackPanel Spacing="6">
+                                <TextBlock Classes="sectionTitle" Text="Target file" />
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                                    <TextBox Text="{Binding TargetPath, Mode=TwoWay}"
+                                             FontSize="10" Watermark="out.jsonl / out.csv / out.parquet" />
+                                    <Button Grid.Column="1" Content="…"
+                                            Click="OnBrowseTargetClick"
+                                            Background="#3A3A4E" Foreground="#FFFFFF"
+                                            FontSize="11" Padding="10,4" />
+                                </Grid>
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Content="Convert"
+                                        Command="{Binding ConvertCommand}"
+                                        IsEnabled="{Binding !IsConverting}"
+                                        Background="#4A90D9" Foreground="#FFFFFF"
+                                        FontSize="11" Padding="14,6" />
+                                <Button Content="Cancel"
+                                        Command="{Binding CancelConversionCommand}"
+                                        IsVisible="{Binding IsConverting}"
+                                        Background="#3A2020" Foreground="#FF8080"
+                                        FontSize="11" Padding="12,6" />
+                            </StackPanel>
+
+                            <StackPanel Spacing="4" IsVisible="{Binding IsConverting}">
+                                <TextBlock Classes="sectionTitle" Text="Progress" />
+                                <ProgressBar Value="{Binding ConversionProgress}" Minimum="0" Maximum="1" Height="4" />
+                            </StackPanel>
+
+                            <TextBlock Text="{Binding ConversionSummary}"
+                                       FontSize="10" Foreground="#AAAAAA" TextWrapping="Wrap" />
+
+                            <StackPanel Spacing="6" IsVisible="{Binding HasConversionErrors}">
+                                <TextBlock Text="Failed rows" FontSize="10" Foreground="#FF8080" />
+                                <ListBox ItemsSource="{Binding ConversionErrors}"
+                                         Background="#1E1E2E" BorderBrush="#2E2E42"
+                                         MaxHeight="240" FontSize="10">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}" FontSize="10"
+                                                       Foreground="#E0A0A0" TextWrapping="Wrap" />
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </StackPanel>
+
+                            <Border Background="#1E1E2E" BorderBrush="#2E2E42" BorderThickness="1"
+                                    CornerRadius="6" Padding="10">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Classes="sectionTitle" Text="Supported conversions" />
+                                    <TextBlock Text="OpenAI ↔ ShareGPT ↔ Alpaca, chat → Pretrain, DPO → DPO, Pretrain → Pretrain."
+                                               FontSize="10" Foreground="#AAAAAA" TextWrapping="Wrap" />
+                                    <TextBlock Text="Unsupported pairs fail explicitly and are listed in the .errors.jsonl report."
+                                               FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
 
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="Target file" FontSize="10" Foreground="#888888" />
-                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-                                <TextBox Text="{Binding TargetPath, Mode=TwoWay}"
-                                         FontSize="10" Watermark="out.jsonl / out.csv / out.parquet" />
-                                <Button Grid.Column="1" Content="…"
-                                        Click="OnBrowseTargetClick"
+                <!-- Search / replace -->
+                <TabItem Header="Search">
+                    <ScrollViewer>
+                        <StackPanel Margin="14" Spacing="10">
+                            <TextBlock Classes="sectionTitle" Text="Search / replace" />
+
+                            <TextBox Text="{Binding Search.Query, Mode=TwoWay}"
+                                     FontSize="11" Watermark="Text or regular expression" />
+                            <TextBox Text="{Binding Search.Replacement, Mode=TwoWay}"
+                                     FontSize="11" Watermark="Replacement ($1 groups in regex mode)" />
+
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <CheckBox IsChecked="{Binding Search.UseRegex, Mode=TwoWay}"
+                                          Content="Regex" FontSize="11" />
+                                <CheckBox IsChecked="{Binding Search.CaseSensitive, Mode=TwoWay}"
+                                          Content="Case sensitive" FontSize="11" />
+                            </StackPanel>
+
+                            <CheckBox IsChecked="{Binding Search.CurrentPageOnly, Mode=TwoWay}"
+                                      Content="Current page only" FontSize="11" />
+
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Content="Preview"
+                                        Command="{Binding Search.PreviewCommand}"
+                                        IsEnabled="{Binding !Search.IsBusy}"
+                                        Background="#4A90D9" Foreground="#FFFFFF"
+                                        FontSize="11" Padding="14,6" />
+                                <Button Content="Replace to file"
+                                        Command="{Binding Search.ReplaceCommand}"
+                                        IsEnabled="{Binding !Search.IsBusy}"
                                         Background="#3A3A4E" Foreground="#FFFFFF"
-                                        FontSize="11" Padding="10,4" />
-                            </Grid>
-                        </StackPanel>
+                                        FontSize="11" Padding="12,6" />
+                                <Button Content="Cancel"
+                                        Command="{Binding Search.CancelCommand}"
+                                        IsVisible="{Binding Search.IsCancellable}"
+                                        Background="#3A2020" Foreground="#FF8080"
+                                        FontSize="11" Padding="10,6" />
+                            </StackPanel>
 
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Button Content="Convert"
-                                    Command="{Binding ConvertCommand}"
-                                    IsEnabled="{Binding !IsConverting}"
-                                    Background="#4A90D9" Foreground="#FFFFFF"
-                                    FontSize="11" Padding="14,6" />
-                            <Button Content="Cancel"
-                                    Command="{Binding CancelConversionCommand}"
-                                    IsVisible="{Binding IsConverting}"
-                                    Background="#3A2020" Foreground="#FF8080"
-                                    FontSize="11" Padding="12,6" />
-                        </StackPanel>
+                            <ProgressBar Value="{Binding Search.Progress}" Minimum="0" Maximum="1"
+                                         Height="4" IsVisible="{Binding Search.IsBusy}" />
 
-                        <StackPanel Spacing="4" IsVisible="{Binding IsConverting}">
-                            <TextBlock Text="Progress" FontSize="10" Foreground="#888888" />
-                            <ProgressBar Value="{Binding ConversionProgress}" Minimum="0" Maximum="1" Height="4" />
-                        </StackPanel>
+                            <TextBlock Text="{Binding Search.Summary}" FontSize="10"
+                                       Foreground="#AAAAAA" TextWrapping="Wrap" />
 
-                        <TextBlock Text="{Binding ConversionSummary}"
-                                   FontSize="10" Foreground="#AAAAAA" TextWrapping="Wrap" />
+                            <StackPanel Spacing="6">
+                                <TextBlock Classes="sectionTitle" Text="Replacement target" />
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                                    <TextBox Text="{Binding Search.TargetPath, Mode=TwoWay}"
+                                             FontSize="10" Watermark="replaced.jsonl" />
+                                    <Button Grid.Column="1" Content="…"
+                                            Click="OnBrowseSearchTargetClick"
+                                            Background="#3A3A4E" Foreground="#FFFFFF"
+                                            FontSize="11" Padding="10,4" />
+                                </Grid>
+                            </StackPanel>
 
-                        <!-- Errors -->
-                        <StackPanel Spacing="6" IsVisible="{Binding HasConversionErrors}">
-                            <TextBlock Text="Failed rows" FontSize="10" Foreground="#FF8080" />
-                            <ListBox ItemsSource="{Binding ConversionErrors}"
+                            <TextBlock Classes="sectionTitle"
+                                       Text="Matches (double-click to jump)" />
+                            <ListBox ItemsSource="{Binding Search.Matches}"
+                                     SelectedItem="{Binding Search.SelectedMatch, Mode=TwoWay}"
+                                     DoubleTapped="OnSearchMatchDoubleTapped"
                                      Background="#1E1E2E" BorderBrush="#2E2E42"
-                                     MaxHeight="240" FontSize="10">
+                                     MaxHeight="260" FontSize="10">
                                 <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding}" FontSize="10"
-                                                   Foreground="#E0A0A0" TextWrapping="Wrap" />
+                                    <DataTemplate x:DataType="vm:DatasetSearchMatchViewModel">
+                                        <StackPanel Spacing="2" Margin="2">
+                                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                                                <TextBlock Text="{Binding LineText}" FontSize="10"
+                                                           Foreground="#6A7A8A" />
+                                                <TextBlock Grid.Column="1" Text="{Binding CountText}"
+                                                           FontSize="10" Foreground="#AAAAAA" />
+                                            </Grid>
+                                            <TextBlock Text="{Binding Snippet}" FontSize="10"
+                                                       Foreground="#CCCCCC" TextWrapping="Wrap"
+                                                       FontFamily="Consolas, Menlo, monospace" />
+                                        </StackPanel>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
                             </ListBox>
-                        </StackPanel>
 
-                        <Border Background="#1E1E2E" BorderBrush="#2E2E42" BorderThickness="1"
-                                CornerRadius="6" Padding="10">
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="Supported conversions" FontSize="10" Foreground="#888888" />
-                                <TextBlock Text="OpenAI ↔ ShareGPT ↔ Alpaca, chat → Pretrain, DPO → DPO, Pretrain → Pretrain."
-                                           FontSize="10" Foreground="#AAAAAA" TextWrapping="Wrap" />
-                                <TextBlock Text="Unsupported pairs fail explicitly and are listed in the .errors.jsonl report."
-                                           FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
+                            <TextBlock Text="{Binding Search.StatusText}" FontSize="10"
+                                       Foreground="#777777" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- Transform -->
+                <TabItem Header="Transform">
+                    <ScrollViewer>
+                        <StackPanel Margin="14" Spacing="10">
+                            <TextBlock Classes="sectionTitle" Text="Dedup / shuffle / split" />
+
+                            <CheckBox IsChecked="{Binding Transform.Deduplicate, Mode=TwoWay}"
+                                      Content="Deduplicate (exact row hash)" FontSize="11" />
+                            <CheckBox IsChecked="{Binding Transform.Shuffle, Mode=TwoWay}"
+                                      Content="Shuffle (deterministic seed)" FontSize="11" />
+
+                            <StackPanel Spacing="6">
+                                <TextBlock Classes="sectionTitle" Text="Seed" />
+                                <TextBox Text="{Binding Transform.SeedText, Mode=TwoWay}"
+                                         FontSize="11" Width="150" HorizontalAlignment="Left" />
                             </StackPanel>
-                        </Border>
-                    </StackPanel>
-                </ScrollViewer>
-            </DockPanel>
+
+                            <StackPanel Spacing="6">
+                                <TextBlock Classes="sectionTitle"
+                                           Text="Splits (optional, name:ratio or name:count)" />
+                                <TextBox Text="{Binding Transform.SplitSpecsText, Mode=TwoWay}"
+                                         FontSize="11" Watermark="train:0.8, valid:0.2" />
+                            </StackPanel>
+
+                            <StackPanel Spacing="6">
+                                <TextBlock Classes="sectionTitle" Text="Output file (no splits)" />
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                                    <TextBox Text="{Binding Transform.OutputPath, Mode=TwoWay}"
+                                             FontSize="10" Watermark="clean.jsonl" />
+                                    <Button Grid.Column="1" Content="…"
+                                            Click="OnBrowseTransformOutputClick"
+                                            Background="#3A3A4E" Foreground="#FFFFFF"
+                                            FontSize="11" Padding="10,4" />
+                                </Grid>
+                            </StackPanel>
+
+                            <StackPanel Spacing="6">
+                                <TextBlock Classes="sectionTitle" Text="Output directory (splits)" />
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                                    <TextBox Text="{Binding Transform.OutputDirectory, Mode=TwoWay}"
+                                             FontSize="10" Watermark="folder" />
+                                    <Button Grid.Column="1" Content="…"
+                                            Click="OnBrowseTransformDirectoryClick"
+                                            Background="#3A3A4E" Foreground="#FFFFFF"
+                                            FontSize="11" Padding="10,4" />
+                                </Grid>
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Content="Run"
+                                        Command="{Binding Transform.RunCommand}"
+                                        IsEnabled="{Binding !Transform.IsBusy}"
+                                        Background="#4A90D9" Foreground="#FFFFFF"
+                                        FontSize="11" Padding="16,6" />
+                                <Button Content="Cancel"
+                                        Command="{Binding Transform.CancelCommand}"
+                                        IsVisible="{Binding Transform.IsCancellable}"
+                                        Background="#3A2020" Foreground="#FF8080"
+                                        FontSize="11" Padding="10,6" />
+                            </StackPanel>
+
+                            <ProgressBar Value="{Binding Transform.Progress}" Minimum="0" Maximum="1"
+                                         Height="4" IsVisible="{Binding Transform.IsBusy}" />
+
+                            <TextBlock Text="{Binding Transform.Summary}" FontSize="10"
+                                       Foreground="#AAAAAA" TextWrapping="Wrap" />
+
+                            <TextBlock Classes="sectionTitle" Text="Results" />
+                            <ListBox ItemsSource="{Binding Transform.Results}"
+                                     Background="#1E1E2E" BorderBrush="#2E2E42"
+                                     MaxHeight="220" FontSize="10">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:DatasetTransformOutputLine">
+                                        <TextBlock Text="{Binding Text}" FontSize="10"
+                                                   Foreground="#CCCCCC" TextWrapping="Wrap" />
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+
+                            <TextBlock Text="{Binding Transform.StatusText}" FontSize="10"
+                                       Foreground="#777777" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- Statistics -->
+                <TabItem Header="Stats">
+                    <ScrollViewer>
+                        <StackPanel Margin="14" Spacing="10">
+                            <TextBlock Classes="sectionTitle" Text="Dataset statistics" />
+
+                            <CheckBox IsChecked="{Binding Statistics.IncludeDuplicates, Mode=TwoWay}"
+                                      Content="Compute duplicate rate (slower)" FontSize="11" />
+
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Content="Compute"
+                                        Command="{Binding Statistics.ComputeCommand}"
+                                        IsEnabled="{Binding !Statistics.IsBusy}"
+                                        Background="#4A90D9" Foreground="#FFFFFF"
+                                        FontSize="11" Padding="14,6" />
+                                <Button Content="Cancel"
+                                        Command="{Binding Statistics.CancelCommand}"
+                                        IsVisible="{Binding Statistics.IsCancellable}"
+                                        Background="#3A2020" Foreground="#FF8080"
+                                        FontSize="11" Padding="10,6" />
+                            </StackPanel>
+
+                            <ProgressBar Value="{Binding Statistics.Progress}" Minimum="0" Maximum="1"
+                                         Height="4" IsVisible="{Binding Statistics.IsBusy}" />
+
+                            <TextBlock Text="{Binding Statistics.Summary}" FontSize="10"
+                                       Foreground="#AAAAAA" TextWrapping="Wrap" />
+
+                            <ItemsControl ItemsSource="{Binding Statistics.Metrics}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:DatasetMetric">
+                                        <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                                            <TextBlock Text="{Binding Name}" FontSize="10" Foreground="#AAAAAA" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Value}" FontSize="10"
+                                                       Foreground="#E0E0E0" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock Classes="sectionTitle" Text="Roles" />
+                            <ItemsControl ItemsSource="{Binding Statistics.RoleCounts}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:DatasetMetric">
+                                        <Grid ColumnDefinitions="*,Auto" Margin="0,1">
+                                            <TextBlock Text="{Binding Name}" FontSize="10" Foreground="#AAAAAA" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Value}" FontSize="10"
+                                                       Foreground="#E0E0E0" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock Classes="sectionTitle" Text="Length buckets (characters)" />
+                            <ItemsControl ItemsSource="{Binding Statistics.LengthBuckets}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:DatasetMetric">
+                                        <Grid ColumnDefinitions="*,Auto" Margin="0,1">
+                                            <TextBlock Text="{Binding Name}" FontSize="10" Foreground="#AAAAAA" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Value}" FontSize="10"
+                                                       Foreground="#E0E0E0" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock Classes="sectionTitle" Text="Formats" />
+                            <ItemsControl ItemsSource="{Binding Statistics.FormatCounts}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:DatasetMetric">
+                                        <Grid ColumnDefinitions="*,Auto" Margin="0,1">
+                                            <TextBlock Text="{Binding Name}" FontSize="10" Foreground="#AAAAAA" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Value}" FontSize="10"
+                                                       Foreground="#E0E0E0" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock Text="{Binding Statistics.StatusText}" FontSize="10"
+                                       Foreground="#777777" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- Validate -->
+                <TabItem Header="Validate">
+                    <ScrollViewer>
+                        <StackPanel Margin="14" Spacing="10">
+                            <TextBlock Classes="sectionTitle" Text="Quality validation" />
+
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                                <TextBlock Text="Max issues" FontSize="10" Foreground="#888888"
+                                           VerticalAlignment="Center" />
+                                <TextBox Grid.Column="1" Text="{Binding Validation.MaxIssuesText, Mode=TwoWay}"
+                                         FontSize="11" Width="90" HorizontalAlignment="Left" />
+                            </Grid>
+
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Content="Validate"
+                                        Command="{Binding Validation.ValidateCommand}"
+                                        IsEnabled="{Binding !Validation.IsBusy}"
+                                        Background="#4A90D9" Foreground="#FFFFFF"
+                                        FontSize="11" Padding="14,6" />
+                                <Button Content="Cancel"
+                                        Command="{Binding Validation.CancelCommand}"
+                                        IsVisible="{Binding Validation.IsCancellable}"
+                                        Background="#3A2020" Foreground="#FF8080"
+                                        FontSize="11" Padding="10,6" />
+                            </StackPanel>
+
+                            <ProgressBar Value="{Binding Validation.Progress}" Minimum="0" Maximum="1"
+                                         Height="4" IsVisible="{Binding Validation.IsBusy}" />
+
+                            <TextBlock Text="{Binding Validation.Summary}" FontSize="10"
+                                       Foreground="#AAAAAA" TextWrapping="Wrap" />
+
+                            <TextBlock Classes="sectionTitle"
+                                       Text="Issues (double-click to jump)" />
+                            <ListBox ItemsSource="{Binding Validation.Issues}"
+                                     SelectedItem="{Binding Validation.SelectedIssue, Mode=TwoWay}"
+                                     DoubleTapped="OnIssueDoubleTapped"
+                                     Background="#1E1E2E" BorderBrush="#2E2E42"
+                                     MaxHeight="260" FontSize="10">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:DatasetIssueViewModel">
+                                        <StackPanel Spacing="2" Margin="2">
+                                            <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
+                                                <TextBlock Text="{Binding LineText}" FontSize="10"
+                                                           Foreground="#6A7A8A" />
+                                                <TextBlock Grid.Column="1" Text="{Binding CodeText}"
+                                                           FontSize="10" Foreground="#AAAAAA" />
+                                                <TextBlock Grid.Column="2" Text="{Binding PathText}"
+                                                           FontSize="10" Foreground="#777777"
+                                                           TextTrimming="CharacterEllipsis" />
+                                            </Grid>
+                                            <TextBlock Text="{Binding Message}" FontSize="10"
+                                                       Foreground="#CCCCCC" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+
+                            <TextBlock Text="Issue list is capped; totals keep counting after the cap."
+                                       FontSize="9" Foreground="#666666"
+                                       IsVisible="{Binding Validation.IssuesTruncated}" />
+
+                            <Border Height="1" Background="#3A3A4E" Margin="0,4" />
+
+                            <TextBlock Classes="sectionTitle" Text="Auto-fix (JSONL only)" />
+
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Content="Preview fixes"
+                                        Command="{Binding Validation.PreviewFixesCommand}"
+                                        IsEnabled="{Binding !Validation.IsBusy}"
+                                        Background="#3A3A4E" Foreground="#FFFFFF"
+                                        FontSize="11" Padding="12,6" />
+                                <Button Content="Write fixed copy"
+                                        Command="{Binding Validation.WriteFixesCommand}"
+                                        IsEnabled="{Binding !Validation.IsBusy}"
+                                        Background="#3A3A4E" Foreground="#FFFFFF"
+                                        FontSize="11" Padding="12,6" />
+                            </StackPanel>
+
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                                <TextBox Text="{Binding Validation.FixTargetPath, Mode=TwoWay}"
+                                         FontSize="10" Watermark="fixed.jsonl" />
+                                <Button Grid.Column="1" Content="…"
+                                        Click="OnBrowseFixTargetClick"
+                                        Background="#3A3A4E" Foreground="#FFFFFF"
+                                        FontSize="11" Padding="10,4" />
+                            </Grid>
+
+                            <TextBlock Text="{Binding Validation.FixSummary}" FontSize="10"
+                                       Foreground="#AAAAAA" TextWrapping="Wrap" />
+
+                            <ListBox ItemsSource="{Binding Validation.FixSamples}"
+                                     IsVisible="{Binding Validation.HasFixPreview}"
+                                     Background="#1E1E2E" BorderBrush="#2E2E42"
+                                     MaxHeight="220" FontSize="10">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate x:DataType="services:DatasetFixSample">
+                                        <StackPanel Spacing="2" Margin="2">
+                                            <TextBlock Text="{Binding LineNumber}"
+                                                       FontSize="10" Foreground="#6A7A8A" />
+                                            <TextBlock Text="{Binding Fixed}" FontSize="10"
+                                                       Foreground="#A0D0A0" TextWrapping="Wrap"
+                                                       FontFamily="Consolas, Menlo, monospace" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+
+                            <TextBlock Text="{Binding Validation.StatusText}" FontSize="10"
+                                       Foreground="#777777" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+            </TabControl>
         </Border>
     </Grid>
 </UserControl>

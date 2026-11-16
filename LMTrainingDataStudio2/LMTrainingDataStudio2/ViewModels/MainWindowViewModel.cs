@@ -16,8 +16,6 @@ namespace LMTrainingDataStudio2.ViewModels;
 public partial class MainWindowViewModel : ObservableObject
 {
     private readonly RecipeValidationService _recipeValidation = new();
-    private readonly DatasetValidationService _datasetValidation = new();
-    private readonly DatasetFormatConverter _formatConverter = new();
     private readonly ISettingsStore _settingsStore;
     private readonly RecipeStore _recipeStore;
     private readonly ExecutionStore _executionStore = new();

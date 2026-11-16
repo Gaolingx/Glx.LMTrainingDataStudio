@@ -1,6 +1,6 @@
 # PLAN / TODO — 实施计划与验收标准
 
-> 最后更新：2026-11-16
+> 最后更新：2026-11-17
 > 当前基线：.NET 9 / Avalonia 11.3 / NUnit 4
 > 工作方式：小步提交，每个 Phase 独立验收；开发期允许 break change，不保留兼容层。
 >
@@ -8,7 +8,96 @@
 
 ---
 
-## 一、本轮进展（Round 10）
+## 一、本轮进展（Round 11）
+
+### 1.1 本轮做了什么
+
+- [x] 质量校验：`DatasetValidationService.ValidateAsync` 支持 JSONL 字节级扫描与 CSV/Parquet 行校验；问题包含级别、行号、JSON 路径与错误码；覆盖语法、非对象、空行、消息结构、未知格式、超长行、非法 UTF-8；达到 `MaxIssues` 后继续计数。
+- [x] 自动修复：JSONL 修复预览（可修复/需人工）与“写修复副本”；只写目标文件，原文件字节不变；非法 UTF-8 与超长行原样复制。
+- [x] 搜索/正则替换：当前页/全文件、大小写、字面量/正则、分组替换、匹配预览（行号/次数/片段）、取消、原子写目标文件、正则超时保护。
+- [x] 去重/混洗/切分：SHA256 + SQLite 去重；固定 seed 的确定性混洗（SQLite 外排 + 批量随机读）；`name:ratio` / `name:count` 多文件切分；CSV/JSONL 输出保持源类型；行数守恒。
+- [x] 数据集统计：角色分布、长度分桶、空样本、空内容消息、重复率、工具调用/工具消息、格式分布、坏行数；SQLite 去重集合保持内存有界。
+- [x] Data 视图右侧面板改为 Convert / Search / Transform / Stats / Validate 五个标签页；校验问题与搜索结果双击跳行；文件/目录选择器。
+- [x] 坏行 fixtures 与错误上限测试：截断 JSON、超长行、非法 UTF-8、错误上限、BOM。
+- [x] 新增 37 个常规测试 + 1 个 gated 大规模质量操作基线（总计 368 通过 + 4 gated）。
+
+### 1.2 验证结果
+
+| 项目 | 命令 | 结果 |
+| --- | --- | --- |
+| 构建 | `dotnet build LMTrainingDataStudio2/LMTrainingDataStudio2.slnx` | 成功，0 警告，0 错误 |
+| 测试 | `dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx` | 368 通过，0 失败，4 跳过（2 真实 provider 冒烟 + 2 性能 gated） |
+| 启动冒烟 | `LMTrainingDataStudio2.exe`（Debug，直接启动 8s） | 进程持续运行，无异常输出 |
+| 1M 质量基线 | `LMTDS_PERF_TESTS=1 dotnet test --filter QualityOperations_LargeInput` | 通过：生成 0.2s、去重+混洗+切分 124.2s（50 万保留/50 万重复）、统计 63.6s、托管内存增量 2MB |
+
+1M 行（256B/行）质量操作实测：生成 0.2s；去重 + 混洗 + `train:0.8/valid:0.2` 切分 124.2s（保留 500,000 行、去重 500,000 行）；统计 63.6s；托管内存增量 2MB（≤300MB）。10M 行可通过 `LMTDS_PERF_ROWS=10000000` 运行；本轮未执行 10M（预计约 25–35 分钟、数 GB 临时文件）。
+
+本轮新增/扩展测试：
+
+| 测试类 | 数量 | 覆盖内容 |
+| --- | --- | --- |
+| `DatasetQualityValidationTests` | 9 | 语法/非对象/空行/路径/错误码、非法 UTF-8、超长行、错误上限、结构告警、修复预览、修复写副本、BOM |
+| `DatasetSearchReplaceTests` | 9 | 字面量大小写、当前页范围、正则匹配/截断、分组替换、取消不发布、CSV、空查询/非法正则 |
+| `DatasetTransformTests` | 10 | 去重、同 seed 混洗可复现、比例/份数切分、组合操作、CSV 输出、路径冲突、非法切分、取消 |
+| `DatasetStatisticsTests` | 4 | 角色/长度/空样本/重复率/工具调用/格式、关闭重复计算、CSV、长度边界 |
+| `DataWorkbenchViewModelTests` 扩展 | 5 | 校验与问题跳行、修复命令、搜索预览/替换、去重运行、统计运行 |
+| `DatasetPerformanceTests`（gated） | 1 | 1M（可配置）行去重/混洗/切分与统计基线 |
+
+### 1.3 本轮改动文件
+
+```text
+PLAN/TODO.md
+PLAN/STATUS.md
+README.md
+LMTrainingDataStudio2/LMTrainingDataStudio2/Models/ValidationResult.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/DatasetQualityModels.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/DatasetValidationService.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Datasets/JsonlRawLineReader.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Datasets/DatasetSearchReplaceService.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Datasets/DatasetTransformService.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Datasets/DatasetStatisticsService.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/ViewModels/DataWorkbenchViewModel.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/ViewModels/DatasetValidationViewModel.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/ViewModels/DatasetSearchReplaceViewModel.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/ViewModels/DatasetTransformViewModel.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/ViewModels/DatasetStatisticsViewModel.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/ViewModels/MainWindowViewModel.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Views/DataWorkbenchView.axaml
+LMTrainingDataStudio2/LMTrainingDataStudio2/Views/DataWorkbenchView.axaml.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/DatasetQualityValidationTests.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/DatasetSearchReplaceTests.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/DatasetTransformTests.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/DatasetStatisticsTests.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/DataWorkbenchViewModelTests.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/DatasetPerformanceTests.cs
+```
+
+### 1.4 技术决策与取舍
+
+1. **JSONL 质量校验按字节扫描。**
+   - 严格 UTF-8 解码可准确识别非法字节；超长行超过上限即丢弃缓冲并继续扫描，避免病态输入耗尽内存；BOM 在首行剥离。CSV/Parquet 复用统一 `IDatasetReader`，按行校验 JSON 与聊天结构。
+2. **自动修复写副本而非原地修改。**
+   - 原文件字节保持不变；可修复行重编码，其余行（含非法 UTF-8、超长行）原样复制；目标文件临时文件 + 原子替换。
+3. **去重与混洗使用临时 SQLite，内存有界。**
+   - 去重表只存 SHA256；混洗表存 `(seq, key, src)`，按 seed 哈希排序后批量读取源行并重排；10M 行时磁盘承担排序与索引，托管内存不随行数增长。
+4. **切分复用 Sampler 语义并保持源文件类型。**
+   - `name:ratio` 与 `name:count` 行为与 Sampler 节点一致；CSV/Parquet 源输出同名同类型文件；取消或异常不发布目标文件。
+5. **统计口径明确。**
+   - 坏行计入 0 长度桶，保证长度桶总数等于总行数；重复率默认计算、可关闭；角色别名与格式检测复用现有转换规则。
+6. **搜索替换正则限时。**
+   - 单行正则匹配 2s 超时，超时按行报错而不是挂起；替换写入独立目标文件，支持当前页/全文件范围。
+
+### 1.5 本轮未做
+
+- 数据逐行编辑 CRUD/单元格编辑。
+- CSV / Parquet 的 1M 质量操作基线（本轮 1M 基线为 JSONL）。
+- 10M 实测（已提供 `LMTDS_PERF_ROWS=10000000` 入口，本轮未执行）。
+- 搜索命中行高亮、问题分组、数据编辑撤销/重做。
+- 数据工作台 UI 未逐项人工点击验证（XAML 编译、启动冒烟与 ViewModel 单测通过）。
+
+---
+
+## 附四：Round 10 历史进展（2026-11-17）
 
 ### 1.1 本轮做了什么
 
@@ -1144,9 +1233,9 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 1. [x] CSV / Parquet 读写与互转（Round 10）。
 2. [x] DPO / Pretrain 格式检测、规范化与批量转换（Round 10；SFT Export 节点尚未直接输出）。
 3. [x] 索引缓存容量、失效、随机读取完整接线（Round 2 / Round 10）。
-4. [ ] 数据 CRUD、去重、混洗、切分、正则替换（Round 11）。
-5. [x] JSONL / CSV / Parquet 分页预览与行号跳转（Round 10）；校验问题列表、自动修复留待 Round 11。
-6. [ ] 大数据分页预览统计（角色/长度/重复率/工具调用）。
+4. [x] 去重、混洗、切分、搜索/正则替换（Round 11）；数据逐行 CRUD 未做。
+5. [x] JSONL / CSV / Parquet 分页预览与行号跳转（Round 10）；校验问题列表、自动修复（Round 11）。
+6. [x] 大数据统计：角色/长度/空样本/重复率/工具调用（Round 11）。
 7. [ ] Canvas 网格/吸附/Fit/Mini-map/复制连线。
 8. [ ] 取消/重试、日志持久化、输出摘要。
 
@@ -1170,10 +1259,10 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 | 8 | Recipe 生命周期与节点契约 | P0 | 新建/打开/保存/另存为、最近文件、脏标记、关闭确认；按类型端口 schema；端口与必需连接校验；错误徽标 | 保存重载完全一致；端口正确；坏文件有明确错误；0 警告、测试全绿 |
 | 9 | 节点能力补齐 | P0/P1 | Expression 真实模板引擎 + 面板/预览；Validator Schema + reject 分支；Sampler Splits/多输出；Tool Profile 树形编辑器与复用 | 每个节点成功/失败/边界测试；模板/规则/切分结果可验证 |
 | 10 | 数据工作台 A | P1 | JSONL 分页预览/行跳转；CSV/Parquet 读写；格式转换 UI；DPO/Pretrain；1M 行验收 | 1M 行内存 ≤ 300MB；转换行数守恒；失败行有行号 |
-| 11 | 数据工作台 B | P1 | 校验问题列表/自动修复；搜索/正则替换；去重/混洗/切分；数据集统计 | 行数守恒、同 seed 可复现、原文件不被修复破坏 |
+| 11 | 数据工作台 B（已完成 2026-11-17） | P1 | 校验问题列表/自动修复；搜索/正则替换；去重/混洗/切分；数据集统计 | 行数守恒、同 seed 可复现、原文件不被修复破坏；368 测试通过 |
 | 12 | 画布、执行与发布 | P1/P2 | 网格/吸附/锚点缩放/Fit/自动布局/Mini-map 交互；层内并行、暂停/重试、输出目录；Headless UI、CI、打包、主题、日志 | 手工脚本通过；500 节点无卡顿；干净环境可安装运行 |
 
-**Round 10 已完成（2026-11-17）**；下一步进入 Round 11 数据工作台 B（校验问题列表/自动修复、搜索替换、去重/混洗/切分、数据集统计）。
+**Round 11 已完成（2026-11-17）**；下一步进入 Round 12：画布体验、执行并行/暂停/重试与发布工程化（Headless UI、CI、打包、主题、日志）。
 
 ---
 

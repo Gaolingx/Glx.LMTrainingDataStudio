@@ -7,6 +7,8 @@ public sealed class ValidationIssue
 {
     public ValidationSeverity Severity { get; set; }
     public string Message { get; set; } = string.Empty;
+    public string? Code { get; set; }
+    public string? Path { get; set; }
     public string? BlockId { get; set; }
     public long? LineNumber { get; set; }
     public string? FilePath { get; set; }

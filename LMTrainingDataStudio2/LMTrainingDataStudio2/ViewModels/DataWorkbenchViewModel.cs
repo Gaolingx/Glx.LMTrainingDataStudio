@@ -87,6 +87,11 @@ public partial class DataWorkbenchViewModel : ObservableObject
     public IReadOnlyList<int> AvailablePageSizes => PageSizes;
     public IReadOnlyList<DatasetFormatOption> TargetFormats => Formats;
 
+    public DatasetValidationViewModel Validation { get; }
+    public DatasetSearchReplaceViewModel Search { get; }
+    public DatasetTransformViewModel Transform { get; }
+    public DatasetStatisticsViewModel Statistics { get; }
+
     public string PositionText => IsDatasetOpen
         ? $"Page {CurrentPage:N0} / {TotalPages:N0}"
         : "No dataset";
@@ -97,11 +102,23 @@ public partial class DataWorkbenchViewModel : ObservableObject
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _converter = new DatasetBatchConverter(settings);
+
+        Validation = new DatasetValidationViewModel(settings);
+        Search = new DatasetSearchReplaceViewModel(settings);
+        Transform = new DatasetTransformViewModel(settings);
+        Statistics = new DatasetStatisticsViewModel(settings);
+
+        Validation.JumpRequested += line => _ = JumpToLineAsync(line);
+        Search.JumpRequested += line => _ = JumpToLineAsync(line);
     }
 
     public void ApplySettings(AppSettings settings)
     {
         _settings = settings;
+        Validation.ApplySettings(settings);
+        Search.ApplySettings(settings);
+        Transform.ApplySettings(settings);
+        Statistics.ApplySettings(settings);
     }
 
     public string SuggestTargetPath(string sourcePath, DatasetFormat format)
@@ -150,6 +167,11 @@ public partial class DataWorkbenchViewModel : ObservableObject
             {
                 SetSuggestedTargetPath(openedPath, SelectedTargetFormat.Format);
             }
+
+            Validation.SetSource(openedPath, fileType);
+            Search.SetSource(openedPath, fileType);
+            Transform.SetSource(openedPath, fileType);
+            Statistics.SetSource(openedPath, fileType);
 
             await LoadPageAsync(1);
             StatusText = $"Opened '{openedPath}' ({openedRows:N0} rows).";
@@ -226,8 +248,17 @@ public partial class DataWorkbenchViewModel : ObservableObject
             }
 
             CurrentPage = page;
-            GoToRowText = TotalRows == 0 ? "0" : (startRow + 1).ToString();
+            Search.SetPageWindow(startRow, pageRows.Count);
             var lastRow = startRow + pageRows.Count;
+            if (TotalRows == 0)
+            {
+                GoToRowText = "0";
+            }
+            else if (!long.TryParse(GoToRowText, out var requestedRow) ||
+                     requestedRow < startRow + 1 || requestedRow > lastRow)
+            {
+                GoToRowText = (startRow + 1).ToString();
+            }
             StatusText = TotalRows == 0
                 ? "The dataset is empty."
                 : $"Rows {startRow + 1:N0}-{lastRow:N0} of {TotalRows:N0}.";
@@ -239,6 +270,18 @@ public partial class DataWorkbenchViewModel : ObservableObject
                 StatusText = $"Page load failed: {ex.Message}";
             }
         }
+    }
+
+    public Task JumpToLineAsync(long lineNumber)
+    {
+        if (_reader is null || TotalRows == 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        var target = Math.Clamp(lineNumber, 1, TotalRows);
+        GoToRowText = target.ToString();
+        return LoadPageAsync((target - 1) / PageSize + 1);
     }
 
     [RelayCommand(CanExecute = nameof(CanCancelConversion))]

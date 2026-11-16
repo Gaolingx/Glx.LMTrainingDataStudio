@@ -17,8 +17,10 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - Tool Profile：参数树编辑、JSON 导入导出，并被 Simulation/LLM 引用复用
 - 统一数据集 IO：JSONL / CSV / Parquet 分页读取与原子写出；Seed 支持三种格式
 - 数据工作台（Data 视图）：分页预览、行号跳转、页面大小切换
+- 数据质量与治理：校验问题列表（级别/行号/JSON 路径/错误码）与跳行、JSONL 自动修复预览与写副本、搜索/正则替换、去重、固定 seed 混洗、比例/份数切分、数据集统计
 - 批量格式转换：OpenAI / ShareGPT / Alpaca / DPO / Pretrain，进度、取消、失败行 `.errors.jsonl`
 - JSONL SQLite 行索引缓存与分页读取；1M 行 1KB/行基线通过（索引 8.8s、分页 10.9ms、内存增量 14MB）
+- 1M 行质量操作基线通过（去重+混洗+切分 124.2s、统计 63.6s、托管内存增量 2MB）
 - OpenAI / ShareGPT / Alpaca 数据格式转换服务
 - 真实 RecipeRunner：Seed / Expression / Validator / Sampler / LLM 执行器，执行记录与 Executions UI
 - OpenAI Chat Completions / Responses、Anthropic Messages 客户端；密钥从设置或环境变量读取，支持节点级超时与指数退避重试
@@ -29,7 +31,7 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - Query Source / Simulation / Cleaner / SFT Export / Expression / Validator / Sampler / Tool Profile 专属属性面板
 - 通用 Block Config JSON 编辑器，可直接配置所有节点类型
 
-> 注意：当前仍是开发版。**数据编辑/搜索/去重、自动布局、输出预览弹窗、Validator 代码规则/超时、Sampler 多输出端口、MCP 适配尚未实现**；应用默认启动空白 Recipe，可通过 File → New from Sample 加载 4 节点示例，或恢复上次打开的文件。
+> 注意：当前仍是开发版。**数据逐行编辑 CRUD、搜索命中高亮、10M 实测、自动布局、输出预览弹窗、Validator 代码规则/超时、Sampler 多输出端口、MCP 适配尚未实现**；应用默认启动空白 Recipe，可通过 File → New from Sample 加载 4 节点示例，或恢复上次打开的文件。
 >
 > - 完整功能清单与节点能力矩阵：[PLAN/STATUS.md](PLAN/STATUS.md)
 > - 分阶段实施计划、阶段目标与验收标准：[PLAN/TODO.md](PLAN/TODO.md)
@@ -161,6 +163,7 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - 支持手动清理缓存。
 - CSV 使用 RFC 4180 记录边界索引，Parquet 按 row group 随机读取；两者都只加载当前页。
 - 1M 行、平均 1KB/行实测：索引 8.8s，任意 100 行分页 ≤10.9ms，转换 66.9s，内存增量 14MB。
+- 1M 行、256B/行质量操作实测：去重+混洗+切分 124.2s（50 万保留/50 万重复），统计 63.6s，托管内存增量 2MB；10M 可通过 `LMTDS_PERF_ROWS=10000000` 运行。
 
 相关实现：
 
@@ -187,17 +190,24 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - `LMTrainingDataStudio2/Services/Datasets/DatasetConversionService.cs`
 - `LMTrainingDataStudio2/Services/Datasets/DatasetBatchConverter.cs`
 
-### 3. 数据验证与修复
+### 3. 数据验证与治理
 
-- JSONL 逐行异步验证。
-- 收集语法错误并返回行号。
-- 对简单问题保留自动修复入口。
+- JSONL 字节级扫描：严格 UTF-8、BOM、超长行（默认 2MB，可配置）与错误上限（默认 1000；达到上限后继续计数）。
+- 问题列表包含级别、行号、JSON 路径与错误码；支持双击跳转到对应行。
+- 覆盖语法、非对象、空行、聊天消息结构、未知格式；CSV/Parquet 复用统一读取器做行级 JSON/结构校验。
+- 自动修复：预览可修复/需人工行，写入独立修复副本；原文件字节不变，非法 UTF-8 与超长行原样保留。
+- 搜索 / 正则替换：当前页或全文件、大小写、分组替换、匹配预览、取消与原子写目标文件。
+- 去重（SHA256 + 临时 SQLite）、固定 seed 混洗（SQLite 外排）、`name:ratio` / `name:count` 多文件切分；行数守恒、同 seed 可复现。
+- 数据集统计：角色分布、长度分桶、空样本、空内容消息、重复率、工具调用/工具消息、格式分布、坏行数。
 - 批量转换按行隔离错误，坏行带行号/原因/原始数据落盘，不中断整批。
 - Recipe 执行前验证节点、连接和基础配置。
 
 相关实现：
 
 - `LMTrainingDataStudio2/Services/DatasetValidationService.cs`
+- `LMTrainingDataStudio2/Services/Datasets/DatasetSearchReplaceService.cs`
+- `LMTrainingDataStudio2/Services/Datasets/DatasetTransformService.cs`
+- `LMTrainingDataStudio2/Services/Datasets/DatasetStatisticsService.cs`
 - `LMTrainingDataStudio2/Services/RecipeValidationService.cs`
 
 ### 4. DAG Recipe 编辑器
@@ -224,7 +234,8 @@ UI 采用 Recipe Graph / DAG 的设计：
 - 悬浮 Run / Validate 控件
 - Mini-map 渲染
 - 底部 Status Bar（文件路径、脏标记、进度、内存与缩放）
-- Data 视图：数据集分页预览、首/上/下/末页、按行号跳转、页面大小切换、格式转换与失败行列表
+- Data 视图：数据集分页预览、首/上/下/末页、按行号跳转、页面大小切换；右侧 Convert / Search / Transform / Stats / Validate 五个工具页签
+- Data 视图：格式转换与失败行列表；搜索/正则替换预览与写目标文件；去重/混洗/切分；角色/长度/重复率/工具调用统计；校验问题列表与自动修复
 
 相关实现：
 
@@ -454,14 +465,14 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 - [x] 并发 query、tokens/延迟/成本统计、失败样本独立输出
 - [ ] 容器级沙箱隔离与非 Windows 平台资源限制
 - [x] Recipe 新建 / 打开 / 保存 / 另存为、最近文件与脏标记
-- [ ] JSONL / CSV / Parquet 流式读取与分页预览
-- [ ] 大文件随机行跳转
+- [x] JSONL / CSV / Parquet 流式读取与分页预览
+- [x] 大文件随机行跳转
 - [ ] 数据增删查改
-- [ ] 去重、混洗、切分文件
-- [ ] 正则搜索与替换
-- [ ] OpenAI / ShareGPT / Alpaca 完整批量互转
-- [ ] DPO / Pretrain 格式支持
-- [ ] 语法错误弹窗与一键修复交互
+- [x] 去重、混洗、切分文件
+- [x] 正则搜索与替换
+- [x] OpenAI / ShareGPT / Alpaca 完整批量互转
+- [x] DPO / Pretrain 格式支持
+- [x] 校验问题列表与自动修复预览/写副本
 - [x] Tool Schema 可视化增删改与 JSON 导入导出
 - [x] Canvas 节点拖拽、Port 连线、多选/框选、平移与基础缩放
 - [ ] 网格背景/吸附、鼠标中心缩放、Fit、自动布局
@@ -471,11 +482,11 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 - [ ] 亮色 / 暗色主题切换
 - [ ] LiveCharts2 或 OxyPlot 进度图表
 - [ ] 执行完成后的 output 目录摘要预览
-- [x] 单元测试与集成测试（313 个：311 自动化通过 + 2 个需环境变量的真实 provider 冒烟）
+- [x] 单元测试与集成测试（372 个：368 自动化通过 + 4 个 gated：2 个真实 provider 冒烟 + 2 个 1M 行性能）
 - [x] Round 8：Recipe 新建/打开/保存、脏标记、最近文件、按类型端口契约
 - [x] Round 9：Expression/Validator/Sampler/Tool Profile 节点能力补齐
-- [ ] Round 10：数据预览、CSV/Parquet、格式转换、DPO/Pretrain
-- [ ] Round 11：校验修复、去重/混洗/切分、搜索替换、统计
+- [x] Round 10：数据预览、CSV/Parquet、格式转换、DPO/Pretrain
+- [x] Round 11：校验修复、去重/混洗/切分、搜索替换、统计
 - [ ] Round 12：画布体验、并行/暂停/重试、CI/打包/主题/日志
 
 ## 编码约定
