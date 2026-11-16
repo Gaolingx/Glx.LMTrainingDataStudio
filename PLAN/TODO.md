@@ -181,6 +181,8 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 
 ### 1.5 本轮未做
 
+> 以下四项已在 Round 7 完成，保留原文作为 Round 6 历史记录。
+
 - 真实 tool-calling provider（OpenAI function calling / Anthropic tool_use）HTTP 客户端。
 - 真实 python / PowerShell / bash 沙箱执行与资源限制。
 - Query / Simulation / Cleaner / SFT Export 的专属属性面板（当前使用通用 Config JSON 编辑器）。
