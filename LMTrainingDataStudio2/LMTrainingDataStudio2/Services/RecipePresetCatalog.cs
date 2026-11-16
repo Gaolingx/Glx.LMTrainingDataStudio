@@ -5,8 +5,23 @@ namespace LMTrainingDataStudio2.Services;
 
 /// <summary>
 /// A named starting point that builds a fresh recipe on every load.
+/// Built-in presets use localization keys; user presets carry literal name/description text.
 /// </summary>
-public sealed record RecipePreset(string Id, string NameKey, string SummaryKey, Func<Recipe> Create);
+public sealed record RecipePreset(
+    string Id,
+    string NameKey,
+    string SummaryKey,
+    Func<Recipe> Create,
+    string? LiteralName = null,
+    string? LiteralDescription = null,
+    string? CustomDocumentId = null)
+{
+    public bool IsCustom => CustomDocumentId is not null;
+
+    public string DisplayName => LiteralName ?? LocalizationService.L(NameKey);
+
+    public string DisplayDescription => LiteralDescription ?? LocalizationService.L(SummaryKey);
+}
 
 /// <summary>
 /// Bundled basic node workflows shown in File → New from Preset and the Block Library.
@@ -29,6 +44,19 @@ public static class RecipePresetCatalog
 
     public static Recipe Create(string id) =>
         Find(id)?.Create() ?? throw new ArgumentException($"Unknown recipe preset '{id}'.", nameof(id));
+
+    public static RecipePreset FromDocument(RecipePresetDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        return new RecipePreset(
+            $"custom:{document.Id}",
+            string.Empty,
+            string.Empty,
+            () => RecipePresetStore.BuildRecipe(document),
+            document.Name,
+            document.Description,
+            document.Id);
+    }
 
     private static Recipe CreateLlmBatch()
     {

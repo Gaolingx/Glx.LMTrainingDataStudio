@@ -39,6 +39,9 @@
                         <Separator />
                         <MenuItem Header="{loc:Loc common.save}" Click="OnSaveRecipeClick" InputGesture="Ctrl+S" />
                         <MenuItem Header="{loc:Loc main.save_as}" Click="OnSaveAsRecipeClick" InputGesture="Ctrl+Shift+S" />
+                        <Separator />
+                        <MenuItem Header="{loc:Loc menu.save_as_preset}" Click="OnSaveAsPresetClick" />
+                        <MenuItem Header="{loc:Loc menu.import_preset}" Click="OnImportPresetClick" />
                     </MenuItem>
                 </Menu>
 
@@ -167,12 +170,27 @@
                                                     Cursor="Hand"
                                                     ToolTip.Tip="{Binding Description}"
                                                     PointerPressed="OnPresetPointerPressed">
-                                                <StackPanel Spacing="2">
-                                                    <TextBlock Text="{Binding Name}" FontSize="11"
-                                                               FontWeight="SemiBold" Foreground="#D8D8EE" />
-                                                    <TextBlock Text="{Binding Description}" FontSize="9"
-                                                               Foreground="#777788" TextWrapping="Wrap" />
-                                                </StackPanel>
+                                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
+                                                    <StackPanel Grid.Column="0" Spacing="2">
+                                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                                            <TextBlock Text="{Binding Name}" FontSize="11"
+                                                                       FontWeight="SemiBold" Foreground="#D8D8EE" />
+                                                            <TextBlock Text="{loc:Loc preset.custom_badge}" FontSize="8"
+                                                                       Foreground="#7B61FF" VerticalAlignment="Center"
+                                                                       IsVisible="{Binding IsCustom}" />
+                                                        </StackPanel>
+                                                        <TextBlock Text="{Binding Description}" FontSize="9"
+                                                                   Foreground="#777788" TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                    <Button Grid.Column="1" Content="×"
+                                                            IsVisible="{Binding IsCustom}"
+                                                            ToolTip.Tip="{loc:Loc preset.delete.tooltip}"
+                                                            Click="OnDeletePresetClick"
+                                                            PointerPressed="OnDeletePresetPointerPressed"
+                                                            Background="Transparent" Foreground="#FF8080"
+                                                            FontSize="12" Padding="6,0"
+                                                            VerticalAlignment="Top" />
+                                                </Grid>
                                             </Border>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>

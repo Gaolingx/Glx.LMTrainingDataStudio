@@ -6,6 +6,7 @@ namespace LMTrainingDataStudio2.Views;
 public enum MessageDialogButtons
 {
     Ok,
+    OkCancel,
     SaveDiscardCancel
 }
 
@@ -39,7 +40,7 @@ public partial class MessageDialog : Window
         var confirm = buttons == MessageDialogButtons.SaveDiscardCancel;
         dialog.SaveButton.IsVisible = confirm;
         dialog.DiscardButton.IsVisible = confirm;
-        dialog.CancelButton.IsVisible = confirm;
+        dialog.CancelButton.IsVisible = buttons != MessageDialogButtons.Ok;
         dialog.OkButton.IsVisible = !confirm;
 
         await dialog.ShowDialog(owner);

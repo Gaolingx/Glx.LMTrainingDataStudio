@@ -13,7 +13,7 @@
 - 逐项核对 `Services/`、`ViewModels/`、`Views/` 与测试，修正第四节目录中已完成的条目（画布、数据治理、执行控制、UI 面板等）。
 - 修正与代码不一致的描述：LLM Prompt 使用 Fluid 模板（不再写“仅 field.path”）；SFT Export 按行透传、不主动裁剪字段；CurrentFilePath 已接线；内存占用仍只采样一次。
 - 新增 Round 13–16 规划：执行与 IO 韧性、数据工作台编辑与预览、节点能力收紧、发布与体验。
-- 当前验证：`dotnet build` 0 警告；`dotnet test` 402 通过 + 4 个 gated 跳过。
+- 当前验证：`dotnet build` 0 警告；`dotnet test` 420 通过 + 4 个 gated 跳过。
 
 ---
 
@@ -26,23 +26,26 @@
 - [x] 静态 UI 本地化：MainWindow、属性面板、节点库、Data 工作台、Executions、消息对话框的标签、按钮、提示与水印全部资源化（约 230 个键）。
 - [x] 节点说明：新增 `BlockCatalog`，为 10 类节点提供名称、一句话简介、详细说明与端口摘要；属性面板显示 Node Guide，画布节点悬停显示简介。
 - [x] 工作流预设：新增 `RecipePresetCatalog` 与 6 个基础流水线（LLM 批量生成、OAI 轨迹清洗、字段映射、校验与切分、模拟 Agent 轨迹、真实工具调用），支持 File → New from Preset 与节点库点击加载。
+- [x] 自定义预设：`RecipePresetStore` 按预设单文件持久化到 `%APPDATA%\LMTrainingDataStudio\presets`；支持保存当前 Recipe、导入外部预设（分配新本地 ID）与删除；原子写入、坏文件跳过并告警。
+- [x] 自定义预设 UI：新增保存预设对话框、File 菜单保存/导入入口、节点库自定义标记与删除按钮。
 - [x] 预设加载遵守脏文档确认流程，加载后标记未保存，并复用现有 Recipe 校验。
-- [x] 新增 16 个测试：本地化服务/节点目录/预设目录、预设加载、设置语言往返与回退、Headless 语言切换与节点说明。
+- [x] 新增 34 个测试：本地化服务/节点目录/预设目录、预设加载、设置语言往返与回退、Headless 语言切换与节点说明、自定义预设存储/导入/删除/快照隔离。
 
 ### 6.2 验证结果
 
 | 项目 | 命令 | 结果 |
 | --- | --- | --- |
 | 构建 | `dotnet build LMTrainingDataStudio2/LMTrainingDataStudio2.slnx` | 成功，0 警告，0 错误 |
-| 测试 | `dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx` | 402 通过，0 失败，4 跳过（2 provider + 2 性能 gated） |
+| 测试 | `dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx` | 420 通过，0 失败，4 跳过（2 provider + 2 性能 gated） |
 | 本地化绑定 | `dotnet test --filter HeadlessUiTests` | 通过：中英文切换后 BlocksHeader 与节点库名称即时更新 |
-| 预设校验 | `RecipePresetCatalogTests` | 6 个预设均为合法 DAG，无校验错误 |
+| 预设校验 | `RecipePresetCatalogTests` | 6 个内置预设均为合法 DAG，无校验错误 |
+| 自定义预设 | `RecipePresetStoreTests` / `MainWindowViewModelDocumentTests` | 保存/导入/删除/快照隔离/坏文件告警全部通过 |
 
 ### 6.3 本轮未做
 
 - 运行日志、执行状态、数据集统计摘要仍为英文技术文本；后续可逐步资源化。
 - Executions 状态筛选与运行状态值仍使用内部英文枚举值，尚未做本地化显示。
-- 预设暂不支持用户自定义保存/导入；当前仅内置目录。
+- 自定义预设暂不支持从 UI 导出到任意路径（当前保存在本机预设目录，可直接复制文件分享）。
 
 ---
 
@@ -1314,7 +1317,8 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 - [部分] 集成测试：分模块 1M 行与四节点流水线已覆盖；完整 1M 行多节点链路待 Round 13。
 - [部分] 性能基准：NUnit gated 1M 行测试已有；BenchmarkDotNet 专项基准未做。
 - [x] 本地化/节点目录/预设：语言切换、10 类节点文案与端口摘要、6 个预设合法性与加载（16 个，Round 附六）。
-- [x] 当前测试总数：402 通过 + 4 gated（2026-11-17 复核）。
+- [x] 自定义预设：单文件存储、保存/导入/删除、原子写入、坏文件告警、快照隔离与 VM 加载（18 个）。
+- [x] 当前测试总数：420 通过 + 4 gated（2026-11-17 复核）。
 
 ### 4.9 工程化与发布
 

@@ -10,6 +10,7 @@ public sealed class MainWindowViewModelDocumentTests
 {
     private string _directory = null!;
     private FakeSettingsStore _settingsStore = null!;
+    private RecipePresetStore _presetStore = null!;
     private MainWindowViewModel _viewModel = null!;
 
     [SetUp]
@@ -23,8 +24,9 @@ public sealed class MainWindowViewModelDocumentTests
             CacheDirectory = Path.Combine(_directory, "cache"),
             MaxCacheSizeMb = 16
         });
+        _presetStore = new RecipePresetStore(Path.Combine(_directory, "presets"));
 
-        _viewModel = new MainWindowViewModel(_settingsStore);
+        _viewModel = new MainWindowViewModel(_settingsStore, presetStore: _presetStore);
     }
 
     [TearDown]
@@ -65,6 +67,90 @@ public sealed class MainWindowViewModelDocumentTests
     {
         Assert.ThrowsAsync<ArgumentException>(
             async () => await _viewModel.NewRecipeFromPresetAsync("does_not_exist"));
+    }
+
+    [Test]
+    public async Task SaveAsPreset_AddsCustomPresetAndPersists()
+    {
+        await _viewModel.NewRecipeAsync(withSample: true);
+
+        var saved = await _viewModel.SaveAsPresetAsync("My Agent Flow", "Reusable sample pipeline");
+
+        Assert.That(saved.IsCustom, Is.True);
+        Assert.That(saved.Name, Is.EqualTo("My Agent Flow"));
+        Assert.That(_viewModel.Presets, Has.Count.EqualTo(RecipePresetCatalog.All.Count + 1));
+        Assert.That(_presetStore.LoadAll().Presets, Has.Count.EqualTo(1));
+
+        var reloaded = new MainWindowViewModel(_settingsStore, presetStore: _presetStore);
+        Assert.That(reloaded.Presets.Any(preset => preset.IsCustom && preset.Name == "My Agent Flow"), Is.True);
+    }
+
+    [Test]
+    public void SaveAsPreset_EmptyDocument_Throws()
+    {
+        Assert.ThrowsAsync<ArgumentException>(
+            async () => await _viewModel.SaveAsPresetAsync("Empty", null));
+    }
+
+    [Test]
+    public async Task ImportPreset_AddsCustomPresetToLibrary()
+    {
+        var sourceDirectory = Path.Combine(_directory, "source");
+        var sourceStore = new RecipePresetStore(sourceDirectory);
+        var source = await sourceStore.SaveAsync(
+            "Shared Cleanup", "Imported description", RecipePresetCatalog.Create("oai_clean"));
+        var sourcePath = Path.Combine(sourceDirectory, source.Id + ".json");
+
+        var imported = await _viewModel.ImportPresetAsync(sourcePath);
+
+        Assert.That(imported.IsCustom, Is.True);
+        Assert.That(imported.Name, Is.EqualTo("Shared Cleanup"));
+        Assert.That(imported.Description, Is.EqualTo("Imported description"));
+        Assert.That(_viewModel.Presets, Has.Count.EqualTo(RecipePresetCatalog.All.Count + 1));
+        Assert.That(_presetStore.LoadAll().Presets, Has.Count.EqualTo(1));
+    }
+
+    [Test]
+    public async Task ImportPreset_InvalidFile_DoesNotChangeLibrary()
+    {
+        var before = _viewModel.Presets.Count;
+        var path = Path.Combine(_directory, "broken.json");
+        await File.WriteAllTextAsync(path, "not json");
+
+        Assert.ThrowsAsync<RecipePresetFormatException>(
+            async () => await _viewModel.ImportPresetAsync(path));
+        Assert.That(_viewModel.Presets, Has.Count.EqualTo(before));
+    }
+
+    [Test]
+    public async Task DeleteCustomPreset_RemovesOnlyUserPresets()
+    {
+        await _viewModel.NewRecipeAsync(withSample: true);
+        var saved = await _viewModel.SaveAsPresetAsync("Delete Me", null);
+
+        Assert.That(await _viewModel.DeleteCustomPresetAsync("llm_batch"), Is.False);
+        Assert.That(_viewModel.Presets, Has.Count.EqualTo(RecipePresetCatalog.All.Count + 1));
+
+        Assert.That(await _viewModel.DeleteCustomPresetAsync(saved.Id), Is.True);
+        Assert.That(_viewModel.Presets, Has.Count.EqualTo(RecipePresetCatalog.All.Count));
+        Assert.That(_presetStore.LoadAll().Presets, Is.Empty);
+    }
+
+    [Test]
+    public async Task NewFromCustomPreset_LoadsSavedSnapshot()
+    {
+        await _viewModel.NewRecipeAsync(withSample: true);
+        var saved = await _viewModel.SaveAsPresetAsync("My Snapshot", null);
+
+        await _viewModel.NewRecipeAsync();
+        Assert.That(_viewModel.Blocks, Is.Empty);
+
+        await _viewModel.NewRecipeFromPresetAsync(saved.Id);
+
+        Assert.That(_viewModel.RecipeName, Is.EqualTo("My Snapshot"));
+        Assert.That(_viewModel.Blocks, Has.Count.EqualTo(4));
+        Assert.That(_viewModel.Edges, Has.Count.EqualTo(3));
+        Assert.That(_viewModel.IsDirty, Is.True);
     }
 
     [Test]
@@ -245,6 +331,7 @@ public sealed class MainWindowViewModelDocumentTests
             MaxCacheSizeMb = source.MaxCacheSizeMb,
             CacheDirectory = source.CacheDirectory,
             IsDarkTheme = source.IsDarkTheme,
+            Language = source.Language,
             GridSnapSize = source.GridSnapSize,
             EnableGridSnap = source.EnableGridSnap,
             OpenAiApiKey = source.OpenAiApiKey,

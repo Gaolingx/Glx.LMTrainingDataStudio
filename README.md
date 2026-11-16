@@ -33,6 +33,7 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - Simulation 支持并发 query（输出保序）与失败轨迹独立 JSONL 输出
 - Query Source / Simulation / Cleaner / SFT Export / Expression / Validator / Sampler / Tool Profile 专属属性面板
 - 内置 6 个基础工作流预设，可从 File → New from Preset 或节点库一键加载
+- 自定义预设：保存当前 Recipe 为预设、导入/删除预设文件；预设保存在本机 `%APPDATA%\LMTrainingDataStudio\presets`
 - 中英文界面本地化（zh-CN / en-US，可在设置中切换），节点库、属性面板与画布悬停提示包含完整节点说明
 - 通用 Block Config JSON 编辑器，可直接配置所有节点类型
 
@@ -60,6 +61,13 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 
 - 菜单 **File → New from Preset**。
 - 左侧节点库顶部的 **Workflow Presets** 列表，点击即可加载。
+
+### 自定义预设
+
+- **保存**：**File → Save as Preset…**，填写名称与可选描述；当前 Recipe 会保存为一份独立快照。
+- **导入**：**File → Import Preset…**，选择导出的预设 JSON；导入会生成新的本地 ID，不会覆盖已有预设。
+- **删除**：自定义预设卡片右上角的 **×**，确认后仅从本机预设库移除，不影响当前画布。
+- 预设文件为单个 JSON（包含名称、描述与完整 Recipe），存放在 `%APPDATA%\LMTrainingDataStudio\presets`，可直接复制给他人后通过 Import 导入。
 
 ### 节点说明
 
@@ -549,7 +557,7 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 - [ ] LiveCharts2 或 OxyPlot 进度图表
 - [x] 执行层内并行、暂停/恢复、节点重试、output 目录摘要
 - [x] 滚动日志、全局异常、CI、win-x64 单文件发布、Headless UI 测试、MIT LICENSE、应用图标
-- [x] 单元测试与集成测试（406 个：402 自动化通过 + 4 个 gated：2 个真实 provider 冒烟 + 2 个性能）
+- [x] 单元测试与集成测试（424 个：420 自动化通过 + 4 个 gated：2 个真实 provider 冒烟 + 2 个性能）
 - [x] Round 8：Recipe 新建/打开/保存、脏标记、最近文件、按类型端口契约
 - [x] Round 9：Expression/Validator/Sampler/Tool Profile 节点能力补齐
 - [x] Round 10：数据预览、CSV/Parquet、格式转换、DPO/Pretrain

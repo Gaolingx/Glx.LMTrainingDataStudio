@@ -1,0 +1,47 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:LMTrainingDataStudio2.Localization"
+        x:Class="LMTrainingDataStudio2.Views.PresetSaveDialog"
+        Width="520"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        ShowInTaskbar="False"
+        Background="#252538">
+    <Border Background="#252538"
+            BorderBrush="#4A90D9"
+            BorderThickness="1"
+            CornerRadius="12"
+            Padding="22">
+        <StackPanel Spacing="14">
+            <TextBlock Text="{loc:Loc preset.dialog.title}"
+                       FontSize="16" FontWeight="SemiBold"
+                       Foreground="#FFFFFF" TextWrapping="Wrap" />
+
+            <StackPanel Spacing="4">
+                <TextBlock Text="{loc:Loc preset.dialog.name}"
+                           FontSize="11" Foreground="#AAAAAA" />
+                <TextBox x:Name="NameBox" FontSize="12" Padding="8,6"
+                         Watermark="{loc:Loc preset.dialog.name}" />
+                <TextBlock x:Name="NameError" IsVisible="False"
+                           FontSize="10" Foreground="#FF6666" TextWrapping="Wrap" />
+            </StackPanel>
+
+            <StackPanel Spacing="4">
+                <TextBlock Text="{loc:Loc preset.dialog.description}"
+                           FontSize="11" Foreground="#AAAAAA" />
+                <TextBox x:Name="DescriptionBox" FontSize="12" Padding="8,6"
+                         Height="78" AcceptsReturn="True" TextWrapping="Wrap" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                <Button Content="{loc:Loc common.cancel}"
+                        Click="OnCancelClick"
+                        Padding="14,7" Background="#3A3A4E" Foreground="#FFFFFF" />
+                <Button Content="{loc:Loc common.save}"
+                        Click="OnSaveClick"
+                        Padding="16,7" Background="#4A90D9" Foreground="#FFFFFF" />
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>

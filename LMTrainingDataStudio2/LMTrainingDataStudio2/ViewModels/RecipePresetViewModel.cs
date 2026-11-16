@@ -1,5 +1,4 @@
 using CommunityToolkit.Mvvm.ComponentModel;
-using LMTrainingDataStudio2.Localization;
 using LMTrainingDataStudio2.Services;
 
 namespace LMTrainingDataStudio2.ViewModels;
@@ -15,9 +14,11 @@ public sealed class RecipePresetViewModel : ObservableObject
 
     public string Id => Preset.Id;
 
-    public string Name => LocalizationService.L(Preset.NameKey);
+    public bool IsCustom => Preset.IsCustom;
 
-    public string Description => LocalizationService.L(Preset.SummaryKey);
+    public string Name => Preset.DisplayName;
+
+    public string Description => Preset.DisplayDescription;
 
     public void RefreshLocalization()
     {

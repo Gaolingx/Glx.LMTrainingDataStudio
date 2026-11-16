@@ -19,8 +19,10 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly RecipeValidationService _recipeValidation = new();
     private readonly ISettingsStore _settingsStore;
     private readonly RecipeStore _recipeStore;
+    private readonly RecipePresetStore _presetStore;
     private readonly ExecutionStore _executionStore = new();
     private readonly HttpClient _llmHttpClient = new();
+    private readonly List<string> _presetLoadWarnings = new();
     private AppSettings _settings;
     private CancellationTokenSource? _runCancellation;
     private ExecutionPauseController? _runPause;
@@ -156,10 +158,14 @@ public partial class MainWindowViewModel : ObservableObject
     {
     }
 
-    public MainWindowViewModel(ISettingsStore settingsStore, RecipeStore? recipeStore = null)
+    public MainWindowViewModel(
+        ISettingsStore settingsStore,
+        RecipeStore? recipeStore = null,
+        RecipePresetStore? presetStore = null)
     {
         _settingsStore = settingsStore ?? throw new ArgumentNullException(nameof(settingsStore));
         _recipeStore = recipeStore ?? new RecipeStore();
+        _presetStore = presetStore ?? new RecipePresetStore();
         var loadResult = _settingsStore.Load();
         _settings = loadResult.Settings;
         LocalizationService.Instance.SetLanguage(_settings.Language);
@@ -180,6 +186,11 @@ public partial class MainWindowViewModel : ObservableObject
         UpdateMemoryUsage();
 
         foreach (var warning in loadResult.Warnings)
+        {
+            LogMessages.Add($"[Warning] {warning}");
+        }
+
+        foreach (var warning in _presetLoadWarnings)
         {
             LogMessages.Add($"[Warning] {warning}");
         }
@@ -226,7 +237,25 @@ public partial class MainWindowViewModel : ObservableObject
         {
             Presets.Add(new RecipePresetViewModel(preset));
         }
+
+        var loaded = _presetStore.LoadAll();
+        foreach (var document in loaded.Presets)
+        {
+            Presets.Add(new RecipePresetViewModel(RecipePresetCatalog.FromDocument(document)));
+        }
+
+        _presetLoadWarnings.AddRange(loaded.Warnings);
     }
+
+    private RecipePresetViewModel AddCustomPreset(RecipePresetDocument document)
+    {
+        var viewModel = new RecipePresetViewModel(RecipePresetCatalog.FromDocument(document));
+        Presets.Add(viewModel);
+        return viewModel;
+    }
+
+    private RecipePresetViewModel? FindPreset(string id) =>
+        Presets.FirstOrDefault(preset => string.Equals(preset.Id, id, StringComparison.OrdinalIgnoreCase));
 
     private void OnLanguageChanged(object? sender, EventArgs e)
     {
@@ -291,17 +320,61 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Replaces the current document with a bundled workflow preset and marks it dirty.
+    /// Replaces the current document with a bundled or user workflow preset and marks it dirty.
     /// </summary>
     public async Task NewRecipeFromPresetAsync(string presetId)
     {
-        var preset = RecipePresetCatalog.Find(presetId)
+        var preset = FindPreset(presetId)?.Preset
                      ?? throw new ArgumentException($"Unknown recipe preset '{presetId}'.", nameof(presetId));
 
         LoadDocument(preset.Create(), path: null, markDirty: true);
         LogMessages.Clear();
-        LogMessages.Add($"[Info] Loaded workflow preset '{LocalizationService.L(preset.NameKey)}'.");
+        LogMessages.Add($"[Info] Loaded workflow preset '{preset.DisplayName}'.");
         await PersistDocumentStateAsync();
+    }
+
+    /// <summary>
+    /// Stores the current document as a user preset in the local preset library.
+    /// </summary>
+    public async Task<RecipePresetViewModel> SaveAsPresetAsync(string name, string? description)
+    {
+        var document = await _presetStore.SaveAsync(name, description, ToRecipe());
+        var viewModel = AddCustomPreset(document);
+        StatusText = string.Format(LocalizationService.L("preset.saved_format"), document.Name);
+        LogMessages.Add($"[Info] Saved user preset '{document.Name}'.");
+        return viewModel;
+    }
+
+    /// <summary>
+    /// Imports a preset file into the local library without changing the current document.
+    /// </summary>
+    public async Task<RecipePresetViewModel> ImportPresetAsync(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+        var document = await _presetStore.ImportAsync(path);
+        var viewModel = AddCustomPreset(document);
+        StatusText = string.Format(LocalizationService.L("preset.imported_format"), document.Name);
+        LogMessages.Add($"[Info] Imported preset '{document.Name}' from '{path}'.");
+        return viewModel;
+    }
+
+    /// <summary>
+    /// Deletes a user preset. Built-in presets cannot be deleted.
+    /// </summary>
+    public async Task<bool> DeleteCustomPresetAsync(string presetId)
+    {
+        var viewModel = FindPreset(presetId);
+        if (viewModel is null || !viewModel.IsCustom || viewModel.Preset.CustomDocumentId is null)
+        {
+            return false;
+        }
+
+        await _presetStore.DeleteAsync(viewModel.Preset.CustomDocumentId);
+        Presets.Remove(viewModel);
+        StatusText = string.Format(LocalizationService.L("preset.deleted_format"), viewModel.Name);
+        LogMessages.Add($"[Info] Deleted user preset '{viewModel.Name}'.");
+        return true;
     }
 
     /// <summary>

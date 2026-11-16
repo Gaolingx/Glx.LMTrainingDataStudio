@@ -1,7 +1,7 @@
 # STATUS — 功能清单、节点能力矩阵与下一阶段规划
 
 > 最后核对：2026-11-17（已逐项与源码、测试复核）
-> 验证基线：`dotnet build` 0 警告 0 错误；`dotnet test` 402 通过 + 4 个 gated 测试（2 个真实 provider 冒烟 + 2 个性能，默认跳过）；Headless UI 5 个测试通过；1M 行 JSONL 与 1M 行质量操作基线通过；win-x64 单文件发布启动通过。
+> 验证基线：`dotnet build` 0 警告 0 错误；`dotnet test` 420 通过 + 4 个 gated 测试（2 个真实 provider 冒烟 + 2 个性能，默认跳过）；Headless UI 5 个测试通过；1M 行 JSONL 与 1M 行质量操作基线通过；win-x64 单文件发布启动通过。
 >
 > 图例：`[x]` 已完成并有测试/验证；`[部分]` 可用但有明确缺口；`[ ]` 未实现。
 >
@@ -33,10 +33,11 @@
 - 真实 provider tool-calling（OpenAI Chat/Responses、Anthropic）与真实沙箱工具（python/PowerShell/bash/web_fetch）。
 - 画布交互：网格/吸附（Alt 关闭）、鼠标中心缩放、Fit、拓扑自动布局、Mini-map 视口与点击导航、双击添加、复制携带连线、内联重命名、真实端口坐标、边 hover、增量拖拽、可拖动分栏。
 - 工作流预设：6 个基础流水线可从 File → New from Preset 或节点库一键加载，加载遵守脏文档确认。
+- 自定义预设：当前 Recipe 可保存为预设；支持导入外部预设（分配新本地 ID）与删除；单文件存于 `%APPDATA%\LMTrainingDataStudio\presets`，坏文件跳过并告警。
 - 节点说明：10 类节点具备本地化名称、简介、详细说明与端口摘要；属性面板 Node Guide 与画布悬停提示复用同一份目录。
 - 界面本地化：zh-CN / en-US 资源化静态 UI（约 230 个键），设置面板切换语言后即时刷新；运行日志/执行状态仍为英文技术文本。
 - 工程化：滚动日志与全局异常、Dark/Light 主题资源、GitHub Actions CI、win-x64 单文件发布脚本、Headless UI 测试、MIT LICENSE、应用图标。
-- 406 个自动化测试：402 个常规通过 + 4 个 gated（2 个真实 provider 冒烟 + 2 个性能）。
+- 424 个自动化测试：420 个常规通过 + 4 个 gated（2 个真实 provider 冒烟 + 2 个性能）。
 
 ### 1.2 当前最大缺口（按优先级）
 
@@ -280,8 +281,10 @@
 | --- | --- | --- |
 | 内置工作流预设 | [x] | 6 个：LLM 批量生成、OAI 轨迹清洗、字段映射、校验与切分、模拟 Agent 轨迹、真实工具调用 |
 | 预设入口 | [x] | File → New from Preset；节点库 Workflow Presets 列表 |
-| 预设合法性 | [x] | 每个预设均通过端口契约、连接与配置校验；有自动化测试 |
-| 自定义预设保存/导入 | [ ] | 当前仅内置目录 |
+| 自定义预设保存/导入/删除 | [x] | `RecipePresetStore` 单文件存储；保存当前 Recipe、导入外部预设、删除自定义预设 |
+| 预设持久化位置 | [x] | `%APPDATA%\LMTrainingDataStudio\presets`；原子写入，坏文件跳过并告警 |
+| 预设合法性 | [x] | 每个内置/导入预设均通过 schema 与 Recipe 校验；有自动化测试 |
+| 自定义预设导出到任意路径 | [ ] | 当前保存到本机预设目录，可直接复制 JSON 分享 |
 | 节点说明目录 | [x] | `BlockCatalog` 统一提供名称/简介/详细说明/端口摘要 |
 | 属性面板 Node Guide | [x] | 选中节点后展示说明与输入/输出端口 |
 | 画布节点悬停提示 | [x] | 显示同一份节点简介 |

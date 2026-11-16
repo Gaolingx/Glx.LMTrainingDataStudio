@@ -77,11 +77,93 @@ public partial class MainWindow : Window
     private async void OnPresetPointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (sender is not Control { DataContext: RecipePresetViewModel preset }) return;
+        if (e.Source is Button) return;
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
 
         if (DataContext is MainWindowViewModel vm)
         {
             await LoadPresetAsync(vm, preset);
+        }
+    }
+
+    private async void OnSaveAsPresetClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm) return;
+
+        if (vm.Blocks.Count == 0)
+        {
+            await MessageDialog.ShowAsync(
+                this,
+                LocalizationService.L("preset.save_empty.title"),
+                LocalizationService.L("preset.save_empty.message"),
+                MessageDialogButtons.Ok);
+            return;
+        }
+
+        var input = await PresetSaveDialog.ShowAsync(this, vm.RecipeName, string.Empty);
+        if (input is null) return;
+
+        try
+        {
+            await vm.SaveAsPresetAsync(input.Value.Name, input.Value.Description);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            await MessageDialog.ShowAsync(
+                this,
+                LocalizationService.L("preset.save_failed.title"),
+                ex.Message,
+                MessageDialogButtons.Ok);
+        }
+    }
+
+    private async void OnImportPresetClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm) return;
+
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = LocalizationService.L("dialog.picker.import_preset"),
+            AllowMultiple = false,
+            FileTypeFilter = new[] { PresetFileType() }
+        });
+
+        var path = files.Count > 0 ? files[0].TryGetLocalPath() : null;
+        if (path is null) return;
+
+        try
+        {
+            await vm.ImportPresetAsync(path);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            await MessageDialog.ShowAsync(
+                this,
+                LocalizationService.L("preset.import_failed.title"),
+                ex.Message,
+                MessageDialogButtons.Ok);
+        }
+    }
+
+    private void OnDeletePresetPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        e.Handled = true;
+    }
+
+    private async void OnDeletePresetClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Control { DataContext: RecipePresetViewModel preset }) return;
+        if (DataContext is not MainWindowViewModel vm || !preset.IsCustom) return;
+
+        var result = await MessageDialog.ShowAsync(
+            this,
+            LocalizationService.L("preset.delete.title"),
+            string.Format(LocalizationService.L("preset.delete.message_format"), preset.Name),
+            MessageDialogButtons.OkCancel);
+
+        if (result == MessageDialogResult.Ok)
+        {
+            await vm.DeleteCustomPresetAsync(preset.Id);
         }
     }
 
@@ -316,6 +398,12 @@ public partial class MainWindow : Window
     }
 
     private static FilePickerFileType RecipeFileType() => new(LocalizationService.L("dialog.file_type.recipe_json"))
+    {
+        Patterns = new[] { "*.json" },
+        MimeTypes = new[] { "application/json" }
+    };
+
+    private static FilePickerFileType PresetFileType() => new(LocalizationService.L("dialog.file_type.recipe_preset"))
     {
         Patterns = new[] { "*.json" },
         MimeTypes = new[] { "application/json" }
