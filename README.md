@@ -21,9 +21,10 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - Query Source / Simulation / Cleaner / SFT Export 专属属性面板
 - 通用 Block Config JSON 编辑器，可直接配置所有节点类型
 
-> 注意：当前仍是早期开发版，部分交互如完整文件打开/保存、自动布局和输出预览弹窗仍在开发中。
+> 注意：当前仍是早期开发版。**Recipe 新建/打开/保存、数据工作台 UI、自动布局和输出预览弹窗尚未实现**；当前启动会加载内存中的示例 Recipe。
 >
-> 详细实施计划、阶段目标与验收标准见 [PLAN/TODO.md](PLAN/TODO.md)。
+> - 完整功能清单与节点能力矩阵：[PLAN/STATUS.md](PLAN/STATUS.md)
+> - 分阶段实施计划、阶段目标与验收标准：[PLAN/TODO.md](PLAN/TODO.md)
 
 ## 技术栈
 
@@ -124,6 +125,23 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - `LMTrainingDataStudio2/Models/DatasetCleanup.cs`
 - `LMTrainingDataStudio2/Services/Executors/SimulationBlockExecutor.cs`
 
+### 节点能力摘要
+
+| 节点 | 执行状态 | 专属面板 | 主要缺口 |
+| --- | --- | --- | --- |
+| Seed | JSONL 可用 | 有 | CSV/Parquet、数据预览、Streaming 开关 |
+| LLM | 三种 provider 可用 | 有 | 多轮/tools/结构化输出、并发、成本统计 |
+| Expression | `{{ path }}` 占位引擎 | 无 | Jinja、预览、语法校验 |
+| Validator | 表达式规则 | 无 | reject 分支、Schema、失败样本 |
+| Sampler | 数量/比例采样 | 无 | Splits、多输出、分层采样 |
+| Tool Profile | 仅配置模型 | 无 | 执行器、树形编辑器、被其他节点复用、MCP |
+| Query Source | 单组/多组 query | 有 | 模板、外部来源 |
+| Simulation | 脚本/真实 provider + 模拟/真实工具 | 有 | Tools/Rules/Script UI、流式、容器隔离 |
+| Cleaner | 正则/格式/ANSI/reasoning/空消息 | 部分 | 正则规则 UI、预览、坏行报告 |
+| SFT Export | 原子 JSONL | 有 | 文件选择器、预览、拆分、DPO/Pretrain |
+
+完整矩阵与逐项缺口见 [PLAN/STATUS.md](PLAN/STATUS.md)。
+
 ### 1. 大文件流式处理
 
 - 面向数百 GB JSONL 文件设计，避免整体加载导致 OOM。
@@ -198,6 +216,9 @@ UI 采用 Recipe Graph / DAG 的设计：
 ```text
 LMTrainingDataStudio2.slnx                  # 解决方案文件
 README.md
+PLAN/
+├── TODO.md                                 # 分阶段实施计划与验收标准
+└── STATUS.md                               # 功能清单、节点矩阵与下一阶段规划
 LMTrainingDataStudio2/                      # 主项目目录
 ├── Program.cs                              # 应用入口，配置 Avalonia AppBuilder
 ├── App.axaml / App.axaml.cs                # Application 定义，主题与资源加载
@@ -319,15 +340,22 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 
 ### Canvas Area
 
-用于展示 Recipe DAG。当前版本包含示例节点和示例连接曲线，后续将支持：
+用于展示 Recipe DAG。当前已支持：
 
-- 节点拖拽
-- Port 连线
-- 多选与框选
-- 缩放和平移
-- 自动布局
-- Fit to View
-- Undo / Redo
+- Block Sheet 拖放添加、可搜索添加菜单（`~` / 右键）
+- 节点拖动、多选拖动、框选、端口连线与边删除
+- 中键平移、滚轮缩放、缩放百分比显示
+- 基础 Undo / Redo（添加/删除/移动/连线/粘贴块）
+- 右键菜单（复制/重命名入口/删除）
+- Mini-map 渲染
+
+尚未实现：
+
+- 网格背景与网格吸附
+- 鼠标中心缩放、Fit to View、自动布局
+- Mini-map 视口矩形与点击导航
+- 双击空白添加、复制携带内部连线、内联重命名
+- 可拖动分栏、真实端口坐标、节点尺寸手柄
 
 ### Property Panel
 
@@ -341,7 +369,9 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 
 ### Status Bar
 
-显示当前状态、行数、文件路径、进度条和内存占用。
+显示当前状态、行数、文件路径、进度条、内存占用和缩放百分比。
+
+> 当前 `CurrentFilePath` 尚未赋值，内存占用只在启动时采样一次；这两项会在 Round 8/12 补齐。
 
 ## 数据格式示例
 
@@ -391,7 +421,7 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 - [x] 新节点专属属性面板（Query Source / Simulation / Cleaner / SFT Export）
 - [x] 并发 query、tokens/延迟/成本统计、失败样本独立输出
 - [ ] 容器级沙箱隔离与非 Windows 平台资源限制
-- [ ] 文件打开 / 保存 / 另存为
+- [ ] Recipe 新建 / 打开 / 保存 / 另存为（当前只有 Seed 数据源文件选择）
 - [ ] JSONL / CSV / Parquet 流式读取与分页预览
 - [ ] 大文件随机行跳转
 - [ ] 数据增删查改
@@ -401,14 +431,20 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 - [ ] DPO / Pretrain 格式支持
 - [ ] 语法错误弹窗与一键修复交互
 - [ ] Tool Schema 可视化增删改
-- [ ] Canvas 节点拖拽与 Port 连线
+- [x] Canvas 节点拖拽、Port 连线、多选/框选、平移与基础缩放
+- [ ] 网格背景/吸附、鼠标中心缩放、Fit、自动布局
 - [ ] Edge 动画与样本预览弹窗
-- [ ] Mini-map 真实视口同步
+- [ ] Mini-map 视口矩形与点击导航
 - [x] Command Pattern 撤销 / 重做
 - [ ] 亮色 / 暗色主题切换
 - [ ] LiveCharts2 或 OxyPlot 进度图表
 - [ ] 执行完成后的 output 目录摘要预览
 - [x] 单元测试与集成测试（248 个：246 自动化通过 + 2 个需环境变量的真实 provider 冒烟）
+- [ ] Round 8：Recipe 新建/打开/保存、脏标记、最近文件、按类型端口契约
+- [ ] Round 9：Expression/Validator/Sampler/Tool Profile 节点能力补齐
+- [ ] Round 10：数据预览、CSV/Parquet、格式转换、DPO/Pretrain
+- [ ] Round 11：校验修复、去重/混洗/切分、搜索替换、统计
+- [ ] Round 12：画布体验、并行/暂停/重试、CI/打包/主题/日志
 
 ## 编码约定
 

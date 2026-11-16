@@ -3,6 +3,8 @@
 > 最后更新：2026-11-16
 > 当前基线：.NET 9 / Avalonia 11.3 / NUnit 4
 > 工作方式：小步提交，每个 Phase 独立验收；开发期允许 break change，不保留兼容层。
+>
+> 完整“已做/未做”清单与 10 个节点的能力矩阵见 [STATUS.md](STATUS.md)。本文保留分阶段计划、验收标准与详细缺口池。
 
 ---
 
@@ -698,7 +700,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 
 ### 4.1 文件与数据集 IO
 
-- [ ] 文件打开 / 保存 / 另存为（无任何 FilePicker 调用）。
+- [ ] Recipe 新建 / 打开 / 保存 / 另存为（当前只有 Seed 数据源文件选择，Recipe 本身无文件入口）。
 - [ ] JSONL 流式分页预览与数据表格。
 - [ ] 大文件随机行跳转 UI。
 - [ ] CSV 读写（CsvHelper 已引用未使用）。
@@ -759,24 +761,33 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 
 ### 4.4 编辑器 UI / Canvas
 
+已实现（Round 1–7，保留在此便于对照）：
+
+- [x] Block Sheet 拖放添加、可搜索添加菜单（`~` / 右键）、节点拖动、多选拖动、框选。
+- [x] 端口连线、边选择/删除、中键平移、滚轮缩放、缩放百分比。
+- [x] 基础 Undo/Redo（添加/删除/移动/连线/粘贴块）、节点/边右键菜单。
+- [x] 复制/粘贴块（不携带边）、Mini-map 基础渲染。
+
+未实现：
+
 - [ ] 网格背景绘制（XAML 注释存在，实际未绘制）。
-- [ ] 网格吸附生效（设置当前无效）。
+- [ ] 网格吸附生效（设置当前无效；拖动/落点/粘贴均未吸附，Alt 临时关闭未实现）。
 - [ ] 缩放以鼠标为中心（当前向原点漂移）。
 - [ ] Fit to View。
 - [ ] 自动布局。
-- [ ] Mini-map 视口矩形、点击/拖动导航。
-- [ ] 双击空白添加节点（提示与行为不一致）。
+- [ ] Mini-map 视口矩形、点击/拖动导航（基础渲染已实现，视口交互未做）。
+- [ ] 双击空白添加节点（当前通过 `~` 或右键菜单添加）。
 - [ ] 复制粘贴携带内部连线。
 - [ ] 系统剪贴板 / 跨实例粘贴。
-- [ ] 右键 Rename 真正重命名。
+- [ ] 右键 Rename 真正重命名（当前仅打开属性面板）。
 - [ ] 左右 GridSplitter 可调整宽度（当前固定 200/320）。
-- [ ] Undo/Redo 菜单/按钮入口与 `Ctrl+Shift+Z`。
-- [ ] 属性面板删除可撤销。
+- [ ] Undo/Redo 菜单/按钮入口与 `Ctrl+Shift+Z`（当前仅 `Ctrl+Z` / `Ctrl+Y`）。
+- [ ] 属性面板删除可撤销（当前走直接删除命令，未进历史）。
 - [ ] 属性修改进入 Undo 历史。
 - [ ] 快捷键全局化，避免焦点冲突。
 - [ ] 端口坐标读取真实控件布局（当前 `55 + index * 18` 硬编码）。
 - [ ] 节点尺寸调整手柄。
-- [ ] 边 hover 高亮、动画、标签避让。
+- [ ] 边 hover 高亮、动画、标签避让（当前仅选中高亮）。
 - [ ] 样本/输出预览弹窗。
 - [x] 属性面板 Seed 专属配置（数据源/文件类型/Index Cache）。
 - [x] LLM 专属配置（Provider/Model/Endpoint/温度/Max tokens/Prompt）。
@@ -805,7 +816,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 - [x] Runner 按节点/行数上报进度。
 - [x] 状态栏展示当前节点与进度；Executions UI 展示节点结果。
 - [ ] 状态栏 `CurrentFilePath`、缩放等其余占位数据。
-- [x] 运行日志持久化与历史记录（`ExecutionStore`，UI 待接）。
+- [x] 运行日志持久化与历史记录（`ExecutionStore` + Executions UI 已接入）。
 - [ ] 输出目录、命名、结果摘要。
 - [ ] 中断恢复与临时文件清理。
 - [ ] 节点间输出当前在内存物化，需改为流式或溢写磁盘。
@@ -889,16 +900,17 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 
 ## 五、优先级与建议顺序
 
-### P0（先让产品“能用”）
+### P0（当前先做，Round 8–9）
 
-1. Phase 1：强类型节点配置、Recipe/设置持久化、JSONL Reader。
-2. Phase 2：执行引擎、执行器、执行记录、Executions UI。
-3. 文件打开/保存/另存为 + 状态栏真实数据。
-4. 属性面板节点配置 + 删除/修改接入 Undo。
-5. 设置持久化、网格吸附、主题切换真正生效。
-6. 格式转换/校验服务接线。
-7. 每个 Phase 随代码补最小单测；Phase 5 做完整矩阵。
-8. 模拟 API 测试与 SFT 轨迹生成（Round 6 完成核心；Round 7 完成真实 provider tool-calling、真实沙箱、专属面板、并发/成本/失败样本；OS 级隔离与流式为后续）。
+> 历史 P0（Phase 1 持久化、Phase 2 执行引擎、Round 6/7 模拟与真实 provider/沙箱）已完成，见 [STATUS.md](STATUS.md)。
+
+1. Recipe 新建/打开/保存/另存为 + 最近文件 + 脏标记 + 关闭确认（当前编辑成果无法落盘）。
+2. 按 BlockType 生成端口 schema；每种节点必需输入/输出校验；错误连接拦截与画布错误徽标。
+3. Expression 真实模板引擎 + 专属面板 + 渲染预览/语法校验。
+4. Validator reject 分支 + Schema 规则 + 失败样本；Sampler Splits/多输出；Tool Profile 树形编辑器与复用。
+5. 状态栏 `CurrentFilePath` 与真实文件路径；属性面板删除/修改接入 Undo。
+6. 设置持久化后的网格吸附、主题切换真正生效。
+7. 每个 Round 随代码补最小单测；Phase 5 做完整矩阵。
 
 ### P1（补齐数据工作台能力）
 
@@ -922,7 +934,23 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 
 ---
 
-## 六、每轮结束的收尾模板
+## 六、下一阶段规划（Round 8–12）
+
+> 目标、交付与验收的完整版本见 [STATUS.md](STATUS.md) 第五节；这里保留执行顺序与出口标准。
+
+| Round | 主题 | 优先级 | 核心交付 | 出口标准 |
+| --- | --- | --- | --- | --- |
+| 8 | Recipe 生命周期与节点契约 | P0 | 新建/打开/保存/另存为、最近文件、脏标记、关闭确认；按类型端口 schema；端口与必需连接校验；错误徽标 | 保存重载完全一致；端口正确；坏文件有明确错误；0 警告、测试全绿 |
+| 9 | 节点能力补齐 | P0/P1 | Expression 真实模板引擎 + 面板/预览；Validator Schema + reject 分支；Sampler Splits/多输出；Tool Profile 树形编辑器与复用 | 每个节点成功/失败/边界测试；模板/规则/切分结果可验证 |
+| 10 | 数据工作台 A | P1 | JSONL 分页预览/行跳转；CSV/Parquet 读写；格式转换 UI；DPO/Pretrain；1M 行验收 | 1M 行内存 ≤ 300MB；转换行数守恒；失败行有行号 |
+| 11 | 数据工作台 B | P1 | 校验问题列表/自动修复；搜索/正则替换；去重/混洗/切分；数据集统计 | 行数守恒、同 seed 可复现、原文件不被修复破坏 |
+| 12 | 画布、执行与发布 | P1/P2 | 网格/吸附/锚点缩放/Fit/自动布局/Mini-map 交互；层内并行、暂停/重试、输出目录；Headless UI、CI、打包、主题、日志 | 手工脚本通过；500 节点无卡顿；干净环境可安装运行 |
+
+**建议立即从 Round 8 的“Recipe 文件生命周期”和“按类型端口契约”开始**：它们是后续所有节点/数据能力的基础，当前缺失会导致编辑成果无法保存、错误连接无法系统性拦截。
+
+---
+
+## 七、每轮结束的收尾模板
 
 每个 Phase/每轮开发结束时按以下顺序收尾：
 
