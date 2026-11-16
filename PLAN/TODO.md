@@ -263,7 +263,8 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 - [x] 执行契约：`IBlockExecutor`、`BlockExecutionContext`、`BlockExecutionResult`（输入/输出均为 `IAsyncEnumerable<DatasetRow>`）。
 - [x] 执行器：Seed（索引/流式）、Expression（`{{ path }}` 子集）、Validator（最小规则语法）、Sampler（reservoir / ratio，确定性）、LLM（`ILlmClient`，测试用 Fake）。
 - [x] `RecipeRunner`：校验门禁、拓扑分层、fail-fast + 下游 Skipped、取消、进度回调、节点日志。
-- [ ] 执行记录持久化（`ExecutionStore`）与 Executions UI。
+- [x] 执行记录持久化：`ExecutionStore` 保存 `{runId}.json` + `{runId}.log`，支持最近列表与详情读取。
+- [ ] Executions UI 与运行详情面板。
 - [ ] MainWindow 运行按钮接入 Runner，删除 `Task.Delay` 模拟。
 - [ ] OpenAI 兼容 HTTP 客户端。
 - [ ] 节点间输出当前在内存物化，大数据阶段改为流式或溢写磁盘。
@@ -577,7 +578,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 - [ ] 异常处理与 `IsRunning` 恢复。
 - [x] Runner 按节点/行数上报进度。
 - [ ] 状态栏 / Executions UI 展示真实进度。
-- [ ] 运行日志持久化与历史记录。
+- [x] 运行日志持久化与历史记录（`ExecutionStore`，UI 待接）。
 - [ ] 输出目录、命名、结果摘要。
 - [ ] 中断恢复与临时文件清理。
 - [ ] 节点间输出当前在内存物化，需改为流式或溢写磁盘。
@@ -622,6 +623,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 - [ ] 索引缓存边界：缓存失效、容量清理、并发打开、超长行。
 - [x] Recipe 执行引擎单测：端到端、fail-fast、取消、进度、拒绝执行（5 个）。
 - [x] 节点执行器单测：Seed / Expression / Validator / Sampler / LLM（12 个）。
+- [x] `ExecutionStore`：往返、json/log 分离、最近排序、坏 JSON、非法 runId、取消、覆盖写、缺失日志（10 个）。
 - [ ] ViewModel 单测：加载/保存、运行状态、异常恢复。
 - [ ] Avalonia Headless UI 测试。
 - [ ] 集成测试：1M 行全链路。

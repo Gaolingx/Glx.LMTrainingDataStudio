@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace LMTrainingDataStudio2.Models;
 
 public enum RunStatus
@@ -32,6 +34,8 @@ public sealed class NodeExecutionResult
     public long InputRows { get; set; }
     public long OutputRows { get; set; }
     public string? Error { get; set; }
+
+    [JsonIgnore]
     public TimeSpan? Duration => StartedAt is null || FinishedAt is null ? null : FinishedAt - StartedAt;
 }
 
@@ -46,9 +50,24 @@ public sealed class ExecutionRun
     public DateTimeOffset StartedAt { get; set; }
     public DateTimeOffset? FinishedAt { get; set; }
     public string? OutputDirectory { get; set; }
-    public List<NodeExecutionResult> Nodes { get; } = new();
-    public List<string> Logs { get; } = new();
+    public List<NodeExecutionResult> Nodes { get; set; } = new();
+
+    /// <summary>
+    /// Logs are persisted to a sidecar file instead of the run JSON.
+    /// </summary>
+    [JsonIgnore]
+    public List<string> Logs { get; set; } = new();
 }
+
+/// <summary>
+/// Lightweight entry for execution history lists.
+/// </summary>
+public sealed record ExecutionRunSummary(
+    string RunId,
+    string RecipeId,
+    RunStatus Status,
+    DateTimeOffset StartedAt,
+    DateTimeOffset? FinishedAt);
 
 /// <summary>
 /// Progress snapshot reported while a recipe runs.
