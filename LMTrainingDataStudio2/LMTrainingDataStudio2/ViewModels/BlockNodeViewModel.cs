@@ -42,6 +42,9 @@ public partial class BlockNodeViewModel : ObservableObject
     [ObservableProperty]
     private SeedConfigEditorViewModel? _seedEditor;
 
+    [ObservableProperty]
+    private LlmConfigEditorViewModel? _llmEditor;
+
     private BlockConfig _config = null!;
 
     /// <summary>
@@ -57,10 +60,23 @@ public partial class BlockNodeViewModel : ObservableObject
             SeedEditor = value is SeedBlockConfig seed
                 ? new SeedConfigEditorViewModel(seed, ApplySeedConfig)
                 : null;
+
+            LlmEditor = value is LlmBlockConfig llm
+                ? new LlmConfigEditorViewModel(llm, ApplyLlmConfig)
+                : null;
         }
     }
 
     private void ApplySeedConfig(SeedBlockConfig config)
+    {
+        if (_config.Equals(config)) return;
+
+        _config = config;
+        OnPropertyChanged(nameof(Config));
+        ConfigError = null;
+    }
+
+    private void ApplyLlmConfig(LlmBlockConfig config)
     {
         if (_config.Equals(config)) return;
 

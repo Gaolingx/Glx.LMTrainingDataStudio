@@ -18,6 +18,7 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly DatasetFormatConverter _formatConverter = new();
     private readonly ISettingsStore _settingsStore;
     private readonly ExecutionStore _executionStore = new();
+    private readonly HttpClient _llmHttpClient = new();
     private AppSettings _settings;
     private CancellationTokenSource? _runCancellation;
 
@@ -152,10 +153,10 @@ public partial class MainWindowViewModel : ObservableObject
             Id = "llm1",
             Type = BlockType.Llm,
             Name = "generator",
-            DisplayName = "GPT-4o Generator",
+            DisplayName = "LLM Generator",
             X = 380,
             Y = 120,
-            Config = new LlmBlockConfig("openai", "gpt-4o", Temperature: 0.7, MaxTokens: 2048, Prompt: null)
+            Config = new LlmBlockConfig(LlmProviderIds.OpenAiChat, "gpt-4o", Temperature: 0.7, MaxTokens: 2048, Prompt: null)
         };
         llmBlock.InputPorts.Add(new PortViewModel { Id = "llm1_in", Name = "input", DataType = "jsonl" });
         llmBlock.OutputPorts.Add(new PortViewModel { Id = "llm1_out", Name = "output", DataType = "messages[]" });
@@ -457,7 +458,8 @@ public partial class MainWindowViewModel : ObservableObject
             new SeedBlockExecutor(_settings),
             new ExpressionBlockExecutor(),
             new ValidatorBlockExecutor(),
-            new SamplerBlockExecutor()
+            new SamplerBlockExecutor(),
+            new LlmBlockExecutor(new LlmApiClient(_llmHttpClient, new EnvironmentLlmCredentials()))
         });
 
     private void OnExecutionProgress(ExecutionProgress progress)

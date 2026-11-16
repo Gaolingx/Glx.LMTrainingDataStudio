@@ -101,6 +101,19 @@ public sealed class RecipeValidationServiceTests
     }
 
     [Test]
+    public void Validate_LlmWithUnknownProvider_ReportsWarning()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("llm1", BlockType.Llm, "generator",
+            new LlmBlockConfig("mystery", "gpt-4o", Temperature: 0.7, MaxTokens: 2048, Prompt: null)));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Severity == ValidationSeverity.Warning && i.Message.Contains("unknown provider")), Is.True);
+    }
+
+    [Test]
     public void Validate_SeedWithNonJsonlFile_ReportsWarning()
     {
         var recipe = new Recipe();

@@ -21,7 +21,7 @@ public abstract record BlockConfig
     public static BlockConfig CreateDefault(BlockType type) => type switch
     {
         BlockType.Seed => new SeedBlockConfig(string.Empty, DataFileType.Jsonl, Streaming: false, UseIndexCache: true),
-        BlockType.Llm => new LlmBlockConfig("openai", string.Empty, Temperature: 0.7, MaxTokens: 2048, Prompt: null),
+        BlockType.Llm => new LlmBlockConfig(LlmProviderIds.OpenAiChat, string.Empty, Temperature: 0.7, MaxTokens: 2048, Prompt: null),
         BlockType.Expression => new ExpressionBlockConfig(string.Empty, new Dictionary<string, string>()),
         BlockType.Validator => new ValidatorBlockConfig("expression", string.Empty, RejectOnFailure: true),
         BlockType.Sampler => new SamplerBlockConfig(Count: null, Ratio: null, Seed: 42, Splits: Array.Empty<string>()),
@@ -90,7 +90,8 @@ public sealed record LlmBlockConfig(
     string ModelAlias,
     double Temperature,
     int MaxTokens,
-    string? Prompt) : BlockConfig;
+    string? Prompt,
+    string? Endpoint = null) : BlockConfig;
 
 public sealed record ExpressionBlockConfig(
     string Template,

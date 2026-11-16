@@ -266,7 +266,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 - [x] 执行记录持久化：`ExecutionStore` 保存 `{runId}.json` + `{runId}.log`，支持最近列表与详情读取。
 - [x] Executions UI：运行列表、状态过滤、节点状态表、日志面板、取消按钮。
 - [x] MainWindow 运行按钮接入 Runner，运行后写入 ExecutionStore 并刷新列表；`Task.Delay` 模拟已删除。
-- [ ] OpenAI 兼容 HTTP 客户端。
+- [x] LLM HTTP 客户端：OpenAI Chat Completions、OpenAI Responses、Anthropic Messages；密钥从环境变量读取。
 - [ ] 节点间输出当前在内存物化，大数据阶段改为流式或溢写磁盘。
 
 #### 范围与实现方式
@@ -528,7 +528,8 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 - [ ] 节点状态与错误徽标。
 - [x] Seed 数据源文件选择、文件类型、Index Cache 编辑（Round 5）。
 - [ ] Seed Streaming 开关、数据预览、过滤。
-- [ ] LLM：Provider、ModelAlias、Endpoint/Key、温度、max tokens、Prompt、结构化输出、并发/超时/重试。
+- [x] LLM Provider（OpenAI Chat Completions / Responses / Anthropic Messages）、ModelAlias、Endpoint、温度、max tokens、Prompt（Round 5）。
+- [ ] LLM 结构化输出、并发/超时/重试、密钥 UI 管理（当前读环境变量）。
 - [ ] Expression：Jinja2 模板、变量映射、渲染预览、语法校验、沙箱。
 - [ ] Validator：代码/Schema 编辑、pass/reject 双输出、失败样本、失败率、超时/沙箱。
 - [ ] Sampler：数量/比例、随机种子、切分、多输出、分层采样。
@@ -558,7 +559,8 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 - [ ] 边 hover 高亮、动画、标签避让。
 - [ ] 样本/输出预览弹窗。
 - [x] 属性面板 Seed 专属配置（数据源/文件类型/Index Cache）。
-- [ ] 其余节点（LLM/Expression/Validator/Sampler/ToolProfile）专属配置项。
+- [x] LLM 专属配置（Provider/Model/Endpoint/温度/Max tokens/Prompt）。
+- [ ] 其余节点（Expression/Validator/Sampler/ToolProfile）专属配置项。
 - [ ] Prompt / Jinja 编辑器。
 - [ ] Tool Schema 树形编辑器。
 - [ ] 节点校验摘要与画布错误标记。
@@ -629,6 +631,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 - [x] `ExecutionStore`：往返、json/log 分离、最近排序、坏 JSON、非法 runId、取消、覆盖写、缺失日志（10 个）。
 - [x] `ExecutionsViewModel`：刷新排序、状态过滤、详情/日志加载、刷新并选中（4 个）。
 - [x] Seed 配置编辑：字段回写、编辑器保持、Config 替换重建、非 Seed 无编辑器、错误清除、非 JSONL 校验警告（6 个）。
+- [x] LLM 接入：三种 Provider 请求/解析、密钥与错误、别名路由（8 个）；LLM 配置编辑器（4 个）；未知 Provider 校验（1 个）。
 - [ ] ViewModel 单测：加载/保存、运行状态、异常恢复。
 - [ ] Avalonia Headless UI 测试。
 - [ ] 集成测试：1M 行全链路。

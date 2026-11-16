@@ -265,6 +265,16 @@ public sealed class RecipeValidationService
                     });
                     break;
 
+                case LlmBlockConfig llm when LlmProviderIds.Normalize(llm.Provider) is null:
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"LLM block '{block.Name}' uses unknown provider '{llm.Provider}'. " +
+                                  $"Supported: {LlmProviderIds.OpenAiChat}, {LlmProviderIds.OpenAiResponses}, {LlmProviderIds.Anthropic}.",
+                        BlockId = block.Id
+                    });
+                    break;
+
                 case ExpressionBlockConfig expression when string.IsNullOrWhiteSpace(expression.Template):
                     result.Issues.Add(new ValidationIssue
                     {
