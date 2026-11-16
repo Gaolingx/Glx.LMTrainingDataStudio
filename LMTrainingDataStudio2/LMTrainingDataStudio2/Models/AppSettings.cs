@@ -20,6 +20,18 @@ public sealed class AppSettings
     /// <summary>Whether to enable grid snapping.</summary>
     public bool EnableGridSnap { get; set; } = true;
 
+    /// <summary>Maximum number of blocks executed concurrently inside a layer.</summary>
+    public int MaxParallelism { get; set; } = 4;
+
+    /// <summary>Number of retries per block before a run fails.</summary>
+    public int NodeRetryCount { get; set; }
+
+    /// <summary>
+    /// Base directory for per-run summaries. Each run gets a subdirectory named after its run id.
+    /// </summary>
+    public string? RunOutputDirectory { get; set; } =
+        Path.Combine(Path.GetTempPath(), "LMTrainingDataStudio", "runs");
+
     /// <summary>OpenAI API key; falls back to OPENAI_API_KEY when empty.</summary>
     public string? OpenAiApiKey { get; set; }
 

@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:LMTrainingDataStudio2.ViewModels"
+             xmlns:controls="using:LMTrainingDataStudio2.Controls"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
              x:Class="LMTrainingDataStudio2.Views.RecipeCanvasView"
              x:DataType="vm:MainWindowViewModel">
@@ -27,7 +28,11 @@
     </UserControl.Styles>
 
     <Panel>
-        <!-- Grid Background Pattern -->
+        <!-- Grid background follows pan and zoom -->
+        <controls:GridBackground Name="GridBackground"
+                                 IsHitTestVisible="False"
+                                 LineBrush="{DynamicResource CanvasGridBrush}" />
+
         <Canvas Name="CanvasArea" Background="Transparent"
                 ClipToBounds="True">
 
@@ -130,8 +135,8 @@
                 Margin="0,0,16,60"
                 Background="#1A1A2A" CornerRadius="4"
                 BorderBrush="#3A3A4E" BorderThickness="1"
-                Opacity="0.85"
-                IsHitTestVisible="False">
+                Opacity="0.9"
+                Cursor="Hand">
             <Canvas Name="MiniMapCanvas" ClipToBounds="True" />
         </Border>
     </Panel>

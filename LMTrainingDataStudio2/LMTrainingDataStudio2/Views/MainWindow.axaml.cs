@@ -28,6 +28,11 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OnFitCanvasClick(object? sender, RoutedEventArgs e)
+    {
+        this.FindControl<RecipeCanvasView>("RecipeCanvas")?.FitToView();
+    }
+
     private async void OnBlockTemplatePointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (sender is not Control { DataContext: BlockTemplateViewModel template }) return;

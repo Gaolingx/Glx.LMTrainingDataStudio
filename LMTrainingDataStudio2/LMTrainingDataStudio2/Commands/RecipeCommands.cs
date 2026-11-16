@@ -246,3 +246,26 @@ public sealed class DeleteEdgeCommand : IUndoableCommand
         _vm.Edges.Add(_edge);
     }
 }
+
+/// <summary>
+/// Command for renaming a block from the canvas inline editor.
+/// </summary>
+public sealed class RenameBlockCommand : IUndoableCommand
+{
+    private readonly BlockNodeViewModel _block;
+    private readonly string _oldName;
+    private readonly string _newName;
+
+    public string Description => $"Rename '{_oldName}'";
+
+    public RenameBlockCommand(BlockNodeViewModel block, string newName)
+    {
+        _block = block;
+        _oldName = block.Name;
+        _newName = newName;
+    }
+
+    public void Execute() => _block.Name = _newName;
+
+    public void Undo() => _block.Name = _oldName;
+}

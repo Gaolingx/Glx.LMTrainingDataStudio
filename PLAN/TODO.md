@@ -8,7 +8,88 @@
 
 ---
 
-## 一、本轮进展（Round 11）
+## 一、本轮进展（Round 12）
+
+### 1.1 本轮做了什么
+
+- [x] 画布：网格背景（随平移/缩放）、网格吸附（Alt 临时关闭）、鼠标中心缩放、Fit to View、拓扑自动布局、Mini-map 视口矩形与点击导航。
+- [x] 画布交互：双击空白添加节点、双击节点内联重命名（可撤销）、复制携带内部连线、真实渲染端口坐标、边 hover 高亮、拖拽增量更新（不重建全部节点）。
+- [x] 执行：层内受控并行（`MaxParallelism`）、暂停/恢复、节点重试（`NodeRetryCount`）、每次运行输出目录与 `run-summary.json`；Executions UI 显示输出目录。
+- [x] 工程化：滚动文件日志与全局异常处理（AppDomain/TaskScheduler/UI 线程）、主题变体（Dark/Light 资源字典）、GitHub Actions CI、win-x64 单文件发布脚本、Avalonia Headless UI 测试、MIT LICENSE、应用图标。
+- [x] 新增 18 个测试：并行/暂停/重试/输出摘要 4、视口/布局 7、日志 2、Headless UI 3、设置 2。
+
+### 1.2 验证结果
+
+| 项目 | 命令 | 结果 |
+| --- | --- | --- |
+| 构建 | `dotnet build LMTrainingDataStudio2/LMTrainingDataStudio2.slnx` | 成功，0 警告，0 错误 |
+| 测试 | `dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx` | 386 通过，0 失败，4 跳过（2 provider + 2 性能 gated） |
+| Headless UI | `dotnet test --filter HeadlessUiTests` | 3 通过：主窗口加载、画布添加节点、主题切换 |
+| 启动冒烟 | `LMTrainingDataStudio2.exe`（Debug，8s） | 持续运行，无异常输出 |
+| 发布 | `dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true` | 成功，单文件 `LMTrainingDataStudio2.exe`（约 49 MB） |
+| 500 节点布局 | `CanvasInteractionTests.Layout_500Blocks_CompletesQuickly` | 通过，布局耗时断言 < 100ms |
+
+### 1.3 本轮改动文件
+
+```text
+PLAN/TODO.md
+PLAN/STATUS.md
+README.md
+LICENSE
+.github/workflows/ci.yml
+scripts/publish-win-x64.ps1
+scripts/generate-icon.ps1
+LMTrainingDataStudio2/LMTrainingDataStudio2/Assets/app-icon.png
+LMTrainingDataStudio2/LMTrainingDataStudio2/Controls/GridBackground.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/CanvasViewport.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/RecipeLayoutService.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/ExecutionPauseController.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/RecipeRunOptions.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/RecipeRunner.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/AppLog.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/ThemeManager.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/SettingsStore.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Models/AppSettings.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Commands/RecipeCommands.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/ViewModels/MainWindowViewModel.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Views/RecipeCanvasView.axaml
+LMTrainingDataStudio2/LMTrainingDataStudio2/Views/RecipeCanvasView.axaml.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Views/MainWindow.axaml
+LMTrainingDataStudio2/LMTrainingDataStudio2/Views/MainWindow.axaml.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Views/ExecutionsView.axaml
+LMTrainingDataStudio2/LMTrainingDataStudio2/App.axaml.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Program.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Themes/Colors.axaml
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeRunnerTests.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CanvasInteractionTests.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/AppLogTests.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/HeadlessUiTests.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/TestAppBuilder.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/SettingsStoreTests.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/LMTrainingDataStudio2.Tests.csproj
+```
+
+### 1.4 技术决策与取舍
+
+1. **拖拽增量更新。** 结构变化才重建节点；拖拽时只更新 `Canvas.Left/Top` 与已有边的几何数据，避免 500 节点时每帧重建视觉树。
+2. **端口坐标取实测值。** 首次布局后读取端口椭圆相对节点的位置并缓存，边与端口命中测试使用真实坐标；布局未完成时退回估算。
+3. **视口数学独立成纯类。** `CanvasViewport` 负责吸附、锚点缩放、Fit 与坐标换算，便于单测；视图只负责把结果应用到变换与网格。
+4. **层内并行 + 首个失败取消同层。** 使用带最大并发的 `Task.WhenAll` 与 linked CTS；失败块取消同层兄弟，下游保持 Skipped；日志加锁、计数用 Interlocked。
+5. **暂停是协作式门控。** 暂停只阻止新块启动，已运行块自然完成；恢复后继续。
+6. **运行摘要落盘。** 每次运行在 `RunOutputDirectory/<runId>` 下写 `run-summary.json`，即使取消/失败也写，便于排查。
+7. **主题资源按变体拆分。** Colors.axaml 改为 ThemeDictionaries；仍有个别视图硬编码深色，完整主题化留待后续。
+
+### 1.5 本轮未做
+
+- 节点尺寸手柄、边过渡动画（当前仅 hover 高亮）、自动布局的间距/分组选项。
+- 节点间流式或溢写磁盘、执行中断后的节点级恢复。
+- 10M 行实测（保留 `LMTDS_PERF_ROWS=10000000` 入口）、MSIX/安装包（当前为单文件 zip）、README 截图。
+- 完整浅色主题（部分视图仍有硬编码深色）。
+- 拖动/缩放单帧 <100ms 的 UI 帧级实测（已通过 500 节点布局测试与增量渲染实现，未做逐帧计时）。
+
+---
+
+## 附五：Round 11 历史进展（2026-11-17）
 
 ### 1.1 本轮做了什么
 
@@ -1142,20 +1223,20 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 ### 4.6 设置、主题与生命周期
 
 - [x] 设置持久化：`ISettingsStore`/`SettingsStore`（Round 2）。
-- [ ] 暗/亮主题切换（`App.axaml` 固定 Dark）。
-- [ ] 硬编码颜色资源化。
-- [ ] 网格吸附设置生效。
+- [x] 暗/亮主题变体与 `ThemeManager`（Round 12；部分视图仍有硬编码深色）。
+- [部分] 硬编码颜色资源化：主面板/画布已主题化，节点内部颜色仍为常量。
+- [x] 网格吸附设置生效（Round 12；Alt 临时关闭）。
 - [ ] 数值输入校验与范围提示。
 - [ ] 缓存目录浏览按钮与可写性检查。
 - [ ] API 密钥加密存储（当前 settings.json 明文，仅限本机使用）。
 - [ ] 设置变更通知已创建的服务。
-- [ ] 窗口/应用图标（`Assets/` 为空）。
+- [x] 窗口/应用图标（Round 12：`Assets/app-icon.png`）。
 - [ ] 单实例 / 文件关联 / 命令行打开。
-- [ ] 全局异常处理与崩溃日志。
+- [x] 全局异常处理与滚动日志（Round 12：`AppLog` + AppDomain/TaskScheduler/UI 线程）。
 
 ### 4.7 代码质量与已知缺陷
 
-- [ ] `_datasetValidation`、`_formatConverter` 未使用字段。
+- [x] `_datasetValidation`、`_formatConverter` 未使用字段已移除（Round 12）。
 - [ ] `BlockTypeToColorConverter`、`InverseBoolConverter` 未使用。
 - [ ] `MainWindowViewModel.AddBlock` RelayCommand 未绑定。
 - [ ] `BlockTemplateViewModel.ColorKey` 未使用。
@@ -1196,20 +1277,22 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 - [ ] ViewModel 单测：加载/保存、运行状态、异常恢复。
 - [ ] Avalonia Headless UI 测试。
 - [ ] 集成测试：1M 行全链路。
-- [ ] 畸形输入测试集与 fixtures。
+- [x] 畸形输入测试集与 fixtures（Round 11：坏行/超长行/非法 UTF-8/错误上限）。
 - [ ] 性能基准（BenchmarkDotNet 或等价）。
-- [ ] CI 自动化。
+- [x] CI 自动化（Round 12：`.github/workflows/ci.yml`）。
+- [x] Avalonia Headless UI 测试（Round 12：主窗口、画布、主题）。
+- [x] 视口/布局/日志/并行执行/暂停/重试测试（Round 12，18 个）。
 
 ### 4.9 工程化与发布
 
-- [ ] LICENSE。
-- [ ] Assets：图标、截图、示例 Recipe。
-- [ ] 发布/打包配置（self-contained、单文件、安装包、版本号）。
-- [ ] CI/CD 流水线。
+- [x] LICENSE（Round 12：MIT）。
+- [部分] Assets：应用图标已添加；README 截图与示例 Recipe 仍未补齐。
+- [部分] 发布/打包：win-x64 self-contained 单文件脚本已验证；MSIX/安装包与自动版本号未做。
+- [x] CI/CD 流水线（Round 12：GitHub Actions）。
 - [ ] `.editorconfig` / 分析器 / 警告即错误。
-- [ ] 日志框架（文件滚动、导出）。
+- [x] 日志框架（Round 12：滚动文件日志 + 全局异常；导出未做）。
 - [ ] 中英文文案统一 / 本地化。
-- [ ] README 路线图与实现状态同步。
+- [x] README 路线图与实现状态同步（Round 12）。
 - [x] 构建环境：`net9.0` + `global.json` 已落地，本机构建通过。
 
 ---
@@ -1236,17 +1319,17 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 4. [x] 去重、混洗、切分、搜索/正则替换（Round 11）；数据逐行 CRUD 未做。
 5. [x] JSONL / CSV / Parquet 分页预览与行号跳转（Round 10）；校验问题列表、自动修复（Round 11）。
 6. [x] 大数据统计：角色/长度/空样本/重复率/工具调用（Round 11）。
-7. [ ] Canvas 网格/吸附/Fit/Mini-map/复制连线。
-8. [ ] 取消/重试、日志持久化、输出摘要。
+7. [x] Canvas 网格/吸附/Fit/自动布局/Mini-map/复制连线（Round 12）。
+8. [x] 暂停/重试、滚动日志、输出摘要（Round 12）；节点间溢写磁盘未做。
 
 ### P2（体验与工程化）
 
-1. 自动布局、边动画、样本预览。
+1. 节点尺寸手柄、边过渡动画、样本预览（自动布局已完成）。
 2. Tool Schema 树形编辑器、MCP 配置。
-3. 主题资源化、图标、Assets。
+3. 主题资源化（部分）、图标（已完成）、README 截图。
 4. 安装包/文件关联/自动更新。
-5. CI/CD、分析器、日志、本地化。
-6. LICENSE 与文档同步。
+5. 分析器、本地化（CI/日志已完成）。
+6. LICENSE（MIT）与文档同步。
 
 ---
 
@@ -1260,9 +1343,9 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 | 9 | 节点能力补齐 | P0/P1 | Expression 真实模板引擎 + 面板/预览；Validator Schema + reject 分支；Sampler Splits/多输出；Tool Profile 树形编辑器与复用 | 每个节点成功/失败/边界测试；模板/规则/切分结果可验证 |
 | 10 | 数据工作台 A | P1 | JSONL 分页预览/行跳转；CSV/Parquet 读写；格式转换 UI；DPO/Pretrain；1M 行验收 | 1M 行内存 ≤ 300MB；转换行数守恒；失败行有行号 |
 | 11 | 数据工作台 B（已完成 2026-11-17） | P1 | 校验问题列表/自动修复；搜索/正则替换；去重/混洗/切分；数据集统计 | 行数守恒、同 seed 可复现、原文件不被修复破坏；368 测试通过 |
-| 12 | 画布、执行与发布 | P1/P2 | 网格/吸附/锚点缩放/Fit/自动布局/Mini-map 交互；层内并行、暂停/重试、输出目录；Headless UI、CI、打包、主题、日志 | 手工脚本通过；500 节点无卡顿；干净环境可安装运行 |
+| 12 | 画布、执行与发布（已完成 2026-11-17） | P1/P2 | 网格/吸附/锚点缩放/Fit/自动布局/Mini-map 交互；层内并行、暂停/重试、输出目录；Headless UI、CI、打包、主题、日志 | 386 测试通过；500 节点布局 <100ms；单文件发布启动成功 |
 
-**Round 11 已完成（2026-11-17）**；下一步进入 Round 12：画布体验、执行并行/暂停/重试与发布工程化（Headless UI、CI、打包、主题、日志）。
+**Round 12 已完成（2026-11-17）**；后续工作聚焦：节点间流式/溢写磁盘、10M 实测、MSIX/安装包、完整浅色主题、README 截图与 MCP/LLM tools 等既有缺口。
 
 ---
 

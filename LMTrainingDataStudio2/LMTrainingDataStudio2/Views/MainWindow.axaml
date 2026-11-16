@@ -8,6 +8,7 @@
         x:Class="LMTrainingDataStudio2.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="{Binding DocumentTitle}"
+        Icon="/Assets/app-icon.png"
         MinWidth="1280" MinHeight="720"
         Width="1440" Height="900"
         Background="{StaticResource CanvasBackgroundBrush}">
@@ -185,18 +186,39 @@
             <Grid Grid.Column="2">
                 <!-- Canvas Background -->
                 <Border Background="{StaticResource CanvasBackgroundBrush}">
-                    <views:RecipeCanvasView DataContext="{Binding}" />
+                    <views:RecipeCanvasView x:Name="RecipeCanvas" DataContext="{Binding}" />
                 </Border>
 
                 <!-- Floating Controls (Run / Validate) - Bottom Right -->
                 <StackPanel HorizontalAlignment="Right" VerticalAlignment="Bottom"
                             Orientation="Horizontal" Spacing="8"
                             Margin="0,0,16,16">
+                    <Button Content="⛶ Fit" Click="OnFitCanvasClick"
+                            Padding="12,8" FontSize="12"
+                            Background="#2A3A4E" Foreground="#FFFFFF"
+                            CornerRadius="6"
+                            ToolTip.Tip="Fit all blocks into view" />
+                    <Button Content="⇉ Layout" Command="{Binding AutoLayoutBlocksCommand}"
+                            Padding="12,8" FontSize="12"
+                            Background="#2A3A4E" Foreground="#FFFFFF"
+                            CornerRadius="6"
+                            ToolTip.Tip="Auto layout by topological layers" />
                     <Button Content="✓ Validate" Command="{Binding ValidateRecipeCommand}"
                             Padding="14,8" FontSize="12"
                             Background="#2D5A2D" Foreground="#FFFFFF"
                             CornerRadius="6"
                             IsEnabled="{Binding !IsRunning}" />
+                    <Button Content="⏸ Pause" Command="{Binding PauseRunCommand}"
+                            Padding="12,8" FontSize="12"
+                            Background="#3A3A4E" Foreground="#FFFFFF"
+                            CornerRadius="6"
+                            IsVisible="{Binding IsRunning}"
+                            IsEnabled="{Binding !IsRunPaused}" />
+                    <Button Content="▶ Resume" Command="{Binding ResumeRunCommand}"
+                            Padding="12,8" FontSize="12"
+                            Background="#2D5A2D" Foreground="#FFFFFF"
+                            CornerRadius="6"
+                            IsVisible="{Binding IsRunPaused}" />
                     <Button Content="▶ Run" Command="{Binding RunRecipeCommand}"
                             Padding="14,8" FontSize="12"
                             Background="#4A90D9" Foreground="#FFFFFF"
@@ -342,6 +364,22 @@
                                                VerticalAlignment="Center" Foreground="#CCCCCC" />
                                     <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding AnthropicApiKey, Mode=TwoWay}"
                                              PasswordChar="●" Watermark="sk-ant-..." />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="#1E1E2E" BorderBrush="#3A3A4E" BorderThickness="1" CornerRadius="8" Padding="16">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="Execution" FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                <Grid ColumnDefinitions="180,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="12">
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Layer parallelism" VerticalAlignment="Center" Foreground="#CCCCCC" />
+                                    <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding MaxParallelism, Mode=TwoWay}" Watermark="4" />
+
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Node retries" VerticalAlignment="Center" Foreground="#CCCCCC" />
+                                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding NodeRetryCount, Mode=TwoWay}" Watermark="0" />
+
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Run summary directory" VerticalAlignment="Center" Foreground="#CCCCCC" />
+                                    <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding RunOutputDirectory, Mode=TwoWay}" Watermark="%TEMP%\LMTrainingDataStudio\runs" />
                                 </Grid>
                             </StackPanel>
                         </Border>

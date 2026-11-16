@@ -78,6 +78,45 @@ public sealed class SettingsStoreTests
     }
 
     [Test]
+    public async Task SaveAsync_ThenLoad_RestoresExecutionSettings()
+    {
+        var settings = new AppSettings
+        {
+            MaxParallelism = 8,
+            NodeRetryCount = 2,
+            RunOutputDirectory = Path.Combine(_directory, "runs")
+        };
+
+        await _store.SaveAsync(settings);
+        var result = _store.Load();
+
+        Assert.That(result.Settings.MaxParallelism, Is.EqualTo(8));
+        Assert.That(result.Settings.NodeRetryCount, Is.EqualTo(2));
+        Assert.That(result.Settings.RunOutputDirectory, Is.EqualTo(settings.RunOutputDirectory));
+        Assert.That(result.Warnings, Is.Empty);
+    }
+
+    [Test]
+    public async Task Load_InvalidExecutionSettings_FallBackWithWarnings()
+    {
+        await File.WriteAllTextAsync(_path, """
+            {
+              "maxParallelism": 0,
+              "nodeRetryCount": 99,
+              "runOutputDirectory": "   "
+            }
+            """);
+
+        var result = _store.Load();
+        var defaults = new AppSettings();
+
+        Assert.That(result.Settings.MaxParallelism, Is.EqualTo(defaults.MaxParallelism));
+        Assert.That(result.Settings.NodeRetryCount, Is.EqualTo(defaults.NodeRetryCount));
+        Assert.That(result.Settings.RunOutputDirectory, Is.EqualTo(defaults.RunOutputDirectory));
+        Assert.That(result.Warnings, Has.Count.EqualTo(3));
+    }
+
+    [Test]
     public async Task SaveAsync_WritesCamelCaseJson()
     {
         await _store.SaveAsync(new AppSettings

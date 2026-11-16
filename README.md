@@ -18,6 +18,9 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - 统一数据集 IO：JSONL / CSV / Parquet 分页读取与原子写出；Seed 支持三种格式
 - 数据工作台（Data 视图）：分页预览、行号跳转、页面大小切换
 - 数据质量与治理：校验问题列表（级别/行号/JSON 路径/错误码）与跳行、JSONL 自动修复预览与写副本、搜索/正则替换、去重、固定 seed 混洗、比例/份数切分、数据集统计
+- 画布：网格/吸附（Alt 关闭）、鼠标中心缩放、Fit、拓扑自动布局、Mini-map 视口与点击导航、双击添加、复制携带连线、内联重命名、真实端口坐标、边 hover
+- 执行：层内受控并行、暂停/恢复、节点重试、运行输出目录与 `run-summary.json`
+- 工程化：滚动日志与全局异常、Dark/Light 主题变体、GitHub Actions CI、win-x64 单文件发布、Headless UI 测试、MIT LICENSE、应用图标
 - 批量格式转换：OpenAI / ShareGPT / Alpaca / DPO / Pretrain，进度、取消、失败行 `.errors.jsonl`
 - JSONL SQLite 行索引缓存与分页读取；1M 行 1KB/行基线通过（索引 8.8s、分页 10.9ms、内存增量 14MB）
 - 1M 行质量操作基线通过（去重+混洗+切分 124.2s、统计 63.6s、托管内存增量 2MB）
@@ -31,7 +34,7 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - Query Source / Simulation / Cleaner / SFT Export / Expression / Validator / Sampler / Tool Profile 专属属性面板
 - 通用 Block Config JSON 编辑器，可直接配置所有节点类型
 
-> 注意：当前仍是开发版。**数据逐行编辑 CRUD、搜索命中高亮、10M 实测、自动布局、输出预览弹窗、Validator 代码规则/超时、Sampler 多输出端口、MCP 适配尚未实现**；应用默认启动空白 Recipe，可通过 File → New from Sample 加载 4 节点示例，或恢复上次打开的文件。
+> 注意：当前仍是开发版。**数据逐行编辑 CRUD、搜索命中高亮、10M 实测、节点间溢写磁盘、节点尺寸手柄/边过渡动画、MSIX 安装包、README 截图、完整浅色主题、Validator 代码规则/超时、Sampler 多输出端口、MCP 适配尚未实现**；应用默认启动空白 Recipe，可通过 File → New from Sample 加载 4 节点示例，或恢复上次打开的文件。
 >
 > - 完整功能清单与节点能力矩阵：[PLAN/STATUS.md](PLAN/STATUS.md)
 > - 分阶段实施计划、阶段目标与验收标准：[PLAN/TODO.md](PLAN/TODO.md)
@@ -230,6 +233,8 @@ UI 采用 Recipe Graph / DAG 的设计：
 - File 菜单：New / New from Sample / Open / Recent / Save / Save As，以及 Ctrl+N/O/S、Ctrl+Shift+S
 - 左侧 Block Sheet
 - 中央 Canvas 区域（节点、贝塞尔连线、错误/警告徽标）
+- 画布交互：网格背景与吸附（Alt 临时关闭）、鼠标中心缩放、Fit、拓扑自动布局、Mini-map 视口/点击导航、双击空白添加、双击节点内联重命名、复制携带内部连线、边 hover
+- 执行控制：Pause / Resume、节点重试设置、运行输出目录（`run-summary.json`）
 - 右侧属性编辑面板（含校验问题列表，可点击定位节点）
 - 悬浮 Run / Validate 控件
 - Mini-map 渲染
@@ -320,7 +325,7 @@ LMTrainingDataStudio2/                      # 主项目目录
 ├── Themes/                                 # 主题资源
 │   └── Colors.axaml                        # Block 类型色彩、面板/画布/边颜色定义
 │
-└── Assets/                                 # 静态资源（图标、字体等，待补充）
+└── Assets/                                 # 应用图标等静态资源
 ```
 
 ## 快速开始
@@ -352,7 +357,16 @@ dotnet build .\LMTrainingDataStudio2.slnx
 
 ```powershell
 dotnet test .\LMTrainingDataStudio2.slnx
+dotnet test .\LMTrainingDataStudio2.slnx --filter HeadlessUiTests
 ```
+
+### 发布（win-x64 单文件）
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/publish-win-x64.ps1
+```
+
+输出在 `artifacts/publish/win-x64`，并生成同名 zip。CI 配置见 `.github/workflows/ci.yml`。
 
 ### 真实 provider 冒烟测试（可选）
 
@@ -475,19 +489,21 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 - [x] 校验问题列表与自动修复预览/写副本
 - [x] Tool Schema 可视化增删改与 JSON 导入导出
 - [x] Canvas 节点拖拽、Port 连线、多选/框选、平移与基础缩放
-- [ ] 网格背景/吸附、鼠标中心缩放、Fit、自动布局
-- [ ] Edge 动画与样本预览弹窗
-- [ ] Mini-map 视口矩形与点击导航
+- [x] 网格背景/吸附、鼠标中心缩放、Fit、自动布局
+- [x] Mini-map 视口矩形与点击导航
+- [x] 双击添加、复制携带内部连线、内联重命名、真实端口坐标、边 hover
+- [ ] Node 尺寸手柄、Edge 过渡动画与样本预览弹窗
 - [x] Command Pattern 撤销 / 重做
-- [ ] 亮色 / 暗色主题切换
+- [部分] 亮色 / 暗色主题切换（主面板/画布已主题化，部分视图仍硬编码深色）
 - [ ] LiveCharts2 或 OxyPlot 进度图表
-- [ ] 执行完成后的 output 目录摘要预览
-- [x] 单元测试与集成测试（372 个：368 自动化通过 + 4 个 gated：2 个真实 provider 冒烟 + 2 个 1M 行性能）
+- [x] 执行层内并行、暂停/恢复、节点重试、output 目录摘要
+- [x] 滚动日志、全局异常、CI、win-x64 单文件发布、Headless UI 测试、MIT LICENSE、应用图标
+- [x] 单元测试与集成测试（390 个：386 自动化通过 + 4 个 gated：2 个真实 provider 冒烟 + 2 个性能）
 - [x] Round 8：Recipe 新建/打开/保存、脏标记、最近文件、按类型端口契约
 - [x] Round 9：Expression/Validator/Sampler/Tool Profile 节点能力补齐
 - [x] Round 10：数据预览、CSV/Parquet、格式转换、DPO/Pretrain
 - [x] Round 11：校验修复、去重/混洗/切分、搜索替换、统计
-- [ ] Round 12：画布体验、并行/暂停/重试、CI/打包/主题/日志
+- [x] Round 12：画布体验、并行/暂停/重试、CI/打包/主题/日志
 
 ## 编码约定
 
@@ -500,4 +516,4 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 
 ## License
 
-当前项目尚未声明许可证。发布前请根据实际用途添加 LICENSE 文件。
+MIT License. See [LICENSE](LICENSE).

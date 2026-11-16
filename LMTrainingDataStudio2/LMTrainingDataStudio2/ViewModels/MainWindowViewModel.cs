@@ -22,6 +22,7 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly HttpClient _llmHttpClient = new();
     private AppSettings _settings;
     private CancellationTokenSource? _runCancellation;
+    private ExecutionPauseController? _runPause;
     private string _recipeId = Guid.NewGuid().ToString("N");
     private DateTime _recipeCreatedAt = DateTime.UtcNow;
     private DateTime _recipeModifiedAt = DateTime.UtcNow;
@@ -65,7 +66,14 @@ public partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CancelRunCommand))]
+    [NotifyCanExecuteChangedFor(nameof(PauseRunCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ResumeRunCommand))]
     private bool _isRunning;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(PauseRunCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ResumeRunCommand))]
+    private bool _isRunPaused;
 
     [ObservableProperty]
     private string _memoryUsage = "0 MB";
@@ -90,6 +98,15 @@ public partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private int _gridSnapSize;
+
+    [ObservableProperty]
+    private int _maxParallelism = 4;
+
+    [ObservableProperty]
+    private int _nodeRetryCount;
+
+    [ObservableProperty]
+    private string _runOutputDirectory = string.Empty;
 
     [ObservableProperty]
     private bool _isDarkTheme;
@@ -128,6 +145,7 @@ public partial class MainWindowViewModel : ObservableObject
         _recipeStore = recipeStore ?? new RecipeStore();
         var loadResult = _settingsStore.Load();
         _settings = loadResult.Settings;
+        ThemeManager.Apply(_settings.IsDarkTheme);
         Executions = new ExecutionsViewModel(_executionStore);
         DataWorkbench = new DataWorkbenchViewModel(_settings);
 
@@ -153,6 +171,9 @@ public partial class MainWindowViewModel : ObservableObject
         CacheDirectory = _settings.CacheDirectory;
         EnableGridSnap = _settings.EnableGridSnap;
         GridSnapSize = _settings.GridSnapSize;
+        MaxParallelism = _settings.MaxParallelism;
+        NodeRetryCount = _settings.NodeRetryCount;
+        RunOutputDirectory = _settings.RunOutputDirectory ?? string.Empty;
         IsDarkTheme = _settings.IsDarkTheme;
         OpenAiApiKey = _settings.OpenAiApiKey ?? string.Empty;
         AnthropicApiKey = _settings.AnthropicApiKey ?? string.Empty;
@@ -766,6 +787,8 @@ public partial class MainWindowViewModel : ObservableObject
         LogMessages.Add("[Info] Recipe execution started.");
 
         _runCancellation = new CancellationTokenSource();
+        _runPause = new ExecutionPauseController();
+        IsRunPaused = false;
         var cancellationToken = _runCancellation.Token;
 
         try
@@ -773,8 +796,9 @@ public partial class MainWindowViewModel : ObservableObject
             var recipe = ToRecipe();
             var runner = CreateRecipeRunner();
             var progress = new Progress<ExecutionProgress>(OnExecutionProgress);
+            var pause = _runPause;
 
-            var run = await Task.Run(() => runner.RunAsync(recipe, progress, cancellationToken));
+            var run = await Task.Run(() => runner.RunAsync(recipe, progress, cancellationToken, pause));
 
             try
             {
@@ -804,6 +828,8 @@ public partial class MainWindowViewModel : ObservableObject
         {
             _runCancellation.Dispose();
             _runCancellation = null;
+            _runPause = null;
+            IsRunPaused = false;
             IsRunning = false;
         }
     }
@@ -812,6 +838,30 @@ public partial class MainWindowViewModel : ObservableObject
     private void CancelRun() => _runCancellation?.Cancel();
 
     private bool CanCancelRun() => IsRunning;
+
+    [RelayCommand(CanExecute = nameof(CanPauseRun))]
+    private void PauseRun()
+    {
+        if (_runPause is null) return;
+        _runPause.Pause();
+        IsRunPaused = true;
+        StatusText = "Execution paused — running blocks will finish.";
+        LogMessages.Add("[Info] Execution paused.");
+    }
+
+    private bool CanPauseRun() => IsRunning && !IsRunPaused;
+
+    [RelayCommand(CanExecute = nameof(CanResumeRun))]
+    private void ResumeRun()
+    {
+        if (_runPause is null) return;
+        _runPause.Resume();
+        IsRunPaused = false;
+        StatusText = "Execution resumed.";
+        LogMessages.Add("[Info] Execution resumed.");
+    }
+
+    private bool CanResumeRun() => IsRunning && IsRunPaused;
 
     private RecipeRunner CreateRecipeRunner() => new(
         _recipeValidation,
@@ -827,7 +877,11 @@ public partial class MainWindowViewModel : ObservableObject
             new SimulationBlockExecutor(new LlmCredentials(_settings), _llmHttpClient),
             new CleanerBlockExecutor(),
             new SftExportBlockExecutor()
-        });
+        },
+        options: new RecipeRunOptions(
+            MaxParallelism,
+            NodeRetryCount,
+            RunOutputDirectory));
 
     private void OnExecutionProgress(ExecutionProgress progress)
     {
@@ -886,6 +940,40 @@ public partial class MainWindowViewModel : ObservableObject
 
         StatusText = "Invalid block configuration";
         LogMessages.Add($"[Error] Block '{SelectedBlock.DisplayName}': {SelectedBlock.ConfigJsonError}");
+    }
+
+    [RelayCommand]
+    private void AutoLayoutBlocks()
+    {
+        var recipe = ToRecipe();
+        if (recipe.Blocks.Count == 0)
+        {
+            StatusText = "Nothing to lay out.";
+            return;
+        }
+
+        var positions = RecipeLayoutService.Arrange(recipe);
+        var moves = new List<(BlockNodeViewModel Block, double OldX, double OldY, double NewX, double NewY)>();
+        foreach (var block in Blocks)
+        {
+            if (!positions.TryGetValue(block.Id, out var position)) continue;
+            if (Math.Abs(block.X - position.X) < 0.1 && Math.Abs(block.Y - position.Y) < 0.1)
+            {
+                continue;
+            }
+
+            moves.Add((block, block.X, block.Y, position.X, position.Y));
+        }
+
+        if (moves.Count == 0)
+        {
+            StatusText = "Auto layout already applied.";
+            return;
+        }
+
+        CommandHistory.Execute(new MoveBlocksCommand(moves));
+        StatusText = $"Auto layout applied to {moves.Count} block(s).";
+        CanvasRenderRequested?.Invoke();
     }
 
     [RelayCommand]
@@ -954,6 +1042,11 @@ public partial class MainWindowViewModel : ObservableObject
                 : CacheDirectory.Trim(),
             EnableGridSnap = EnableGridSnap,
             GridSnapSize = Math.Clamp(GridSnapSize, SettingsStore.MinGridSnapSize, SettingsStore.MaxGridSnapSize),
+            MaxParallelism = Math.Clamp(MaxParallelism, SettingsStore.MinParallelism, SettingsStore.MaxParallelism),
+            NodeRetryCount = Math.Clamp(NodeRetryCount, 0, SettingsStore.MaxNodeRetries),
+            RunOutputDirectory = string.IsNullOrWhiteSpace(RunOutputDirectory)
+                ? defaults.RunOutputDirectory
+                : RunOutputDirectory.Trim(),
             IsDarkTheme = IsDarkTheme,
             OpenAiApiKey = NullIfBlank(OpenAiApiKey),
             AnthropicApiKey = NullIfBlank(AnthropicApiKey),
@@ -965,6 +1058,7 @@ public partial class MainWindowViewModel : ObservableObject
         {
             await _settingsStore.SaveAsync(settings);
             _settings = settings;
+            ThemeManager.Apply(settings.IsDarkTheme);
             DataWorkbench.ApplySettings(settings);
             LoadSettingsSnapshot();
             StatusText = "Settings saved ✓";

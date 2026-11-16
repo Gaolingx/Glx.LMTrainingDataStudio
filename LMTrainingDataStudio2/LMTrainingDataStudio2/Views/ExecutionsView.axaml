@@ -112,6 +112,13 @@
                         <TextBlock Text="{Binding Executions.SelectedRun.FinishedAt, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}"
                                    FontSize="10" Foreground="#CCCCCC" />
                     </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <TextBlock Text="Output:" FontSize="10" Foreground="#888888" />
+                        <TextBlock Text="{Binding Executions.SelectedRun.OutputDirectory, TargetNullValue='—'}"
+                                   FontSize="10" Foreground="#CCCCCC"
+                                   MaxWidth="420" TextTrimming="CharacterEllipsis"
+                                   ToolTip.Tip="{Binding Executions.SelectedRun.OutputDirectory}" />
+                    </StackPanel>
                 </StackPanel>
 
                 <!-- Node table header -->

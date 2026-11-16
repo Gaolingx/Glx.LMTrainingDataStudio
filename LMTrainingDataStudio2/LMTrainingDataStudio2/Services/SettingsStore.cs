@@ -13,6 +13,9 @@ public sealed class SettingsStore : ISettingsStore
     public const long MinCacheSizeMb = 16;
     public const int MinGridSnapSize = 1;
     public const int MaxGridSnapSize = 256;
+    public const int MinParallelism = 1;
+    public const int MaxParallelism = 64;
+    public const int MaxNodeRetries = 10;
     public const int MaxRecentFiles = 10;
 
     private static readonly JsonSerializerOptions SerializerOptions = new()
@@ -87,6 +90,33 @@ public sealed class SettingsStore : ISettingsStore
         else
         {
             settings.CacheDirectory = settings.CacheDirectory.Trim();
+        }
+
+        if (settings.MaxParallelism < MinParallelism || settings.MaxParallelism > MaxParallelism)
+        {
+            warnings.Add(
+                $"maxParallelism must be between {MinParallelism} and {MaxParallelism}; found {settings.MaxParallelism}. " +
+                $"Using default {defaults.MaxParallelism}.");
+            settings.MaxParallelism = defaults.MaxParallelism;
+        }
+
+        if (settings.NodeRetryCount < 0 || settings.NodeRetryCount > MaxNodeRetries)
+        {
+            warnings.Add(
+                $"nodeRetryCount must be between 0 and {MaxNodeRetries}; found {settings.NodeRetryCount}. " +
+                $"Using default {defaults.NodeRetryCount}.");
+            settings.NodeRetryCount = defaults.NodeRetryCount;
+        }
+
+        if (string.IsNullOrWhiteSpace(settings.RunOutputDirectory))
+        {
+            warnings.Add(
+                $"runOutputDirectory must not be empty. Using default '{defaults.RunOutputDirectory}'.");
+            settings.RunOutputDirectory = defaults.RunOutputDirectory;
+        }
+        else
+        {
+            settings.RunOutputDirectory = settings.RunOutputDirectory.Trim();
         }
 
         settings.RecentFiles = settings.RecentFiles?
