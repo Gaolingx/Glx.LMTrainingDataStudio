@@ -15,7 +15,7 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - 真实 RecipeRunner：Seed / Expression / Validator / Sampler / LLM 执行器，执行记录与 Executions UI
 - OpenAI Chat Completions / Responses、Anthropic Messages 客户端；密钥从设置或环境变量读取，支持节点级超时与指数退避重试
 - 模拟 API 测试：Query Source → Simulation（mini harness）→ Cleaner → SFT Export，多轮 tool 轨迹与 OpenAI messages JSONL 导出
-- 真实 provider tool-calling：OpenAI Chat function calling、OpenAI Responses `function_call`、Anthropic Messages `tool_use`，含 token usage / 延迟 / 成本统计
+- 真实 provider tool-calling：OpenAI Chat function calling、OpenAI Responses `function_call`、Anthropic Messages `tool_use`，含 token usage / 延迟 / 成本统计；已通过真实 OpenAI 兼容端点冒烟（tool_calls + usage + 两轮 harness 往返）
 - 真实沙箱工具：python / PowerShell / bash / web_fetch；环境白名单、临时目录、超时杀进程树、输出上限，Windows 额外限制内存与进程数
 - Simulation 支持并发 query（输出保序）与失败轨迹独立 JSONL 输出
 - Query Source / Simulation / Cleaner / SFT Export 专属属性面板
@@ -290,6 +290,17 @@ dotnet build .\LMTrainingDataStudio2.slnx
 dotnet test .\LMTrainingDataStudio2.slnx
 ```
 
+### 真实 provider 冒烟测试（可选）
+
+默认测试不会联网；`ProviderSmokeTests` 在没有环境变量时自动跳过。设置以下变量后会真实调用 OpenAI Chat Completions，并验证 tool calling 与两轮 harness 往返。API Key 只放在环境变量中，不要写入仓库：
+
+```powershell
+$env:LMTDS_PROVIDER_SMOKE_KEY = "<your-api-key>"
+$env:LMTDS_PROVIDER_SMOKE_BASE_URL = "https://api.openai.com/v1"
+$env:LMTDS_PROVIDER_SMOKE_MODEL = "gpt-4o-mini"
+dotnet test .\LMTrainingDataStudio2.slnx --filter ProviderSmokeTests
+```
+
 ### 运行项目
 
 ```powershell
@@ -397,7 +408,7 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 - [ ] 亮色 / 暗色主题切换
 - [ ] LiveCharts2 或 OxyPlot 进度图表
 - [ ] 执行完成后的 output 目录摘要预览
-- [x] 单元测试与集成测试（246 个，`dotnet test` 全绿）
+- [x] 单元测试与集成测试（248 个：246 自动化通过 + 2 个需环境变量的真实 provider 冒烟）
 
 ## 编码约定
 

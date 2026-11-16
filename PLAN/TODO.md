@@ -20,14 +20,16 @@
 - [x] `TrajectorySerializer` 新增失败样本 JSON（query / status / error / messages / tools / usage）；SFT 输出仍只含 `messages` + `tools`。
 - [x] 校验补强：max concurrency、max failure samples、provider endpoint、沙箱负数限制、真实工具执行器白名单。
 - [x] 专属属性面板：Query Source / Simulation / Cleaner / SFT Export 编辑器；Simulation 面板覆盖 provider、模式、并发、成本、失败样本与沙箱参数，Tools/Rules/Script 仍可用 Config JSON 编辑。
-- [x] 新增 46 个测试：沙箱 24、provider 客户端 9、执行器扩展 7、专属编辑器 5、校验 1。
+- [x] 新增 gated 真实 provider 冒烟测试：仅当设置 `LMTDS_PROVIDER_SMOKE_*` 环境变量时联网，默认跳过；不保存 API Key。
+- [x] 新增 48 个测试：沙箱 24、provider 客户端 9、执行器扩展 7、专属编辑器 5、校验 1、真实 provider 冒烟 2。
 
 ### 1.2 验证结果
 
 | 项目 | 命令 | 结果 |
 | --- | --- | --- |
 | 构建 | `dotnet build LMTrainingDataStudio2/LMTrainingDataStudio2.slnx` | 成功，0 警告，0 错误 |
-| 测试 | `dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx` | 246 通过，0 失败，0 跳过 |
+| 测试 | `dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx` | 246 通过，0 失败，2 跳过（真实 provider 冒烟需环境变量） |
+| 真实 provider 冒烟 | `LMTDS_PROVIDER_SMOKE_* dotnet test --filter ProviderSmokeTests` | 2 通过：tool_calls + usage（288+41）；harness 2 轮、tokens 644+54、1.75s |
 
 本轮新增/扩展测试：
 
@@ -39,6 +41,7 @@
 | `BlockNodeViewModelTests` 扩展 | 5 | 四种专属编辑器创建、Query/Simulation/Cleaner/SFT 配置回写、隐藏字段保留 |
 | `RecipeValidationServiceTests` 扩展 | 1 | endpoint、并发、失败样本、沙箱负数、真实工具白名单 |
 | `BlockConfigSerializationTests` 扩展 | 0（扩展既有） | 新字段往返与 Sandbox 深拷贝 |
+| `ProviderSmokeTests`（gated） | 2 | 真实端点 tool_calls/usage；真实 provider + harness 两轮工具往返；无环境变量时跳过 |
 
 ### 1.3 本轮改动文件
 
@@ -89,8 +92,8 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 
 - 容器/文件系统/网络命名空间级隔离；非 Windows 平台的内存与进程数限制。
 - provider 流式输出与 tool-call delta 增量解析、速率限制、多模态消息。
-- 使用真实 API Key 的手工 provider 往返验收（协议已用 Fake HTTP 覆盖）。
 - 新面板的手工 UI 验收（XAML 编译与编辑器回写单测通过）。
+- CI 中默认执行真实 provider 冒烟（需显式环境变量；本轮已用真实 OpenAI 兼容端点跑通 2 项）。
 - 内置各模型价格预设。
 
 ---
@@ -677,7 +680,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 - [x] 清洗后的行仍是合法 OAI messages JSON，未知字段保留。
 - [x] SFT 导出文件为逐行 JSONL，原子替换，不残留 `.tmp`。
 - [x] Query → Simulation → Cleaner → SftExport 端到端测试通过。
-- [x] 真实 provider function calling 往返（协议层，Fake HTTP 覆盖三种格式；真实 Key 手工验收待做）。
+- [x] 真实 provider function calling 往返（Fake HTTP 覆盖三种格式 + 真实 OpenAI 兼容端点冒烟 2 项通过）。
 - [x] 真实沙箱工具执行与资源限制（进程/超时/输出/环境；Windows 额外内存与进程数限制）。
 
 #### 收尾动作
@@ -861,6 +864,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 - [x] 新配置序列化/深拷贝、Config JSON 编辑器、配置校验（16 个）。
 - [x] 真实沙箱：进程执行、超时、输出截断、环境隔离、Windows 内存限制、python/powershell/bash 真实执行、web_fetch 响应/截断/禁重定向/网络防护（24 个）。
 - [x] provider tool-calling：三种 provider 请求/响应、usage、错误、harness 往返（9 个）。
+- [x] 真实 provider 冒烟：tool_calls/usage 与 harness 两轮往返，环境变量启用（2 个，默认跳过）。
 - [x] 四个新节点专属编辑器：创建、回写、隐藏字段保留（5 个）。
 - [ ] ViewModel 单测：加载/保存、运行状态、异常恢复。
 - [ ] Avalonia Headless UI 测试。
