@@ -82,4 +82,52 @@ public sealed class IndexCacheServiceTests
         Assert.DoesNotThrow(() => service.CleanCache());
         Assert.That(service.GetTotalCacheSize(), Is.EqualTo(0));
     }
+
+    [Test]
+    public async Task EnsureIndexAsync_SourceChanged_RebuildsIndex()
+    {
+        var dataPath = Path.Combine(_directory, "data.jsonl");
+        await File.WriteAllTextAsync(dataPath, "a\nb\n");
+
+        using var service = new IndexCacheService(_settings);
+        await using (var first = await service.OpenCacheAsync(dataPath))
+        {
+            Assert.That(await service.EnsureIndexAsync(dataPath, first), Is.EqualTo(2));
+            Assert.That(await service.ReadLineAsync(dataPath, first, 1), Is.EqualTo("b"));
+        }
+
+        await File.AppendAllTextAsync(dataPath, "c\n");
+
+        await using var second = await service.OpenCacheAsync(dataPath);
+        Assert.That(await service.EnsureIndexAsync(dataPath, second), Is.EqualTo(3));
+        Assert.That(await service.ReadLineAsync(dataPath, second, 2), Is.EqualTo("c"));
+    }
+
+    [Test]
+    public async Task EnsureIndexAsync_OverCacheLimit_DeletesOldestCache()
+    {
+        var settings = new AppSettings
+        {
+            CacheDirectory = _settings.CacheDirectory,
+            MaxCacheSizeMb = 1
+        };
+        using var service = new IndexCacheService(settings);
+
+        var oldestCache = Path.Combine(settings.CacheDirectory, "oldest.db");
+        var newerCache = Path.Combine(settings.CacheDirectory, "newer.db");
+        await File.WriteAllBytesAsync(oldestCache, new byte[600 * 1024]);
+        await File.WriteAllBytesAsync(newerCache, new byte[600 * 1024]);
+        File.SetLastWriteTimeUtc(oldestCache, DateTime.UtcNow.AddHours(-2));
+        File.SetLastWriteTimeUtc(newerCache, DateTime.UtcNow.AddHours(-1));
+
+        var dataPath = Path.Combine(_directory, "data.jsonl");
+        await File.WriteAllTextAsync(dataPath, "{}\n");
+
+        await using var connection = await service.OpenCacheAsync(dataPath);
+        var total = await service.EnsureIndexAsync(dataPath, connection);
+
+        Assert.That(total, Is.EqualTo(1));
+        Assert.That(File.Exists(oldestCache), Is.False);
+        Assert.That(File.Exists(newerCache), Is.True);
+    }
 }
