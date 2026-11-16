@@ -13,6 +13,7 @@ public sealed class SettingsStore : ISettingsStore
     public const long MinCacheSizeMb = 16;
     public const int MinGridSnapSize = 1;
     public const int MaxGridSnapSize = 256;
+    public const int MaxRecentFiles = 10;
 
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -87,6 +88,17 @@ public sealed class SettingsStore : ISettingsStore
         {
             settings.CacheDirectory = settings.CacheDirectory.Trim();
         }
+
+        settings.RecentFiles = settings.RecentFiles?
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Select(path => path.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(MaxRecentFiles)
+            .ToList() ?? new List<string>();
+
+        settings.LastRecipePath = string.IsNullOrWhiteSpace(settings.LastRecipePath)
+            ? null
+            : settings.LastRecipePath.Trim();
 
         return new SettingsLoadResult(settings, warnings);
     }

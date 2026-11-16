@@ -42,6 +42,19 @@ public partial class BlockNodeViewModel : ObservableObject
     private string? _configError;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasValidationError))]
+    private string? _validationError;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasValidationError))]
+    [NotifyPropertyChangedFor(nameof(ValidationIssueCount))]
+    private int _validationErrorCount;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ValidationIssueCount))]
+    private int _validationWarningCount;
+
+    [ObservableProperty]
     private SeedConfigEditorViewModel? _seedEditor;
 
     [ObservableProperty]
@@ -165,6 +178,29 @@ public partial class BlockNodeViewModel : ObservableObject
 
     public ObservableCollection<PortViewModel> InputPorts { get; } = new();
     public ObservableCollection<PortViewModel> OutputPorts { get; } = new();
+
+    public bool HasValidationError => ValidationErrorCount > 0;
+
+    public int ValidationIssueCount => ValidationErrorCount + ValidationWarningCount;
+
+    /// <summary>
+    /// Replaces all ports with the schema required by <see cref="Type"/>.
+    /// </summary>
+    public void ApplyDefaultPorts()
+    {
+        InputPorts.Clear();
+        OutputPorts.Clear();
+
+        foreach (var spec in BlockPortSchema.CreateInputPorts(Type))
+        {
+            InputPorts.Add(new PortViewModel { Name = spec.Name, DataType = spec.DataType });
+        }
+
+        foreach (var spec in BlockPortSchema.CreateOutputPorts(Type))
+        {
+            OutputPorts.Add(new PortViewModel { Name = spec.Name, DataType = spec.DataType });
+        }
+    }
 
     /// <summary>
     /// Gets the header color brush key based on block type.

@@ -137,16 +137,17 @@ public sealed class RecipeRunnerTests
 
         var seed = CreateBlock("seed", BlockType.Seed, "seed_data",
             new SeedBlockConfig(_dataPath, DataFileType.Jsonl, Streaming: false, UseIndexCache: true));
-        seed.OutputPorts.Add(CreatePort("seed_out", "rows", PortDirection.Output, "jsonl"));
+        seed.OutputPorts.Add(CreatePort("seed_out", "rows", PortDirection.Output, "rows"));
 
         var validator = CreateBlock("val", BlockType.Validator, "check",
             new ValidatorBlockConfig("expression", "messages.length > 0", RejectOnFailure: true));
-        validator.InputPorts.Add(CreatePort("val_in", "input", PortDirection.Input, "jsonl"));
-        validator.OutputPorts.Add(CreatePort("val_out", "valid", PortDirection.Output, "jsonl"));
+        validator.InputPorts.Add(CreatePort("val_in", "input", PortDirection.Input, "rows"));
+        validator.OutputPorts.Add(CreatePort("val_out", "valid", PortDirection.Output, "rows"));
 
         var sampler = CreateBlock("sample", BlockType.Sampler, "sample",
             new SamplerBlockConfig(sampleCount, Ratio: null, Seed: 42, Splits: Array.Empty<string>()));
-        sampler.InputPorts.Add(CreatePort("sample_in", "input", PortDirection.Input, "jsonl"));
+        sampler.InputPorts.Add(CreatePort("sample_in", "input", PortDirection.Input, "rows"));
+        sampler.OutputPorts.Add(CreatePort("sample_out", "output", PortDirection.Output, "rows"));
 
         recipe.Blocks.AddRange(new[] { seed, validator, sampler });
         recipe.Edges.Add(CreateEdge("e1", seed, seed.OutputPorts[0], validator, validator.InputPorts[0]));

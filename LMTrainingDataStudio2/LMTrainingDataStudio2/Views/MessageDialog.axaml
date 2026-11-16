@@ -1,0 +1,37 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="LMTrainingDataStudio2.Views.MessageDialog"
+        Width="520"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        ShowInTaskbar="False"
+        Background="#252538">
+    <Border Background="#252538"
+            BorderBrush="#4A90D9"
+            BorderThickness="1"
+            CornerRadius="12"
+            Padding="22">
+        <StackPanel Spacing="16">
+            <TextBlock x:Name="HeadingText"
+                       FontSize="16" FontWeight="SemiBold"
+                       Foreground="#FFFFFF" TextWrapping="Wrap" />
+            <TextBlock x:Name="MessageText"
+                       FontSize="12" Foreground="#CCCCCC" TextWrapping="Wrap" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                <Button x:Name="SaveButton" Content="Save"
+                        Click="OnSaveClick"
+                        Padding="14,7" Background="#4A90D9" Foreground="#FFFFFF" />
+                <Button x:Name="DiscardButton" Content="Don't Save"
+                        Click="OnDiscardClick"
+                        Padding="14,7" Background="#3A3A4E" Foreground="#FFFFFF" />
+                <Button x:Name="CancelButton" Content="Cancel"
+                        Click="OnCancelClick"
+                        Padding="14,7" Background="#3A3A4E" Foreground="#FFFFFF" />
+                <Button x:Name="OkButton" Content="OK"
+                        Click="OnOkClick"
+                        Padding="16,7" Background="#4A90D9" Foreground="#FFFFFF" />
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>

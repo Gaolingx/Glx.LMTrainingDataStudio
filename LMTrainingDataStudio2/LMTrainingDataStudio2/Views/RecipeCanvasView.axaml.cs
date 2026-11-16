@@ -49,6 +49,7 @@ public partial class RecipeCanvasView : UserControl
     private Point _lastCanvasMenuPosition = new(300, 200);
     private readonly List<BlockNodeViewModel> _clipboard = new();
     private readonly Dictionary<string, (BlockNodeViewModel Block, double X, double Y)> _dragInitialPositions = new();
+    private MainWindowViewModel? _subscribedViewModel;
 
     public RecipeCanvasView()
     {
@@ -80,8 +81,15 @@ public partial class RecipeCanvasView : UserControl
 
     private void OnDataContextChanged(object? sender, EventArgs e)
     {
+        if (_subscribedViewModel is not null)
+        {
+            _subscribedViewModel.CanvasRenderRequested -= OnCanvasRenderRequested;
+        }
+
         if (DataContext is MainWindowViewModel vm)
         {
+            _subscribedViewModel = vm;
+            vm.CanvasRenderRequested += OnCanvasRenderRequested;
             vm.Blocks.CollectionChanged += (_, _) => Dispatcher.UIThread.Post(RenderBlocks);
             vm.Edges.CollectionChanged += (_, _) => Dispatcher.UIThread.Post(RenderBlocks);
             vm.CommandHistory.HistoryChanged += (_, _) => Dispatcher.UIThread.Post(RenderBlocks);
@@ -89,6 +97,8 @@ public partial class RecipeCanvasView : UserControl
             RenderBlocks();
         }
     }
+
+    private void OnCanvasRenderRequested() => Dispatcher.UIThread.Post(RenderBlocks);
 
     private void OnCanvasPointerPressed(object? sender, PointerPressedEventArgs e)
     {
@@ -263,16 +273,13 @@ public partial class RecipeCanvasView : UserControl
         if (_isConnecting)
         {
             var target = HitTestInputPort(point);
-            if (_connectionSourceBlock != null && _connectionSourcePort != null && target != null && target.Value.Block != _connectionSourceBlock)
+            if (_connectionSourceBlock != null && _connectionSourcePort != null && target != null)
             {
-                vm.CommandHistory.Execute(new AddEdgeCommand(vm, new EdgeViewModel
-                {
-                    SourceBlockId = _connectionSourceBlock.Id,
-                    SourcePortId = _connectionSourcePort.Id,
-                    TargetBlockId = target.Value.Block.Id,
-                    TargetPortId = target.Value.Port.Id,
-                    Label = _connectionSourcePort.DataType
-                }));
+                vm.TryConnect(
+                    _connectionSourceBlock,
+                    _connectionSourcePort,
+                    target.Value.Block,
+                    target.Value.Port);
             }
             _isConnecting = false;
             _connectionSourceBlock = null;
@@ -735,8 +742,7 @@ public partial class RecipeCanvasView : UserControl
             IsSelected = true,
             Config = BlockConfig.CreateDefault(type)
         };
-        block.InputPorts.Add(new PortViewModel { Name = "input", DataType = "any" });
-        block.OutputPorts.Add(new PortViewModel { Name = "output", DataType = "any" });
+        block.ApplyDefaultPorts();
         vm.CommandHistory.Execute(new AddBlockCommand(vm, block));
         vm.SelectedBlock = block;
     }
@@ -932,13 +938,70 @@ public partial class RecipeCanvasView : UserControl
             });
         }
 
+        var header = new StackPanel
+        {
+            Orientation = Avalonia.Layout.Orientation.Horizontal,
+            Spacing = 6,
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+            Children =
+            {
+                new TextBlock { Text = block.IconText, FontSize = 12 },
+                new TextBlock { Text = block.DisplayName, FontSize = 11, FontWeight = FontWeight.SemiBold, Foreground = Brushes.White }
+            }
+        };
+
+        if (block.HasValidationError)
+        {
+            var badge = new Border
+            {
+                Width = 18,
+                Height = 18,
+                CornerRadius = new CornerRadius(9),
+                Background = new SolidColorBrush(Color.Parse("#D0021B")),
+                Margin = new Thickness(4, 0, 0, 0),
+                Child = new TextBlock
+                {
+                    Text = "!",
+                    FontSize = 11,
+                    FontWeight = FontWeight.Bold,
+                    Foreground = Brushes.White,
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                    VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
+                }
+            };
+            ToolTip.SetTip(badge, block.ValidationError ?? "Validation error");
+            header.Children.Add(badge);
+        }
+        else if (block.ValidationWarningCount > 0)
+        {
+            var badge = new Border
+            {
+                Width = 18,
+                Height = 18,
+                CornerRadius = new CornerRadius(9),
+                Background = new SolidColorBrush(Color.Parse("#F5A623")),
+                Margin = new Thickness(4, 0, 0, 0),
+                Child = new TextBlock
+                {
+                    Text = block.ValidationWarningCount.ToString(),
+                    FontSize = 10,
+                    FontWeight = FontWeight.Bold,
+                    Foreground = Brushes.White,
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+                    VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
+                }
+            };
+            ToolTip.SetTip(badge, $"{block.ValidationWarningCount} validation warning(s)");
+            header.Children.Add(badge);
+        }
+
         return new Border
         {
             Width = block.Width,
             CornerRadius = new CornerRadius(8),
             Background = new SolidColorBrush(Color.Parse("#2A2A3E")),
-            BorderBrush = new SolidColorBrush(Color.Parse(block.IsSelected ? "#4A90D9" : "#3A3A4E")),
-            BorderThickness = new Thickness(block.IsSelected ? 2 : 1),
+            BorderBrush = new SolidColorBrush(Color.Parse(block.HasValidationError ? "#D0021B" : block.IsSelected ? "#4A90D9" : "#3A3A4E")),
+            BorderThickness = new Thickness(block.IsSelected || block.HasValidationError ? 2 : 1),
             Tag = block,
             Child = new StackPanel
             {
@@ -950,17 +1013,7 @@ public partial class RecipeCanvasView : UserControl
                         CornerRadius = new CornerRadius(8, 8, 0, 0),
                         Background = new SolidColorBrush(Color.Parse(headerColor)),
                         Padding = new Thickness(10, 4),
-                        Child = new StackPanel
-                        {
-                            Orientation = Avalonia.Layout.Orientation.Horizontal,
-                            Spacing = 6,
-                            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
-                            Children =
-                            {
-                                new TextBlock { Text = block.IconText, FontSize = 12 },
-                                new TextBlock { Text = block.DisplayName, FontSize = 11, FontWeight = FontWeight.SemiBold, Foreground = Brushes.White }
-                            }
-                        }
+                        Child = header
                     },
                     body
                 }

@@ -10,6 +10,8 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 
 - Avalonia 桌面应用与三栏式 Studio UI（Block Sheet / Canvas / Property Panel / Status Bar）
 - Recipe / 设置持久化：原子写入、camelCase 多态 JSON、schema 版本校验
+- Recipe 文件生命周期：新建（空白/示例）、打开、保存、另存为、最近文件、脏标记、关闭确认与重启恢复
+- 按 BlockType 的端口契约与连接守卫：方向/类型/单输入/重复/环校验；校验问题列表与画布错误/警告徽标
 - JSONL SQLite 行索引缓存与分页读取
 - OpenAI / ShareGPT / Alpaca 数据格式转换服务初版
 - 真实 RecipeRunner：Seed / Expression / Validator / Sampler / LLM 执行器，执行记录与 Executions UI
@@ -21,7 +23,7 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - Query Source / Simulation / Cleaner / SFT Export 专属属性面板
 - 通用 Block Config JSON 编辑器，可直接配置所有节点类型
 
-> 注意：当前仍是早期开发版。**Recipe 新建/打开/保存、数据工作台 UI、自动布局和输出预览弹窗尚未实现**；当前启动会加载内存中的示例 Recipe。
+> 注意：当前仍是开发版。**数据工作台 UI、自动布局、输出预览弹窗、Expression/Validator/Sampler 完整语义尚未实现**；应用默认启动空白 Recipe，可通过 File → New from Sample 加载 4 节点示例，或恢复上次打开的文件。
 >
 > - 完整功能清单与节点能力矩阵：[PLAN/STATUS.md](PLAN/STATUS.md)
 > - 分阶段实施计划、阶段目标与验收标准：[PLAN/TODO.md](PLAN/TODO.md)
@@ -197,13 +199,13 @@ UI 采用 Recipe Graph / DAG 的设计：
 
 当前 UI 已包含：
 
+- File 菜单：New / New from Sample / Open / Recent / Save / Save As，以及 Ctrl+N/O/S、Ctrl+Shift+S
 - 左侧 Block Sheet
-- 中央 Canvas 区域
-- 示例节点和连接曲线
-- 右侧属性编辑面板
+- 中央 Canvas 区域（节点、贝塞尔连线、错误/警告徽标）
+- 右侧属性编辑面板（含校验问题列表，可点击定位节点）
 - 悬浮 Run / Validate 控件
-- Mini-map 占位区域
-- 底部 Status Bar
+- Mini-map 渲染
+- 底部 Status Bar（文件路径、脏标记、进度、内存与缩放）
 
 相关实现：
 
@@ -226,8 +228,9 @@ LMTrainingDataStudio2/                      # 主项目目录
 ├── LMTrainingDataStudio2.csproj            # 项目文件（Avalonia 11.3 / .NET 9）
 │
 ├── Models/                                 # 数据模型层
-│   ├── AppSettings.cs                      # 全局设置（缓存容量、主题、网格吸附等）
+│   ├── AppSettings.cs                      # 全局设置（缓存容量、主题、网格吸附、最近文件等）
 │   ├── BlockConfig.cs                      # 强类型节点配置（多态 kind）
+│   ├── BlockPortSchema.cs                  # 按 BlockType 的固定端口契约
 │   ├── ChatMessage.cs                      # 规范化聊天消息、ToolDefinition、ToolCall、SftSample
 │   ├── DatasetCleanup.cs                   # 轨迹清洗规则（正则/格式规范化）
 │   ├── DatasetFormat.cs                    # DatasetFormat / DataFileType 枚举
@@ -242,6 +245,7 @@ LMTrainingDataStudio2/                      # 主项目目录
 │   ├── Executors/                          # 节点执行器（Seed/Expression/Validator/Sampler/LLM/Query/Simulation/Cleaner/SftExport）
 │   ├── Sandbox/                            # 真实沙箱：进程限制器、python/powershell/bash/web_fetch 运行时
 │   ├── Simulation/                         # 模拟 API：scripted/provider client、tool runtime、harness、清洗、OAI 序列化
+│   ├── ConnectionRules.cs                  # 入图前连接守卫（方向/类型/单输入/重复/环）
 │   ├── DatasetFormatConverter.cs           # OpenAI / ShareGPT / Alpaca 格式互转
 │   ├── DatasetValidationService.cs         # JSONL 逐行语法验证 + 自动修复
 │   ├── ExecutionStore.cs                   # 执行记录持久化
@@ -253,7 +257,8 @@ LMTrainingDataStudio2/                      # 主项目目录
 │   └── SettingsStore.cs                    # 设置持久化
 │
 ├── ViewModels/                             # MVVM ViewModel 层
-│   ├── MainWindowViewModel.cs              # 主窗口 VM（Recipe 管理、Run/Validate 命令）
+│   ├── MainWindowViewModel.cs              # 主窗口 VM（文档生命周期、Run/Validate、最近文件）
+│   ├── ValidationIssueViewModel.cs         # 校验问题列表项（可定位节点）
 │   ├── BlockNodeViewModel.cs               # 画布节点 VM + PortViewModel
 │   ├── BlockTemplateViewModel.cs           # Block Sheet 模板项 VM
 │   ├── QuerySourceConfigEditorViewModel.cs # Query Source 专属编辑器
@@ -263,8 +268,9 @@ LMTrainingDataStudio2/                      # 主项目目录
 │   └── EdgeViewModel.cs                    # 连线 VM
 │
 ├── Views/                                  # Avalonia 视图层
-│   ├── MainWindow.axaml / .axaml.cs        # 三栏式主窗口布局
-│   ├── RecipeCanvasView.axaml / .axaml.cs  # DAG 画布（节点渲染、贝塞尔曲线连线）
+│   ├── MainWindow.axaml / .axaml.cs        # 三栏式主窗口布局、File 菜单、快捷键与关闭确认
+│   ├── MessageDialog.axaml / .axaml.cs     # 保存确认与错误提示对话框
+│   ├── RecipeCanvasView.axaml / .axaml.cs  # DAG 画布（节点渲染、贝塞尔曲线连线、错误徽标）
 │   └── PropertyPanelView.axaml / .axaml.cs # 右侧属性编辑面板
 │
 ├── Commands/                               # 撤销/重做命令层（Command Pattern）
@@ -332,7 +338,7 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 
 ### Recipe Header
 
-用于编辑 Recipe 名称、切换 Editor / Executions 视图，以及访问全局设置或缓存清理入口。
+包含 File 菜单（新建/打开/最近文件/保存/另存为）、可编辑的 Recipe 名称、脏标记、Editor / Executions 切换与全局设置入口。关闭或切换文档时若有未保存修改，会弹出保存确认。
 
 ### Block Sheet
 
@@ -439,7 +445,7 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 - [ ] 亮色 / 暗色主题切换
 - [ ] LiveCharts2 或 OxyPlot 进度图表
 - [ ] 执行完成后的 output 目录摘要预览
-- [x] 单元测试与集成测试（248 个：246 自动化通过 + 2 个需环境变量的真实 provider 冒烟）
+- [x] 单元测试与集成测试（287 个：285 自动化通过 + 2 个需环境变量的真实 provider 冒烟）
 - [ ] Round 8：Recipe 新建/打开/保存、脏标记、最近文件、按类型端口契约
 - [ ] Round 9：Expression/Validator/Sampler/Tool Profile 节点能力补齐
 - [ ] Round 10：数据预览、CSV/Parquet、格式转换、DPO/Pretrain

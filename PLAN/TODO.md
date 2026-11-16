@@ -8,7 +8,68 @@
 
 ---
 
-## 一、本轮进展（Round 7）
+## 一、本轮进展（Round 8）
+
+### 1.1 本轮做了什么
+
+- [x] Recipe 文件生命周期：File 菜单/快捷键、新建（空白/示例）、打开、保存、另存为、最近文件、脏标记、关闭确认、重启恢复。
+- [x] Avalonia `StorageProvider` 文件选择；加载失败保留当前文档，错误信息包含路径与 JSON 位置。
+- [x] 端口 schema：Seed / Query Source 仅输出，SFT Export 仅输入，Tool Profile 无数据端口，其余输入 + 输出；数据端口统一为 `rows`。
+- [x] 连接守卫：方向、DataType、重复边、单输入、成环在入图前拦截，并写入状态栏/日志。
+- [x] 校验补强：端口契约、必需输入连接、单输入、方向/类型；属性面板问题列表可定位；画布错误/警告徽标。
+- [x] 启动默认空白文档；“New from Sample”提供 Query Source → Simulation → Cleaner → SFT Export 示例。
+- [x] 测试：端口工厂、连接规则、端口契约校验、坏文件加载、保存重载往返、最近文件/恢复/脏标记。
+
+### 1.2 验证结果
+
+| 项目 | 命令 | 结果 |
+| --- | --- | --- |
+| 构建 | `dotnet build LMTrainingDataStudio2/LMTrainingDataStudio2.slnx` | 成功，0 警告，0 错误 |
+| 测试 | `dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx` | 285 通过，0 失败，2 跳过（真实 provider 冒烟需环境变量） |
+| 启动冒烟 | `dotnet run --project LMTrainingDataStudio2/LMTrainingDataStudio2/LMTrainingDataStudio2.csproj --no-build` | 进程持续运行 10s，无异常输出 |
+
+### 1.3 本轮改动文件
+
+```text
+PLAN/TODO.md
+PLAN/STATUS.md
+README.md
+LMTrainingDataStudio2/LMTrainingDataStudio2/Models/BlockPortSchema.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Models/AppSettings.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/ConnectionRules.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/RecipeValidationService.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/SettingsStore.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/ViewModels/MainWindowViewModel.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/ViewModels/BlockNodeViewModel.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/ViewModels/ValidationIssueViewModel.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Views/MainWindow.axaml
+LMTrainingDataStudio2/LMTrainingDataStudio2/Views/MainWindow.axaml.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Views/MessageDialog.axaml
+LMTrainingDataStudio2/LMTrainingDataStudio2/Views/MessageDialog.axaml.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Views/PropertyPanelView.axaml
+LMTrainingDataStudio2/LMTrainingDataStudio2/Views/RecipeCanvasView.axaml.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/BlockPortSchemaTests.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/ConnectionRulesTests.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/MainWindowViewModelDocumentTests.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeRunnerTests.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/SimulationExecutorsTests.cs
+```
+
+### 1.4 技术决策与取舍
+
+1. **端口契约集中在 `BlockPortSchema`。**
+   - 画布、示例 Recipe、ViewModel 与校验共用同一份定义，避免“新建节点端口”与“校验规则”漂移。
+2. **连接在入图前拦截，而不是只依赖执行前校验。**
+   - 错误连接立即反馈到状态栏/日志；图校验仍作为兜底。
+3. **脏标记忽略选择与校验状态。**
+   - 只对文档内容（名称、节点、端口、边、配置、坐标）置脏，避免点选节点或执行校验触发关闭确认。
+4. **设置文件同时保存最近文件与上次打开路径。**
+   - 复用既有原子写入；启动时文件缺失或损坏只回退空白并记录警告，不阻塞启动。
+
+---
+
+## 附：Round 7 历史进展（2026-11-16）
 
 ### 1.1 本轮做了什么
 
@@ -904,8 +965,8 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 
 > 历史 P0（Phase 1 持久化、Phase 2 执行引擎、Round 6/7 模拟与真实 provider/沙箱）已完成，见 [STATUS.md](STATUS.md)。
 
-1. Recipe 新建/打开/保存/另存为 + 最近文件 + 脏标记 + 关闭确认（当前编辑成果无法落盘）。
-2. 按 BlockType 生成端口 schema；每种节点必需输入/输出校验；错误连接拦截与画布错误徽标。
+1. [x] Recipe 新建/打开/保存/另存为 + 最近文件 + 脏标记 + 关闭确认（Round 8 完成）。
+2. [x] 按 BlockType 生成端口 schema；每种节点必需输入/输出校验；错误连接拦截与画布错误徽标（Round 8 完成）。
 3. Expression 真实模板引擎 + 专属面板 + 渲染预览/语法校验。
 4. Validator reject 分支 + Schema 规则 + 失败样本；Sampler Splits/多输出；Tool Profile 树形编辑器与复用。
 5. 状态栏 `CurrentFilePath` 与真实文件路径；属性面板删除/修改接入 Undo。
@@ -946,7 +1007,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 | 11 | 数据工作台 B | P1 | 校验问题列表/自动修复；搜索/正则替换；去重/混洗/切分；数据集统计 | 行数守恒、同 seed 可复现、原文件不被修复破坏 |
 | 12 | 画布、执行与发布 | P1/P2 | 网格/吸附/锚点缩放/Fit/自动布局/Mini-map 交互；层内并行、暂停/重试、输出目录；Headless UI、CI、打包、主题、日志 | 手工脚本通过；500 节点无卡顿；干净环境可安装运行 |
 
-**建议立即从 Round 8 的“Recipe 文件生命周期”和“按类型端口契约”开始**：它们是后续所有节点/数据能力的基础，当前缺失会导致编辑成果无法保存、错误连接无法系统性拦截。
+**Round 8 已完成（2026-11-16）**；下一步从 Round 9 的 Expression 真实模板引擎开始，随后补 Validator reject/Schema、Sampler Splits 与 Tool Profile 复用。
 
 ---
 

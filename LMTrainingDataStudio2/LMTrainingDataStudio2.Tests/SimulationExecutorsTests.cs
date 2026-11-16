@@ -583,7 +583,7 @@ public sealed class SimulationExecutorsTests
     {
         Id = id,
         Name = id,
-        DataType = "any",
+        DataType = BlockPortSchema.RowsDataType,
         Direction = direction
     };
 

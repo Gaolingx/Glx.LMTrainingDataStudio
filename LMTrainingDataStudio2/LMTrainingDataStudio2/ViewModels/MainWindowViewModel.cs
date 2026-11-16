@@ -5,6 +5,8 @@ using LMTrainingDataStudio2.Models;
 using LMTrainingDataStudio2.Services;
 using LMTrainingDataStudio2.Services.Executors;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.ComponentModel;
 
 namespace LMTrainingDataStudio2.ViewModels;
 
@@ -17,13 +19,24 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly DatasetValidationService _datasetValidation = new();
     private readonly DatasetFormatConverter _formatConverter = new();
     private readonly ISettingsStore _settingsStore;
+    private readonly RecipeStore _recipeStore;
     private readonly ExecutionStore _executionStore = new();
     private readonly HttpClient _llmHttpClient = new();
     private AppSettings _settings;
     private CancellationTokenSource? _runCancellation;
+    private string _recipeId = Guid.NewGuid().ToString("N");
+    private DateTime _recipeCreatedAt = DateTime.UtcNow;
+    private DateTime _recipeModifiedAt = DateTime.UtcNow;
+    private bool _suppressDocumentEvents;
 
     [ObservableProperty]
     private string _recipeName = "Untitled Recipe";
+
+    [ObservableProperty]
+    private bool _isDirty;
+
+    [ObservableProperty]
+    private bool _hasValidationIssues;
 
     [ObservableProperty]
     private bool _isEditorView = true;
@@ -90,34 +103,42 @@ public partial class MainWindowViewModel : ObservableObject
     public ObservableCollection<EdgeViewModel> Edges { get; } = new();
     public ObservableCollection<BlockTemplateViewModel> BlockTemplates { get; } = new();
     public ObservableCollection<string> LogMessages { get; } = new();
+    public ObservableCollection<string> RecentFiles { get; } = new();
+    public ObservableCollection<ValidationIssueViewModel> ValidationIssues { get; } = new();
     public CommandHistory CommandHistory { get; } = new();
     public ExecutionsViewModel Executions { get; }
+
+    /// <summary>Raised when the canvas must re-render without a collection change.</summary>
+    public event Action? CanvasRenderRequested;
+
+    public string DocumentTitle => $"{RecipeName}{(IsDirty ? " *" : string.Empty)}";
 
     public MainWindowViewModel() : this(new SettingsStore())
     {
     }
 
-    public MainWindowViewModel(ISettingsStore settingsStore)
+    public MainWindowViewModel(ISettingsStore settingsStore, RecipeStore? recipeStore = null)
     {
         _settingsStore = settingsStore ?? throw new ArgumentNullException(nameof(settingsStore));
+        _recipeStore = recipeStore ?? new RecipeStore();
         var loadResult = _settingsStore.Load();
         _settings = loadResult.Settings;
         Executions = new ExecutionsViewModel(_executionStore);
 
         LoadSettingsSnapshot();
         InitializeBlockTemplates();
-        LoadSampleRecipe();
+
+        Blocks.CollectionChanged += OnBlocksCollectionChanged;
+        Edges.CollectionChanged += OnEdgesCollectionChanged;
+        CommandHistory.HistoryChanged += OnHistoryChanged;
+
+        LoadDocument(CreateBlankRecipe(), path: null, markDirty: false);
         UpdateMemoryUsage();
 
         foreach (var warning in loadResult.Warnings)
         {
             LogMessages.Add($"[Warning] {warning}");
         }
-
-        CommandHistory.HistoryChanged += (_, _) =>
-        {
-            StatusText = CommandHistory.CanUndo || CommandHistory.CanRedo ? "Recipe history updated" : "Ready";
-        };
     }
 
     private void LoadSettingsSnapshot()
@@ -129,6 +150,17 @@ public partial class MainWindowViewModel : ObservableObject
         IsDarkTheme = _settings.IsDarkTheme;
         OpenAiApiKey = _settings.OpenAiApiKey ?? string.Empty;
         AnthropicApiKey = _settings.AnthropicApiKey ?? string.Empty;
+
+        RecentFiles.Clear();
+        foreach (var path in _settings.RecentFiles)
+        {
+            if (File.Exists(path) &&
+                !RecentFiles.Any(existing => string.Equals(existing, path, StringComparison.OrdinalIgnoreCase)))
+            {
+                RecentFiles.Add(path);
+            }
+        }
+
         UpdateCacheSizeText();
     }
 
@@ -146,101 +178,574 @@ public partial class MainWindowViewModel : ObservableObject
         BlockTemplates.Add(new BlockTemplateViewModel("SFT Export", BlockType.SftExport, "Write OAI messages JSONL for SFT"));
     }
 
-    private void LoadSampleRecipe()
+    #region Document lifecycle
+
+    /// <summary>
+    /// Starts a new document. With <paramref name="withSample"/>, the bundled sample pipeline is loaded and marked dirty.
+    /// </summary>
+    public async Task NewRecipeAsync(bool withSample = false)
     {
-        var seedBlock = new BlockNodeViewModel
+        LoadDocument(withSample ? CreateSampleRecipe() : CreateBlankRecipe(), path: null, markDirty: withSample);
+        LogMessages.Clear();
+        LogMessages.Add(withSample
+            ? "[Info] Loaded the sample recipe. Use File > Save As to keep it."
+            : "[Info] Started a new recipe.");
+        await PersistDocumentStateAsync();
+    }
+
+    /// <summary>
+    /// Replaces the current document with the recipe stored at <paramref name="path"/>.
+    /// The current document is left untouched when loading fails.
+    /// </summary>
+    public async Task OpenRecipeAsync(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+        var fullPath = Path.GetFullPath(path);
+        var recipe = await _recipeStore.LoadAsync(fullPath);
+
+        LoadDocument(recipe, fullPath, markDirty: false);
+        AddRecentFile(fullPath);
+        LogMessages.Clear();
+        LogMessages.Add($"[Info] Opened recipe '{fullPath}'.");
+        await PersistDocumentStateAsync();
+    }
+
+    /// <summary>
+    /// Saves the current document to <paramref name="path"/> and clears the dirty marker.
+    /// </summary>
+    public async Task SaveRecipeAsync(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+        var fullPath = Path.GetFullPath(path);
+        _recipeModifiedAt = DateTime.UtcNow;
+
+        await _recipeStore.SaveAsync(ToRecipe(), fullPath);
+
+        CurrentFilePath = fullPath;
+        IsDirty = false;
+        AddRecentFile(fullPath);
+        StatusText = $"Saved {fullPath}";
+        LogMessages.Add($"[Info] Saved recipe to '{fullPath}'.");
+        await PersistDocumentStateAsync();
+    }
+
+    /// <summary>
+    /// Restores the most recently opened recipe. Returns false (leaving the blank document) when there is nothing to restore.
+    /// </summary>
+    public async Task<bool> RestoreLastRecipeAsync()
+    {
+        var path = _settings.LastRecipePath;
+        if (string.IsNullOrWhiteSpace(path))
         {
-            Id = "seed1",
-            Type = BlockType.Seed,
-            Name = "seed_data",
-            DisplayName = "Training Data",
-            X = 80,
-            Y = 150,
-            Config = new SeedBlockConfig("data/train.jsonl", DataFileType.Jsonl, Streaming: false, UseIndexCache: true)
+            return false;
+        }
+
+        if (!File.Exists(path))
+        {
+            LogMessages.Add($"[Warning] Last recipe '{path}' no longer exists; starting with a blank recipe.");
+            return false;
+        }
+
+        try
+        {
+            await OpenRecipeAsync(path);
+            StatusText = $"Restored {path}";
+            return true;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            LogMessages.Add($"[Warning] Could not restore '{path}': {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Builds the current recipe model from the editor state.
+    /// </summary>
+    public Recipe ToRecipe()
+    {
+        var recipe = new Recipe
+        {
+            Id = _recipeId,
+            Name = RecipeName,
+            CreatedAt = _recipeCreatedAt,
+            ModifiedAt = _recipeModifiedAt
         };
-        seedBlock.OutputPorts.Add(new PortViewModel { Id = "seed1_out", Name = "rows", DataType = "jsonl" });
 
-        var llmBlock = new BlockNodeViewModel
+        foreach (var blockVm in Blocks)
         {
-            Id = "llm1",
-            Type = BlockType.Llm,
-            Name = "generator",
-            DisplayName = "LLM Generator",
-            X = 380,
-            Y = 120,
-            Config = new LlmBlockConfig(LlmProviderIds.OpenAiChat, "gpt-4o", Temperature: 0.7, MaxTokens: 2048, Prompt: null)
-        };
-        llmBlock.InputPorts.Add(new PortViewModel { Id = "llm1_in", Name = "input", DataType = "jsonl" });
-        llmBlock.OutputPorts.Add(new PortViewModel { Id = "llm1_out", Name = "output", DataType = "messages[]" });
+            recipe.Blocks.Add(new RecipeBlock
+            {
+                Id = blockVm.Id,
+                Type = blockVm.Type,
+                Name = blockVm.Name,
+                DisplayName = blockVm.DisplayName,
+                X = blockVm.X,
+                Y = blockVm.Y,
+                Width = blockVm.Width,
+                Height = blockVm.Height,
+                Config = blockVm.Config,
+                InputPorts = blockVm.InputPorts.Select(p => new BlockPort
+                {
+                    Id = p.Id,
+                    Name = p.Name,
+                    DataType = p.DataType,
+                    Direction = PortDirection.Input
+                }).ToList(),
+                OutputPorts = blockVm.OutputPorts.Select(p => new BlockPort
+                {
+                    Id = p.Id,
+                    Name = p.Name,
+                    DataType = p.DataType,
+                    Direction = PortDirection.Output
+                }).ToList()
+            });
+        }
 
-        var validatorBlock = new BlockNodeViewModel
+        foreach (var edgeVm in Edges)
         {
-            Id = "val1",
-            Type = BlockType.Validator,
-            Name = "code_check",
-            DisplayName = "Python Validator",
-            X = 680,
-            Y = 150,
-            Config = new ValidatorBlockConfig("expression", "len(messages) > 0", RejectOnFailure: true)
-        };
-        validatorBlock.InputPorts.Add(new PortViewModel { Id = "val1_in", Name = "input", DataType = "messages[]" });
-        validatorBlock.OutputPorts.Add(new PortViewModel { Id = "val1_out", Name = "valid", DataType = "messages[]" });
+            recipe.Edges.Add(new RecipeEdge
+            {
+                Id = edgeVm.Id,
+                SourceBlockId = edgeVm.SourceBlockId,
+                SourcePortId = edgeVm.SourcePortId,
+                TargetBlockId = edgeVm.TargetBlockId,
+                TargetPortId = edgeVm.TargetPortId,
+                Label = edgeVm.Label
+            });
+        }
 
-        Blocks.Add(seedBlock);
-        Blocks.Add(llmBlock);
-        Blocks.Add(validatorBlock);
+        return recipe;
+    }
 
-        Edges.Add(new EdgeViewModel
+    private void LoadDocument(Recipe recipe, string? path, bool markDirty)
+    {
+        _suppressDocumentEvents = true;
+        try
         {
-            Id = "edge1",
-            SourceBlockId = "seed1",
-            SourcePortId = "seed1_out",
-            TargetBlockId = "llm1",
-            TargetPortId = "llm1_in",
-            Label = "jsonl"
-        });
+            foreach (var block in Blocks)
+            {
+                block.PropertyChanged -= OnBlockPropertyChanged;
+            }
 
-        Edges.Add(new EdgeViewModel
+            foreach (var edge in Edges)
+            {
+                edge.PropertyChanged -= OnEdgePropertyChanged;
+            }
+
+            Blocks.Clear();
+            Edges.Clear();
+            CommandHistory.Clear();
+            ValidationIssues.Clear();
+            HasValidationIssues = false;
+
+            foreach (var block in recipe.Blocks)
+            {
+                var blockVm = new BlockNodeViewModel
+                {
+                    Id = block.Id,
+                    Type = block.Type,
+                    Name = block.Name,
+                    DisplayName = block.DisplayName,
+                    X = block.X,
+                    Y = block.Y,
+                    Width = block.Width,
+                    Height = block.Height,
+                    Config = block.Config.DeepClone()
+                };
+
+                foreach (var port in block.InputPorts)
+                {
+                    blockVm.InputPorts.Add(new PortViewModel
+                    {
+                        Id = port.Id,
+                        Name = port.Name,
+                        DataType = port.DataType
+                    });
+                }
+
+                foreach (var port in block.OutputPorts)
+                {
+                    blockVm.OutputPorts.Add(new PortViewModel
+                    {
+                        Id = port.Id,
+                        Name = port.Name,
+                        DataType = port.DataType
+                    });
+                }
+
+                Blocks.Add(blockVm);
+            }
+
+            foreach (var edge in recipe.Edges)
+            {
+                Edges.Add(new EdgeViewModel
+                {
+                    Id = edge.Id,
+                    SourceBlockId = edge.SourceBlockId,
+                    SourcePortId = edge.SourcePortId,
+                    TargetBlockId = edge.TargetBlockId,
+                    TargetPortId = edge.TargetPortId,
+                    Label = edge.Label
+                });
+            }
+
+            _recipeId = recipe.Id;
+            _recipeCreatedAt = recipe.CreatedAt;
+            _recipeModifiedAt = recipe.ModifiedAt;
+            RecipeName = recipe.Name;
+            SelectedBlock = null;
+            CurrentFilePath = path ?? string.Empty;
+            IsDirty = markDirty;
+            StatusText = path is null
+                ? (markDirty ? "New recipe loaded from sample" : "New recipe")
+                : $"Opened {path}";
+        }
+        finally
         {
-            Id = "edge2",
-            SourceBlockId = "llm1",
-            SourcePortId = "llm1_out",
-            TargetBlockId = "val1",
-            TargetPortId = "val1_in",
-            Label = "messages[]"
+            _suppressDocumentEvents = false;
+        }
+
+        CanvasRenderRequested?.Invoke();
+    }
+
+    private static Recipe CreateBlankRecipe() => new() { Name = "Untitled Recipe" };
+
+    private static Recipe CreateSampleRecipe()
+    {
+        var recipe = new Recipe { Name = "Sample SFT Trajectory" };
+
+        var queries = CreateRecipeBlock(
+            "queries", BlockType.QuerySource, "user_queries", "User Queries", 80, 160,
+            new QuerySourceBlockConfig(
+                new[] { "Explain the TCP three-way handshake with a small example." },
+                QuerySetMode.MultipleQueries,
+                Repeat: 1,
+                SystemPrompt: "You are a concise network engineering tutor."));
+
+        var simulation = CreateRecipeBlock(
+            "simulation", BlockType.Simulation, "trajectory", "Tool-calling Simulation", 360, 120,
+            new SimulationBlockConfig(
+                "demo-model",
+                MaxRounds: 6,
+                SystemPrompt: "Use the python tool when a calculation helps.",
+                Tools: SimulatedToolCatalog.Common(),
+                FinalContent: "The TCP handshake establishes a reliable connection with SYN, SYN-ACK and ACK."));
+
+        var cleaner = CreateRecipeBlock(
+            "cleaner", BlockType.Cleaner, "clean", "Cleaner", 640, 160,
+            new CleanerBlockConfig(new DatasetCleanupRules
+            {
+                NormalizeNewlines = true,
+                NormalizeWhitespace = true
+            }));
+
+        var export = CreateRecipeBlock(
+            "export", BlockType.SftExport, "sft_export", "SFT Export", 920, 160,
+            new SftExportBlockConfig("out/sample-sft.jsonl"));
+
+        recipe.Blocks.AddRange(new[] { queries, simulation, cleaner, export });
+        AddSampleEdge(recipe, "edge_queries_simulation", queries, simulation);
+        AddSampleEdge(recipe, "edge_simulation_cleaner", simulation, cleaner);
+        AddSampleEdge(recipe, "edge_cleaner_export", cleaner, export);
+        return recipe;
+    }
+
+    private static RecipeBlock CreateRecipeBlock(
+        string id,
+        BlockType type,
+        string name,
+        string displayName,
+        double x,
+        double y,
+        BlockConfig config) => new()
+    {
+        Id = id,
+        Type = type,
+        Name = name,
+        DisplayName = displayName,
+        X = x,
+        Y = y,
+        Config = config,
+        InputPorts = BlockPortSchema.CreateInputPorts(type),
+        OutputPorts = BlockPortSchema.CreateOutputPorts(type)
+    };
+
+    private static void AddSampleEdge(Recipe recipe, string id, RecipeBlock source, RecipeBlock target)
+    {
+        var sourcePort = source.OutputPorts[0];
+        recipe.Edges.Add(new RecipeEdge
+        {
+            Id = id,
+            SourceBlockId = source.Id,
+            SourcePortId = sourcePort.Id,
+            TargetBlockId = target.Id,
+            TargetPortId = target.InputPorts[0].Id,
+            Label = sourcePort.DataType
         });
     }
 
-    [RelayCommand]
-    private async Task ValidateRecipeAsync()
+    private void AddRecentFile(string path)
     {
+        var existing = RecentFiles.FirstOrDefault(
+            candidate => string.Equals(candidate, path, StringComparison.OrdinalIgnoreCase));
+        if (existing is not null)
+        {
+            RecentFiles.Remove(existing);
+        }
+
+        RecentFiles.Insert(0, path);
+        while (RecentFiles.Count > SettingsStore.MaxRecentFiles)
+        {
+            RecentFiles.RemoveAt(RecentFiles.Count - 1);
+        }
+    }
+
+    private async Task PersistDocumentStateAsync()
+    {
+        _settings.RecentFiles = RecentFiles.ToList();
+        _settings.LastRecipePath = string.IsNullOrWhiteSpace(CurrentFilePath) ? null : CurrentFilePath;
+
+        try
+        {
+            await _settingsStore.SaveAsync(_settings);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            LogMessages.Add($"[Warning] Could not persist recent files: {ex.Message}");
+        }
+    }
+
+    private void OnBlocksCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.OldItems is not null)
+        {
+            foreach (BlockNodeViewModel block in e.OldItems)
+            {
+                block.PropertyChanged -= OnBlockPropertyChanged;
+            }
+        }
+
+        if (e.NewItems is not null)
+        {
+            foreach (BlockNodeViewModel block in e.NewItems)
+            {
+                block.PropertyChanged += OnBlockPropertyChanged;
+            }
+        }
+
+        if (_suppressDocumentEvents) return;
+
+        MarkDirty();
+        CanvasRenderRequested?.Invoke();
+    }
+
+    private void OnEdgesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.OldItems is not null)
+        {
+            foreach (EdgeViewModel edge in e.OldItems)
+            {
+                edge.PropertyChanged -= OnEdgePropertyChanged;
+            }
+        }
+
+        if (e.NewItems is not null)
+        {
+            foreach (EdgeViewModel edge in e.NewItems)
+            {
+                edge.PropertyChanged += OnEdgePropertyChanged;
+            }
+        }
+
+        if (_suppressDocumentEvents) return;
+
+        MarkDirty();
+        CanvasRenderRequested?.Invoke();
+    }
+
+    private void OnBlockPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(BlockNodeViewModel.IsSelected)
+            or nameof(BlockNodeViewModel.ConfigError)
+            or nameof(BlockNodeViewModel.ConfigJsonError)
+            or nameof(BlockNodeViewModel.ValidationError)
+            or nameof(BlockNodeViewModel.ValidationErrorCount)
+            or nameof(BlockNodeViewModel.ValidationWarningCount)
+            or nameof(BlockNodeViewModel.ValidationIssueCount)
+            or nameof(BlockNodeViewModel.HasValidationError))
+        {
+            return;
+        }
+
+        if (_suppressDocumentEvents) return;
+
+        MarkDirty();
+        if (e.PropertyName is nameof(BlockNodeViewModel.Name) or nameof(BlockNodeViewModel.DisplayName))
+        {
+            CanvasRenderRequested?.Invoke();
+        }
+    }
+
+    private void OnEdgePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(EdgeViewModel.IsSelected) or nameof(EdgeViewModel.IsHighlighted))
+        {
+            return;
+        }
+
+        MarkDirty();
+    }
+
+    private void OnHistoryChanged(object? sender, EventArgs e)
+    {
+        if (_suppressDocumentEvents) return;
+
+        StatusText = CommandHistory.CanUndo || CommandHistory.CanRedo ? "Recipe history updated" : "Ready";
+        MarkDirty();
+        CanvasRenderRequested?.Invoke();
+    }
+
+    private void MarkDirty()
+    {
+        if (_suppressDocumentEvents) return;
+        IsDirty = true;
+    }
+
+    partial void OnRecipeNameChanged(string value)
+    {
+        MarkDirty();
+        OnPropertyChanged(nameof(DocumentTitle));
+    }
+
+    partial void OnIsDirtyChanged(bool value) => OnPropertyChanged(nameof(DocumentTitle));
+
+    #endregion
+
+    #region Validation and execution
+
+    [RelayCommand]
+    private void ValidateRecipe()
+    {
+        if (IsRunning) return;
+
         IsRunning = true;
         StatusText = "Validating recipe...";
         LogMessages.Clear();
 
-        await Task.Run(() =>
+        var result = _recipeValidation.Validate(ToRecipe());
+        ApplyValidationResult(result);
+
+        foreach (var issue in result.Issues)
         {
-            var recipe = BuildRecipeFromViewModel();
-            var result = _recipeValidation.Validate(recipe);
+            LogMessages.Add($"[{issue.Severity}] {issue.Message}");
+        }
 
-            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        StatusText = result.IsValid
+            ? "Validation passed ✓"
+            : $"Validation failed: {result.Issues.Count(i => i.Severity == ValidationSeverity.Error)} error(s)";
+        IsRunning = false;
+    }
+
+    private void ApplyValidationResult(ValidationResult result)
+    {
+        ValidationIssues.Clear();
+        HasValidationIssues = result.Issues.Count > 0;
+
+        foreach (var block in Blocks)
+        {
+            block.ValidationError = null;
+            block.ValidationErrorCount = 0;
+            block.ValidationWarningCount = 0;
+        }
+
+        foreach (var issue in result.Issues)
+        {
+            ValidationIssues.Add(new ValidationIssueViewModel(issue, LocateValidationIssue));
+
+            if (issue.BlockId is null) continue;
+            var block = Blocks.FirstOrDefault(candidate => candidate.Id == issue.BlockId);
+            if (block is null) continue;
+
+            if (issue.Severity == ValidationSeverity.Error)
             {
-                foreach (var issue in result.Issues)
-                {
-                    LogMessages.Add($"[{issue.Severity}] {issue.Message}");
-                }
+                block.ValidationErrorCount++;
+                block.ValidationError ??= issue.Message;
+            }
+            else if (issue.Severity == ValidationSeverity.Warning)
+            {
+                block.ValidationWarningCount++;
+            }
+        }
 
-                foreach (var block in Blocks)
-                {
-                    block.ConfigError = result.Issues
-                        .FirstOrDefault(i => i.BlockId == block.Id && i.Severity == ValidationSeverity.Error)
-                        ?.Message;
-                }
+        CanvasRenderRequested?.Invoke();
+    }
 
-                StatusText = result.IsValid ? "Validation passed ✓" : $"Validation failed: {result.Issues.Count(i => i.Severity == ValidationSeverity.Error)} error(s)";
-                IsRunning = false;
-            });
-        });
+    private void LocateValidationIssue(ValidationIssueViewModel issue)
+    {
+        if (issue.BlockId is null)
+        {
+            StatusText = issue.Message;
+            return;
+        }
+
+        var block = Blocks.FirstOrDefault(candidate => candidate.Id == issue.BlockId);
+        if (block is null)
+        {
+            StatusText = issue.Message;
+            return;
+        }
+
+        foreach (var candidate in Blocks)
+        {
+            candidate.IsSelected = false;
+        }
+
+        block.IsSelected = true;
+        SelectedBlock = block;
+        IsPropertyPanelVisible = true;
+        StatusText = $"Located block '{block.DisplayName}'";
+        CanvasRenderRequested?.Invoke();
+    }
+
+    /// <summary>
+    /// Adds an edge only when the connection is structurally valid.
+    /// Returns false and explains the reason in <see cref="StatusText"/> otherwise.
+    /// </summary>
+    public bool TryConnect(
+        BlockNodeViewModel sourceBlock,
+        PortViewModel sourcePort,
+        BlockNodeViewModel targetBlock,
+        PortViewModel targetPort)
+    {
+        var recipe = ToRecipe();
+        var error = ConnectionRules.Validate(
+            recipe.Blocks,
+            recipe.Edges,
+            sourceBlock.Id,
+            sourcePort.Id,
+            targetBlock.Id,
+            targetPort.Id);
+
+        if (error is not null)
+        {
+            StatusText = error;
+            LogMessages.Add($"[Error] {error}");
+            return false;
+        }
+
+        CommandHistory.Execute(new AddEdgeCommand(this, new EdgeViewModel
+        {
+            SourceBlockId = sourceBlock.Id,
+            SourcePortId = sourcePort.Id,
+            TargetBlockId = targetBlock.Id,
+            TargetPortId = targetPort.Id,
+            Label = sourcePort.DataType
+        }));
+        StatusText = "Connection added";
+        return true;
     }
 
     [RelayCommand]
@@ -259,7 +764,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         try
         {
-            var recipe = BuildRecipeFromViewModel();
+            var recipe = ToRecipe();
             var runner = CreateRecipeRunner();
             var progress = new Progress<ExecutionProgress>(OnExecutionProgress);
 
@@ -302,6 +807,34 @@ public partial class MainWindowViewModel : ObservableObject
 
     private bool CanCancelRun() => IsRunning;
 
+    private RecipeRunner CreateRecipeRunner() => new(
+        _recipeValidation,
+        new IBlockExecutor[]
+        {
+            new SeedBlockExecutor(_settings),
+            new ExpressionBlockExecutor(),
+            new ValidatorBlockExecutor(),
+            new SamplerBlockExecutor(),
+            new LlmBlockExecutor(new LlmApiClient(_llmHttpClient, new LlmCredentials(_settings))),
+            new QuerySourceBlockExecutor(),
+            new SimulationBlockExecutor(new LlmCredentials(_settings), _llmHttpClient),
+            new CleanerBlockExecutor(),
+            new SftExportBlockExecutor()
+        });
+
+    private void OnExecutionProgress(ExecutionProgress progress)
+    {
+        Progress = progress.TotalBlocks == 0 ? 0 : (double)progress.CompletedBlocks / progress.TotalBlocks;
+        TotalLines = progress.ProcessedRows;
+        StatusText = progress.CurrentBlockName is null
+            ? "Running recipe..."
+            : $"Running {progress.CurrentBlockName} ({progress.CompletedBlocks}/{progress.TotalBlocks})";
+    }
+
+    #endregion
+
+    #region Editor commands
+
     [RelayCommand]
     private void AddBlock(BlockType type)
     {
@@ -314,25 +847,21 @@ public partial class MainWindowViewModel : ObservableObject
             Y = 200,
             Config = BlockConfig.CreateDefault(type)
         };
-        block.OutputPorts.Add(new PortViewModel { Name = "output", DataType = "any" });
-        block.InputPorts.Add(new PortViewModel { Name = "input", DataType = "any" });
-        Blocks.Add(block);
+        block.ApplyDefaultPorts();
+        CommandHistory.Execute(new AddBlockCommand(this, block));
         SelectedBlock = block;
     }
 
     [RelayCommand]
     private void DeleteSelectedBlock()
     {
-        if (SelectedBlock == null) return;
+        if (SelectedBlock is null) return;
 
-        // Remove connected edges
-        var edgesToRemove = Edges
-            .Where(e => e.SourceBlockId == SelectedBlock.Id || e.TargetBlockId == SelectedBlock.Id)
+        var connectedEdges = Edges
+            .Where(edge => edge.SourceBlockId == SelectedBlock.Id || edge.TargetBlockId == SelectedBlock.Id)
             .ToList();
-        foreach (var edge in edgesToRemove)
-            Edges.Remove(edge);
 
-        Blocks.Remove(SelectedBlock);
+        CommandHistory.Execute(new DeleteSelectionCommand(this, new[] { SelectedBlock }, connectedEdges));
         SelectedBlock = null;
     }
 
@@ -377,6 +906,10 @@ public partial class MainWindowViewModel : ObservableObject
         await Executions.RefreshAsync();
     }
 
+    #endregion
+
+    #region Settings
+
     [RelayCommand]
     private void OpenSettings()
     {
@@ -404,7 +937,9 @@ public partial class MainWindowViewModel : ObservableObject
             GridSnapSize = Math.Clamp(GridSnapSize, SettingsStore.MinGridSnapSize, SettingsStore.MaxGridSnapSize),
             IsDarkTheme = IsDarkTheme,
             OpenAiApiKey = NullIfBlank(OpenAiApiKey),
-            AnthropicApiKey = NullIfBlank(AnthropicApiKey)
+            AnthropicApiKey = NullIfBlank(AnthropicApiKey),
+            RecentFiles = RecentFiles.ToList(),
+            LastRecipePath = string.IsNullOrWhiteSpace(CurrentFilePath) ? null : CurrentFilePath
         };
 
         try
@@ -433,80 +968,8 @@ public partial class MainWindowViewModel : ObservableObject
         LogMessages.Add("[Info] Index cache cleaned.");
     }
 
-    private Recipe BuildRecipeFromViewModel()
-    {
-        var recipe = new Recipe { Name = RecipeName };
-
-        foreach (var blockVm in Blocks)
-        {
-            recipe.Blocks.Add(new RecipeBlock
-            {
-                Id = blockVm.Id,
-                Type = blockVm.Type,
-                Name = blockVm.Name,
-                DisplayName = blockVm.DisplayName,
-                X = blockVm.X,
-                Y = blockVm.Y,
-                Config = blockVm.Config,
-                InputPorts = blockVm.InputPorts.Select(p => new BlockPort
-                {
-                    Id = p.Id,
-                    Name = p.Name,
-                    DataType = p.DataType,
-                    Direction = PortDirection.Input
-                }).ToList(),
-                OutputPorts = blockVm.OutputPorts.Select(p => new BlockPort
-                {
-                    Id = p.Id,
-                    Name = p.Name,
-                    DataType = p.DataType,
-                    Direction = PortDirection.Output
-                }).ToList()
-            });
-        }
-
-        foreach (var edgeVm in Edges)
-        {
-            recipe.Edges.Add(new RecipeEdge
-            {
-                Id = edgeVm.Id,
-                SourceBlockId = edgeVm.SourceBlockId,
-                SourcePortId = edgeVm.SourcePortId,
-                TargetBlockId = edgeVm.TargetBlockId,
-                TargetPortId = edgeVm.TargetPortId,
-                Label = edgeVm.Label
-            });
-        }
-
-        return recipe;
-    }
-
-    private RecipeRunner CreateRecipeRunner() => new(
-        _recipeValidation,
-        new IBlockExecutor[]
-        {
-            new SeedBlockExecutor(_settings),
-            new ExpressionBlockExecutor(),
-            new ValidatorBlockExecutor(),
-            new SamplerBlockExecutor(),
-            new LlmBlockExecutor(new LlmApiClient(_llmHttpClient, new LlmCredentials(_settings))),
-            new QuerySourceBlockExecutor(),
-            new SimulationBlockExecutor(new LlmCredentials(_settings), _llmHttpClient),
-            new CleanerBlockExecutor(),
-            new SftExportBlockExecutor()
-        });
-
     private static string? NullIfBlank(string value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-
-    private void OnExecutionProgress(ExecutionProgress progress)
-    {
-        Progress = progress.TotalBlocks == 0 ? 0 : (double)progress.CompletedBlocks / progress.TotalBlocks;
-        TotalLines = progress.ProcessedRows;
-        StatusText = progress.CurrentBlockName is null
-            ? "Running recipe..."
-            : $"Running {progress.CurrentBlockName} ({progress.CompletedBlocks}/{progress.TotalBlocks})";
-    }
 
     private void UpdateMemoryUsage()
     {
@@ -528,4 +991,6 @@ public partial class MainWindowViewModel : ObservableObject
             CacheSizeText = "Unavailable";
         }
     }
+
+    #endregion
 }

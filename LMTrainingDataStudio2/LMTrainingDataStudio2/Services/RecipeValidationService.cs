@@ -31,7 +31,9 @@ public sealed class RecipeValidationService
         }
 
         ValidateBlockNames(recipe, result);
+        ValidatePortContracts(recipe, result);
         ValidateEdgeConnections(recipe, result);
+        ValidateRequiredInputConnections(recipe, result);
         ValidateIsolatedBlocks(recipe, result);
         ValidateCycles(recipe, result);
         ValidateBlockConfigurations(recipe, result);
@@ -62,6 +64,92 @@ public sealed class RecipeValidationService
                     BlockId = block.Id
                 });
             }
+        }
+    }
+
+    private void ValidatePortContracts(Recipe recipe, ValidationResult result)
+    {
+        foreach (var block in recipe.Blocks)
+        {
+            ValidatePortCollection(
+                block, block.InputPorts, PortDirection.Input, BlockPortSchema.GetInputSpec(block.Type), result);
+            ValidatePortCollection(
+                block, block.OutputPorts, PortDirection.Output, BlockPortSchema.GetOutputSpec(block.Type), result);
+        }
+    }
+
+    private static void ValidatePortCollection(
+        RecipeBlock block,
+        IReadOnlyCollection<BlockPort> ports,
+        PortDirection direction,
+        BlockPortSpec? expected,
+        ValidationResult result)
+    {
+        var directionName = direction == PortDirection.Input ? "input" : "output";
+
+        if (expected is null)
+        {
+            if (ports.Count > 0)
+            {
+                AddError(result,
+                    $"Block '{block.Name}' ({block.Type}) must not have {directionName} ports.",
+                    block.Id);
+            }
+
+            return;
+        }
+
+        if (ports.Count == 0)
+        {
+            AddError(result,
+                $"Block '{block.Name}' ({block.Type}) requires an {directionName} port.",
+                block.Id);
+            return;
+        }
+
+        if (ports.Count > 1)
+        {
+            AddError(result,
+                $"Block '{block.Name}' ({block.Type}) supports at most one {directionName} port.",
+                block.Id);
+        }
+
+        foreach (var port in ports)
+        {
+            if (port.Direction != direction)
+            {
+                AddError(result,
+                    $"Block '{block.Name}' port '{port.Name}' must be an {directionName} port.",
+                    block.Id);
+            }
+
+            if (!port.DataType.Equals(expected.DataType, StringComparison.OrdinalIgnoreCase))
+            {
+                AddError(result,
+                    $"Block '{block.Name}' {directionName} port '{port.Name}' must have data type " +
+                    $"'{expected.DataType}'; got '{port.DataType}'.",
+                    block.Id);
+            }
+        }
+    }
+
+    private static void ValidateRequiredInputConnections(Recipe recipe, ValidationResult result)
+    {
+        foreach (var block in recipe.Blocks)
+        {
+            if (!BlockPortSchema.ExpectsInput(block.Type) || block.InputPorts.Count == 0)
+            {
+                continue;
+            }
+
+            if (recipe.Edges.Any(edge => edge.TargetBlockId == block.Id))
+            {
+                continue;
+            }
+
+            AddError(result,
+                $"Block '{block.Name}' ({block.Type}) requires an incoming connection.",
+                block.Id);
         }
     }
 
@@ -109,11 +197,13 @@ public sealed class RecipeValidationService
             {
                 if (sourcePort.Block.Id != sourceBlock!.Id)
                 {
-                    AddError(result, $"Source port '{edge.SourcePortId}' does not belong to block '{sourceBlock.Name}'.");
+                    AddError(result, $"Source port '{edge.SourcePortId}' does not belong to block '{sourceBlock.Name}'.",
+                        sourceBlock.Id);
                 }
                 else if (sourcePort.Port.Direction != PortDirection.Output)
                 {
-                    AddError(result, $"Source port '{sourcePort.Port.Name}' on block '{sourceBlock.Name}' must be an output port.");
+                    AddError(result, $"Source port '{sourcePort.Port.Name}' on block '{sourceBlock.Name}' must be an output port.",
+                        sourceBlock.Id);
                 }
             }
 
@@ -121,25 +211,41 @@ public sealed class RecipeValidationService
             {
                 if (targetPort.Block.Id != targetBlock!.Id)
                 {
-                    AddError(result, $"Target port '{edge.TargetPortId}' does not belong to block '{targetBlock.Name}'.");
+                    AddError(result, $"Target port '{edge.TargetPortId}' does not belong to block '{targetBlock.Name}'.",
+                        targetBlock.Id);
                 }
                 else if (targetPort.Port.Direction != PortDirection.Input)
                 {
-                    AddError(result, $"Target port '{targetPort.Port.Name}' on block '{targetBlock.Name}' must be an input port.");
+                    AddError(result, $"Target port '{targetPort.Port.Name}' on block '{targetBlock.Name}' must be an input port.",
+                        targetBlock.Id);
                 }
             }
 
             if (!seenEdges.Add((edge.SourceBlockId, edge.SourcePortId, edge.TargetBlockId, edge.TargetPortId)))
             {
-                AddError(result, $"Duplicate edge from '{edge.SourceBlockId}' to '{edge.TargetBlockId}'.");
+                AddError(result, $"Duplicate edge from '{edge.SourceBlockId}' to '{edge.TargetBlockId}'.",
+                    targetBlock?.Id);
             }
 
             if (sourcePortExists && targetPortExists &&
-                !ArePortTypesCompatible(sourcePort.Port.DataType, targetPort.Port.DataType))
+                !ConnectionRules.ArePortTypesCompatible(sourcePort.Port.DataType, targetPort.Port.DataType))
             {
                 AddError(result,
-                    $"Port type mismatch: '{sourcePort.Port.DataType}' cannot connect to '{targetPort.Port.DataType}'.");
+                    $"Port type mismatch: '{sourcePort.Port.DataType}' cannot connect to '{targetPort.Port.DataType}'.",
+                    targetBlock?.Id);
             }
+        }
+
+        foreach (var fanIn in recipe.Edges
+                     .GroupBy(edge => (edge.TargetBlockId, edge.TargetPortId))
+                     .Where(group => group.Count() > 1))
+        {
+            var block = blocks.GetValueOrDefault(fanIn.Key.TargetBlockId);
+            var port = ports.TryGetValue(fanIn.Key.TargetPortId, out var entry) ? entry.Port : null;
+            AddError(result,
+                $"Input port '{port?.Name ?? fanIn.Key.TargetPortId}' on block '{block?.Name ?? fanIn.Key.TargetBlockId}' " +
+                $"accepts only one incoming connection (found {fanIn.Count()}).",
+                block?.Id);
         }
     }
 
@@ -167,17 +273,13 @@ public sealed class RecipeValidationService
         }
     }
 
-    private static void AddError(ValidationResult result, string message) =>
+    private static void AddError(ValidationResult result, string message, string? blockId = null) =>
         result.Issues.Add(new ValidationIssue
         {
             Severity = ValidationSeverity.Error,
-            Message = message
+            Message = message,
+            BlockId = blockId
         });
-
-    private static bool ArePortTypesCompatible(string sourceType, string targetType) =>
-        sourceType.Equals("any", StringComparison.OrdinalIgnoreCase) ||
-        targetType.Equals("any", StringComparison.OrdinalIgnoreCase) ||
-        sourceType.Equals(targetType, StringComparison.OrdinalIgnoreCase);
 
     private void ValidateCycles(Recipe recipe, ValidationResult result)
     {

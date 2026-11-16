@@ -25,4 +25,10 @@ public sealed class AppSettings
 
     /// <summary>Anthropic API key; falls back to ANTHROPIC_API_KEY when empty.</summary>
     public string? AnthropicApiKey { get; set; }
+
+    /// <summary>Most recently opened recipe files, newest first.</summary>
+    public List<string> RecentFiles { get; set; } = new();
+
+    /// <summary>Recipe file restored on the next launch; empty starts a blank document.</summary>
+    public string? LastRecipePath { get; set; }
 }

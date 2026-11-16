@@ -1,7 +1,7 @@
 # STATUS — 功能清单、节点能力矩阵与下一阶段规划
 
-> 最后核对：2026-11-16，基于提交 `a873955`
-> 验证基线：`dotnet build` 0 警告 0 错误；`dotnet test` 246 通过 + 2 个需环境变量的真实 provider 冒烟（启用后 2 通过）；真实 provider 冒烟已跑通。
+> 最后核对：2026-11-16，Round 8 完成后（工作区）
+> 验证基线：`dotnet build` 0 警告 0 错误；`dotnet test` 285 通过 + 2 个需环境变量的真实 provider 冒烟（gated，默认跳过）；真实 provider 冒烟此前已跑通。
 >
 > 图例：`[x]` 已完成并有测试/验证；`[部分]` 可用但有明确缺口；`[ ]` 未实现。
 
@@ -12,20 +12,21 @@
 ### 1.1 已形成的可用闭环
 
 - Recipe 内存模型、强类型节点配置、多态 JSON 序列化、深拷贝、Recipe/Settings 持久化服务。
+- Recipe 文件生命周期闭环：新建、从示例新建、打开、保存、另存为、最近文件、脏标记、关闭确认、重启恢复上次文件。
+- 按 BlockType 生成端口 schema；连接前校验方向/类型/单输入/重复/环；校验问题列表与画布错误/警告徽标。
 - JSONL 流式读取、SQLite 行索引缓存、分页读取。
 - DAG 校验、拓扑分层、顺序执行、fail-fast、下游 Skipped、取消、进度、日志、执行记录持久化与 Executions UI。
 - 10 种节点类型全部接入 Block Sheet、画布、默认配置与 Recipe JSON。
 - Query Source → Simulation → Cleaner → SFT Export 端到端 SFT 轨迹生成可用（脚本/真实 provider、模拟/真实工具均可切换）。
 - 真实 provider tool-calling（OpenAI Chat/Responses、Anthropic）与真实沙箱工具（python/PowerShell/bash/web_fetch）。
-- 246 个自动化测试 + 2 个 gated 真实 provider 冒烟测试。
+- 285 个自动化测试 + 2 个 gated 真实 provider 冒烟测试。
 
 ### 1.2 当前最大缺口
 
-1. **Recipe 文件生命周期未闭环**：没有新建/打开/保存/另存为、最近文件、脏标记、关闭确认，重启后回到硬编码示例 Recipe。
-2. **节点语义不完整**：Expression 仍是 `{{ path }}` 占位引擎；Validator 无 reject 分支；Sampler 的 `Splits` 未实现；Tool Profile 无执行器/无引用；端口按节点类型不固定。
-3. **数据工作台未接 UI**：CSV/Parquet、格式转换、校验修复、分页预览、数据编辑、去重/混洗/切分、搜索替换都还没有界面。
-4. **画布体验缺口**：网格背景/吸附、缩放锚点、Fit、自动布局、Mini-map 视口/点击、复制携带连线、真实端口坐标、可调分栏等。
-5. **发布工程化缺口**：Headless UI 测试、1M/10M 性能验收、CI、打包、主题切换、日志/崩溃处理、LICENSE/Assets。
+1. **节点语义不完整**：Expression 仍是 `{{ path }}` 占位引擎；Validator 无 reject 分支；Sampler 的 `Splits` 未实现；Tool Profile 无执行器/无引用。
+2. **数据工作台未接 UI**：CSV/Parquet、格式转换、校验修复、分页预览、数据编辑、去重/混洗/切分、搜索替换都还没有界面。
+3. **画布体验缺口**：网格背景/吸附、缩放锚点、Fit、自动布局、Mini-map 视口/点击、复制携带连线、可调分栏等。
+4. **发布工程化缺口**：Headless UI 测试、1M/10M 性能验收、CI、打包、主题切换、日志/崩溃处理、LICENSE/Assets。
 
 ---
 
@@ -39,7 +40,7 @@
 | SQLite 索引缓存 | [x] | `UseIndexCache=true` 时走索引；可配置容量并清理 |
 | 行数进度 | [x] | `RowsProcessed` 上报 |
 | 专属属性面板 | [x] | 路径选择、文件类型、Index Cache 开关 |
-| 端口 schema 按类型固定 | [ ] | 当前从 Block Sheet 添加时固定 input/output + any |
+| 端口 schema 按类型固定 | [x] | 仅输出 `rows`；连接前校验方向/类型 |
 | CSV / Parquet 读取 | [ ] | UI 可选，执行时抛 `NotSupportedException`；仅 JSONL 可用 |
 | `Streaming` 开关生效 | [ ] | 配置存在，但执行分支只由 `UseIndexCache` 决定 |
 | 数据预览 / 过滤 / 列映射 | [ ] | 无 |
@@ -88,7 +89,7 @@
 | JSON Schema / 代码规则 | [ ] | 仅 expression |
 | 专属属性面板 | [ ] | 仅通用 Config JSON |
 | 失败样本查看 / 失败率 / 超时 | [ ] | 无 |
-| 端口 schema 固定为输入/输出 | [ ] | 同 Seed 问题 |
+| 端口 schema 固定为输入/输出 | [x] | 输入 + 输出 `rows`；必需输入连接校验 |
 
 ### 2.5 Sampler（确定性采样）
 
@@ -181,6 +182,9 @@
 
 - [x] 强类型 `BlockConfig` 多态层级、`kind` 判别、默认工厂、深拷贝、类型匹配校验。
 - [x] Recipe / Settings 原子持久化服务与 schema 版本。
+- [x] Recipe 文件生命周期：新建（空白/示例）、打开、保存、另存为、最近文件、脏标记、关闭确认与重启恢复。
+- [x] 端口契约：按 BlockType 生成端口；连接前校验方向、DataType、重复边、单输入与环；非法连接被拦截。
+- [x] 校验问题列表（属性面板）与画布节点错误/警告徽标，问题可定位到节点。
 - [x] JSONL 读取、索引缓存、LRU 容量清理、源文件指纹失效。
 - [x] DAG 校验：空 Recipe、重名、环、悬空边、孤立节点、重复边、端口归属/方向、DataType 兼容、节点配置告警。
 - [x] 执行引擎：拓扑分层、层内串行、fail-fast、下游 Skipped、取消、进度、日志。
@@ -195,15 +199,14 @@
 
 ### 3.2 部分完成
 
-- [部分] 端口模型：`BlockPort` 有类型/方向，但新节点固定 input/output + any，未按 BlockType 生成；端口坐标仍是 `55 + index * 18` 估算。
-- [部分] 校验：覆盖结构问题，但缺少“每种节点必需输入/输出”、错误码、列号、问题分组。
+- [部分] 端口坐标仍是 `55 + index * 18` 估算，未按实际渲染位置计算。
+- [部分] 校验：已覆盖端口契约、必需输入、单输入、方向/类型、环与配置；缺少错误码、列号与问题分组。
 - [部分] 执行：层内串行、节点间输出全量内存物化；无并行、暂停、重试、中断恢复、输出目录摘要。
 - [部分] 画布：缩放不以鼠标为中心；Undo/Redo 无菜单/按钮与 `Ctrl+Shift+Z`；复制不携带边；Mini-map 无视口矩形/点击导航。
 - [部分] 设置：网格吸附设置未生效；主题设置未应用；内存占用只在构造时读取。
 
 ### 3.3 未实现
 
-- [ ] Recipe 新建/打开/保存/另存为、最近文件、脏标记、关闭确认、重启恢复。
 - [ ] 数据集分页预览、行跳转、数据编辑、搜索/正则替换。
 - [ ] CSV / Parquet 读写与格式转换 UI。
 - [ ] DPO / Pretrain 格式。
@@ -215,7 +218,7 @@
 - [ ] 全局异常处理、滚动日志、崩溃报告。
 - [ ] 单实例 / 文件关联 / 命令行打开。
 - [ ] Prompt/Jinja 编辑器、Tool Schema 树形编辑器、样本预览。
-- [ ] 节点尺寸调整、边 hover 动画、标签避让、画布错误徽标。
+- [ ] 节点尺寸调整、边 hover 动画、标签避让。
 - [ ] 应用图标、README 截图。
 
 ---
@@ -239,7 +242,7 @@
 
 ## 五、下一阶段规划（Round 8–12）
 
-### Round 8 — Recipe 生命周期与节点契约（P0，建议立即开始）
+### Round 8 — Recipe 生命周期与节点契约（P0，已完成 2026-11-16）
 
 **目标**：让“编辑中的 Recipe”真正可保存、可恢复、可交付；修正节点端口契约。
 
@@ -255,6 +258,8 @@
 5. 校验补强：每种节点的必需输入/输出、单输入约束、端口类型与节点类型匹配；修正示例 Recipe 端口。
 6. 画布节点显示校验错误徽标；属性面板问题列表可定位。
 7. 测试：RecipeStore/ViewModel 文件生命周期、端口工厂、端口校验、坏文件加载。
+
+> 完成情况：File 菜单 + 快捷键 + StorageProvider 已接线；最近文件/上次路径写入设置；脏标记与关闭确认可用；启动默认空白并可恢复上次文件；“New from Sample”加载 4 节点示例；端口 schema 与连接拦截已生效；属性面板问题列表与画布徽标已接入；新增端口/连接/文档生命周期测试，测试总数 285（+2 gated）。
 
 **验收**
 - 保存后重新加载，节点/边/配置/坐标/schemaVersion 完全一致。
@@ -321,11 +326,14 @@
 
 ## 六、建议的下一步
 
-优先做 **Round 8.1（Recipe 打开/保存/另存为 + 脏标记）** 和 **Round 8.4（按类型端口契约）**，原因：
+Round 8 已完成，建议进入 **Round 9（节点能力补齐）**，按以下顺序落地：
 
-1. 这两项是所有后续节点/数据功能的基础，当前不做会导致编辑成果无法保存、端口错误无法被系统性拦截。
-2. 它们能立即提升产品可用性，且改动集中在既有 `RecipeStore`、`MainWindowViewModel`、`RecipeCanvasView`、`RecipeValidationService`，风险可控。
-3. 完成后再进入 Round 9 的 Expression/Validator/Sampler/Tool Profile，避免在不稳定的端口/持久化契约上继续叠加功能。
+1. **Expression**：替换为真实模板引擎（Fluid 或 Scriban），补专属面板、变量说明、渲染预览与语法错误定位；输出必须是合法 JSON。
+2. **Validator**：JSON Schema 规则、reject 独立输出端口/失败文件、失败率与失败样本、坏行策略。
+3. **Sampler**：`Splits` 与多输出/多文件真正生效，补确定性测试与专属面板。
+4. **Tool Profile**：Tool Schema 树形编辑器、JSON 导入导出，并被 Simulation/LLM 复用。
+
+理由：端口与持久化契约已稳定，可以安全地在节点语义层继续叠加功能；Validator/Sampler 的输出端口会进一步依赖本轮建立的端口契约。
 
 ---
 

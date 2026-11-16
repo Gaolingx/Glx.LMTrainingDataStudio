@@ -24,13 +24,15 @@ public sealed class RecipeValidationServiceTests
         var recipe = new Recipe();
         var seed = CreateBlock("seed1", BlockType.Seed, "seed_data",
             new SeedBlockConfig("data.jsonl", DataFileType.Jsonl, Streaming: false, UseIndexCache: true));
-        seed.OutputPorts.Add(CreatePort("seed_out", PortDirection.Output));
+        seed.OutputPorts.Add(CreateSchemaPort(BlockType.Seed, PortDirection.Output));
         var validator = CreateBlock("val1", BlockType.Validator, "code_check",
             new ValidatorBlockConfig("expression", "len(messages) > 0", RejectOnFailure: true));
-        validator.InputPorts.Add(CreatePort("val_in", PortDirection.Input));
+        validator.InputPorts.Add(CreateSchemaPort(BlockType.Validator, PortDirection.Input));
+        validator.OutputPorts.Add(CreateSchemaPort(BlockType.Validator, PortDirection.Output));
 
         recipe.Blocks.AddRange(new[] { seed, validator });
-        recipe.Edges.Add(CreateEdge("edge1", "seed1", "seed_out", "val1", "val_in"));
+        recipe.Edges.Add(CreateEdge(
+            "edge1", "seed1", seed.OutputPorts[0].Id, "val1", validator.InputPorts[0].Id));
 
         var result = _service.Validate(recipe);
 
@@ -77,7 +79,8 @@ public sealed class RecipeValidationServiceTests
     public void Validate_DanglingEdge_ReportsMissingBlocksAndPorts()
     {
         var recipe = new Recipe();
-        var block = CreateBlock("b1", BlockType.Validator, "only_block");
+        var block = CreateBlock("b1", BlockType.Seed, "only_block");
+        block.OutputPorts.Add(CreateSchemaPort(BlockType.Seed, PortDirection.Output));
         recipe.Blocks.Add(block);
         recipe.Edges.Add(CreateEdge("e1", "missing_source", "missing_out", "missing_target", "missing_in"));
 
@@ -91,7 +94,9 @@ public sealed class RecipeValidationServiceTests
     public void Validate_SeedWithoutSource_ReportsWarning()
     {
         var recipe = new Recipe();
-        recipe.Blocks.Add(CreateBlock("seed1", BlockType.Seed, "seed_data"));
+        var seed = CreateBlock("seed1", BlockType.Seed, "seed_data");
+        seed.OutputPorts.Add(CreateSchemaPort(BlockType.Seed, PortDirection.Output));
+        recipe.Blocks.Add(seed);
 
         var result = _service.Validate(recipe);
 
@@ -145,8 +150,10 @@ public sealed class RecipeValidationServiceTests
     public void Validate_SeedWithNonJsonlFile_ReportsWarning()
     {
         var recipe = new Recipe();
-        recipe.Blocks.Add(CreateBlock("seed1", BlockType.Seed, "seed_data",
-            new SeedBlockConfig("data.csv", DataFileType.Csv, Streaming: false, UseIndexCache: true)));
+        var seed = CreateBlock("seed1", BlockType.Seed, "seed_data",
+            new SeedBlockConfig("data.csv", DataFileType.Csv, Streaming: false, UseIndexCache: true));
+        seed.OutputPorts.Add(CreateSchemaPort(BlockType.Seed, PortDirection.Output));
+        recipe.Blocks.Add(seed);
 
         var result = _service.Validate(recipe);
 
@@ -158,11 +165,13 @@ public sealed class RecipeValidationServiceTests
     public void Validate_LlmWithoutModelAlias_ReportsWarning()
     {
         var recipe = new Recipe();
-        recipe.Blocks.Add(CreateBlock("llm1", BlockType.Llm, "generator"));
+        var llm = CreateBlock("llm1", BlockType.Llm, "generator");
+        llm.InputPorts.Add(CreateSchemaPort(BlockType.Llm, PortDirection.Input));
+        llm.OutputPorts.Add(CreateSchemaPort(BlockType.Llm, PortDirection.Output));
+        recipe.Blocks.Add(llm);
 
         var result = _service.Validate(recipe);
 
-        Assert.That(result.IsValid, Is.True);
         Assert.That(result.Issues.Any(i =>
             i.Severity == ValidationSeverity.Warning && i.Message.Contains("no model alias")), Is.True);
     }
@@ -227,7 +236,7 @@ public sealed class RecipeValidationServiceTests
 
         var result = _service.Validate(recipe);
 
-        Assert.That(result.Issues.Any(i => i.Message.Contains("Sampler")), Is.False);
+        Assert.That(result.Issues.Any(i => i.Message.Contains("neither count nor ratio")), Is.False);
     }
 
     [Test]
@@ -468,6 +477,125 @@ public sealed class RecipeValidationServiceTests
 
         Assert.That(result.Issues.Any(i => i.Message.Contains("no output path")), Is.True);
     }
+
+    [Test]
+    public void Validate_SeedWithInputPort_ReportsError()
+    {
+        var seed = CreateBlock("seed", BlockType.Seed, "seed_data");
+        seed.InputPorts.Add(CreateSchemaPort(BlockType.Expression, PortDirection.Input));
+        seed.OutputPorts.Add(CreateSchemaPort(BlockType.Seed, PortDirection.Output));
+        var recipe = new Recipe();
+        recipe.Blocks.Add(seed);
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Severity == ValidationSeverity.Error && i.Message.Contains("must not have input ports")), Is.True);
+    }
+
+    [Test]
+    public void Validate_SftExportWithOutputPort_ReportsError()
+    {
+        var export = CreateBlock("export", BlockType.SftExport, "export",
+            new SftExportBlockConfig("out/sft.jsonl"));
+        export.InputPorts.Add(CreateSchemaPort(BlockType.SftExport, PortDirection.Input));
+        export.OutputPorts.Add(CreateSchemaPort(BlockType.Validator, PortDirection.Output));
+        var recipe = new Recipe();
+        recipe.Blocks.Add(export);
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Severity == ValidationSeverity.Error && i.Message.Contains("must not have output ports")), Is.True);
+    }
+
+    [Test]
+    public void Validate_ToolProfileWithDataPort_ReportsError()
+    {
+        var toolProfile = CreateBlock("tools", BlockType.ToolProfile, "tools");
+        toolProfile.InputPorts.Add(CreateSchemaPort(BlockType.Expression, PortDirection.Input));
+        var recipe = new Recipe();
+        recipe.Blocks.Add(toolProfile);
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Severity == ValidationSeverity.Error && i.Message.Contains("must not have input ports")), Is.True);
+    }
+
+    [Test]
+    public void Validate_TransformWithoutRequiredPorts_ReportsErrors()
+    {
+        var expression = CreateBlock("expr", BlockType.Expression, "render");
+        var recipe = new Recipe();
+        recipe.Blocks.Add(expression);
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i => i.Message.Contains("requires an input port")), Is.True);
+        Assert.That(result.Issues.Any(i => i.Message.Contains("requires an output port")), Is.True);
+    }
+
+    [Test]
+    public void Validate_WrongPortDataType_ReportsError()
+    {
+        var seed = CreateBlock("seed", BlockType.Seed, "seed_data");
+        seed.OutputPorts.Add(CreatePort("seed_out", PortDirection.Output, "jsonl"));
+        var recipe = new Recipe();
+        recipe.Blocks.Add(seed);
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Severity == ValidationSeverity.Error &&
+            i.Message.Contains("must have data type 'rows'")), Is.True);
+    }
+
+    [Test]
+    public void Validate_TransformWithoutIncomingConnection_ReportsError()
+    {
+        var validator = CreateBlock("val", BlockType.Validator, "check");
+        validator.InputPorts.Add(CreateSchemaPort(BlockType.Validator, PortDirection.Input));
+        validator.OutputPorts.Add(CreateSchemaPort(BlockType.Validator, PortDirection.Output));
+        var recipe = new Recipe();
+        recipe.Blocks.Add(validator);
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Severity == ValidationSeverity.Error &&
+            i.Message.Contains("requires an incoming connection")), Is.True);
+    }
+
+    [Test]
+    public void Validate_MultipleIncomingConnections_ReportsError()
+    {
+        var first = CreateBlock("seed1", BlockType.Seed, "seed_one");
+        first.OutputPorts.Add(CreateSchemaPort(BlockType.Seed, PortDirection.Output));
+        var second = CreateBlock("seed2", BlockType.Seed, "seed_two");
+        second.OutputPorts.Add(CreateSchemaPort(BlockType.Seed, PortDirection.Output));
+        var validator = CreateBlock("val", BlockType.Validator, "check");
+        validator.InputPorts.Add(CreateSchemaPort(BlockType.Validator, PortDirection.Input));
+        validator.OutputPorts.Add(CreateSchemaPort(BlockType.Validator, PortDirection.Output));
+
+        var recipe = new Recipe();
+        recipe.Blocks.AddRange(new[] { first, second, validator });
+        recipe.Edges.Add(CreateEdge(
+            "e1", "seed1", first.OutputPorts[0].Id, "val", validator.InputPorts[0].Id));
+        recipe.Edges.Add(CreateEdge(
+            "e2", "seed2", second.OutputPorts[0].Id, "val", validator.InputPorts[0].Id));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Severity == ValidationSeverity.Error &&
+            i.Message.Contains("accepts only one incoming connection")), Is.True);
+    }
+
+    private static BlockPort CreateSchemaPort(BlockType type, PortDirection direction) =>
+        direction == PortDirection.Input
+            ? BlockPortSchema.CreateInputPorts(type)[0]
+            : BlockPortSchema.CreateOutputPorts(type)[0];
 
     private static RecipeBlock CreateBlock(string id, BlockType type, string name, BlockConfig? config = null) => new()
     {
