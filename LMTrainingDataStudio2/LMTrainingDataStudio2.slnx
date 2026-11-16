@@ -1,3 +1,4 @@
 <Solution>
   <Project Path="LMTrainingDataStudio2/LMTrainingDataStudio2.csproj" />
+  <Project Path="LMTrainingDataStudio2.Tests/LMTrainingDataStudio2.Tests.csproj" />
 </Solution>

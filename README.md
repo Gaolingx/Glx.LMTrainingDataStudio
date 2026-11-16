@@ -19,12 +19,14 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - Tool Schema 数据模型
 
 > 注意：当前仍是早期开发版，部分交互如真实节点拖拽、连线创建、自动布局、完整文件读写和输出预览弹窗仍在开发中。
+>
+> 详细实施计划、阶段目标与验收标准见 [TODO.md](TODO.md)。
 
 ## 技术栈
 
 - **语言**：C#
 - **框架**：Avalonia UI
-- **运行时**：.NET 10（项目当前 `TargetFramework` 为 `net10.0`）
+- **运行时**：.NET 9（项目当前 `TargetFramework` 为 `net9.0`）
 - **数据缓存**：SQLite / `Microsoft.Data.Sqlite`
 - **CSV 支持**：`CsvHelper`
 - **Parquet 支持**：`Parquet.Net`
@@ -107,7 +109,7 @@ LMTrainingDataStudio2/                      # 主项目目录
 ├── Program.cs                              # 应用入口，配置 Avalonia AppBuilder
 ├── App.axaml / App.axaml.cs                # Application 定义，主题与资源加载
 ├── app.manifest                            # Windows 应用清单
-├── LMTrainingDataStudio2.csproj            # 项目文件（Avalonia 11.3 / .NET 10）
+├── LMTrainingDataStudio2.csproj            # 项目文件（Avalonia 11.3 / .NET 9）
 │
 ├── Models/                                 # 数据模型层
 │   ├── AppSettings.cs                      # 全局设置（缓存容量、主题、网格吸附等）
@@ -152,7 +154,7 @@ LMTrainingDataStudio2/                      # 主项目目录
 ### 环境要求
 
 - Windows / Linux / macOS 桌面环境
-- .NET SDK 10 或与项目 `TargetFramework` 匹配的 SDK
+- .NET SDK 9 或与项目 `TargetFramework` 匹配的 SDK
 
 检查 SDK：
 
@@ -170,6 +172,12 @@ dotnet restore .\LMTrainingDataStudio2.slnx
 
 ```powershell
 dotnet build .\LMTrainingDataStudio2.slnx
+```
+
+### 运行测试
+
+```powershell
+dotnet test .\LMTrainingDataStudio2.slnx
 ```
 
 ### 运行项目
