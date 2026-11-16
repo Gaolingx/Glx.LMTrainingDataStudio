@@ -11,6 +11,9 @@ public sealed class BlockExecutionContext
     public IAsyncEnumerable<DatasetRow>? Input { get; init; }
     public required Action<string> Log { get; init; }
     public IProgress<long>? RowsProcessed { get; init; }
+
+    /// <summary>Tool profile resolved from a referenced Tool Profile block, when configured.</summary>
+    public ToolProfile? ToolProfile { get; init; }
 }
 
 /// <summary>

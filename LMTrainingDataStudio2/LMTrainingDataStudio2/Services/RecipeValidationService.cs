@@ -1,4 +1,5 @@
 using LMTrainingDataStudio2.Models;
+using LMTrainingDataStudio2.Services.Executors;
 
 namespace LMTrainingDataStudio2.Services;
 
@@ -37,6 +38,7 @@ public sealed class RecipeValidationService
         ValidateIsolatedBlocks(recipe, result);
         ValidateCycles(recipe, result);
         ValidateBlockConfigurations(recipe, result);
+        ValidateToolProfileReferences(recipe, result);
 
         return result;
     }
@@ -400,11 +402,24 @@ public sealed class RecipeValidationService
                     });
                     break;
 
-                case ExpressionBlockConfig expression when string.IsNullOrWhiteSpace(expression.Template):
+                case ExpressionBlockConfig expression when
+                    string.IsNullOrWhiteSpace(expression.Template) && expression.Fields.Count == 0:
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
-                        Message = $"Expression block '{block.Name}' has no template configured.",
+                        Message = $"Expression block '{block.Name}' has no template or field mapping configured.",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case ExpressionBlockConfig expression when
+                    !string.IsNullOrWhiteSpace(expression.Template) &&
+                    !TemplateRenderer.Validate(expression.Template).IsValid:
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Expression block '{block.Name}' has an invalid template: " +
+                                  TemplateRenderer.Validate(expression.Template).Error,
                         BlockId = block.Id
                     });
                     break;
@@ -416,6 +431,31 @@ public sealed class RecipeValidationService
                         Message = $"Validator block '{block.Name}' has no rule configured.",
                         BlockId = block.Id
                     });
+                    break;
+
+                case ValidatorBlockConfig validator when !IsKnownValidatorRuleKind(validator.RuleKind):
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Validator block '{block.Name}' uses unknown rule kind '{validator.RuleKind}'. " +
+                                  "Supported: expression, schema.",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case ValidatorBlockConfig validator when IsSchemaRuleKind(validator.RuleKind) &&
+                                                         !string.IsNullOrWhiteSpace(validator.Rule) &&
+                                                         TryValidateJsonSchema(validator.Rule, out var schemaError) is false:
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Validator block '{block.Name}' has an invalid JSON Schema: {schemaError}",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case SamplerBlockConfig sampler when sampler.Splits is { Length: > 0 }:
+                    ValidateSamplerSplits(sampler, block, result);
                     break;
 
                 case SamplerBlockConfig sampler when sampler.Count is null && sampler.Ratio is null:
@@ -611,6 +651,109 @@ public sealed class RecipeValidationService
                     });
                     break;
             }
+        }
+    }
+
+    private void ValidateToolProfileReferences(Recipe recipe, ValidationResult result)
+    {
+        foreach (var block in recipe.Blocks)
+        {
+            var reference = ToolProfileResolver.GetReference(block.Config);
+            if (string.IsNullOrWhiteSpace(reference))
+            {
+                continue;
+            }
+
+            var profile = ToolProfileResolver.Resolve(recipe, block);
+            if (profile is null)
+            {
+                result.Issues.Add(new ValidationIssue
+                {
+                    Severity = ValidationSeverity.Warning,
+                    Message = $"Block '{block.Name}' references unknown tool profile '{reference}'.",
+                    BlockId = block.Id
+                });
+            }
+            else if (profile.Tools is not { Count: > 0 })
+            {
+                result.Issues.Add(new ValidationIssue
+                {
+                    Severity = ValidationSeverity.Warning,
+                    Message = $"Block '{block.Name}' references tool profile '{reference}', which has no tools.",
+                    BlockId = block.Id
+                });
+            }
+            else if (block.Config is SimulationBlockConfig { ToolMode: ToolExecutionMode.Real } &&
+                     profile.Tools
+                         .Select(tool => tool.Function.Name)
+                         .FirstOrDefault(name => !RealSandboxTools.Contains(name)) is { } unsupported)
+            {
+                result.Issues.Add(new ValidationIssue
+                {
+                    Severity = ValidationSeverity.Warning,
+                    Message = $"Simulation block '{block.Name}' tool profile '{reference}' exposes " +
+                              $"'{unsupported}', which has no real sandbox executor.",
+                    BlockId = block.Id
+                });
+            }
+        }
+    }
+
+    private static void ValidateSamplerSplits(
+        SamplerBlockConfig sampler,
+        RecipeBlock block,
+        ValidationResult result)
+    {
+        if (string.IsNullOrWhiteSpace(sampler.OutputDirectory))
+        {
+            result.Issues.Add(new ValidationIssue
+            {
+                Severity = ValidationSeverity.Warning,
+                Message = $"Sampler block '{block.Name}' has splits but no output directory.",
+                BlockId = block.Id
+            });
+        }
+        else if (!SamplerSplitPlan.TryParse(sampler.Splits, out _, out var error))
+        {
+            result.Issues.Add(new ValidationIssue
+            {
+                Severity = ValidationSeverity.Warning,
+                Message = $"Sampler block '{block.Name}' has invalid splits: {error}",
+                BlockId = block.Id
+            });
+        }
+
+        if (sampler.Count is not null || sampler.Ratio is not null)
+        {
+            result.Issues.Add(new ValidationIssue
+            {
+                Severity = ValidationSeverity.Warning,
+                Message = $"Sampler block '{block.Name}' ignores count/ratio while splits are configured.",
+                BlockId = block.Id
+            });
+        }
+    }
+
+    private static bool IsKnownValidatorRuleKind(string ruleKind) =>
+        string.Equals(ruleKind, "expression", StringComparison.OrdinalIgnoreCase) ||
+        IsSchemaRuleKind(ruleKind);
+
+    private static bool IsSchemaRuleKind(string ruleKind) =>
+        string.Equals(ruleKind, "schema", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(ruleKind, "json_schema", StringComparison.OrdinalIgnoreCase);
+
+    private static bool TryValidateJsonSchema(string json, out string? error)
+    {
+        try
+        {
+            JsonSchemaRuleEvaluator.Parse(json);
+            error = null;
+            return true;
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            error = ex.Message;
+            return false;
         }
     }
 

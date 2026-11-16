@@ -97,6 +97,9 @@ public partial class SimulationConfigEditorViewModel : ObservableObject
     [ObservableProperty]
     private string _bashExecutable;
 
+    [ObservableProperty]
+    private string _toolProfileName;
+
     public SimulationConfigEditorViewModel(
         SimulationBlockConfig config,
         Action<SimulationBlockConfig> apply)
@@ -129,6 +132,7 @@ public partial class SimulationConfigEditorViewModel : ObservableObject
         _pythonExecutable = sandbox.PythonExecutable ?? string.Empty;
         _powerShellExecutable = sandbox.PowerShellExecutable ?? string.Empty;
         _bashExecutable = sandbox.BashExecutable ?? string.Empty;
+        _toolProfileName = config.ToolProfileName ?? string.Empty;
 
         _selectedProvider = Providers.FirstOrDefault(option =>
             option.Id == LlmProviderIds.Normalize(config.Provider)) ?? Providers[0];
@@ -209,6 +213,8 @@ public partial class SimulationConfigEditorViewModel : ObservableObject
 
     partial void OnBashExecutableChanged(string value) => Push();
 
+    partial void OnToolProfileNameChanged(string value) => Push();
+
     private void Push()
     {
         var sandbox = (_base.Sandbox ?? new SandboxLimits()) with
@@ -247,7 +253,8 @@ public partial class SimulationConfigEditorViewModel : ObservableObject
             Sandbox = sandbox,
             Tools = _base.Tools,
             Rules = _base.Rules,
-            Script = _base.Script
+            Script = _base.Script,
+            ToolProfileName = NullIfBlank(ToolProfileName)
         });
     }
 

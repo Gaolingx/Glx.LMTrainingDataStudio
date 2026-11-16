@@ -1,7 +1,7 @@
 # STATUS — 功能清单、节点能力矩阵与下一阶段规划
 
-> 最后核对：2026-11-16，Round 8 完成后（工作区）
-> 验证基线：`dotnet build` 0 警告 0 错误；`dotnet test` 285 通过 + 2 个需环境变量的真实 provider 冒烟（gated，默认跳过）；真实 provider 冒烟此前已跑通。
+> 最后核对：2026-11-16，Round 9 完成后（工作区）
+> 验证基线：`dotnet build` 0 警告 0 错误；`dotnet test` 311 通过 + 2 个需环境变量的真实 provider 冒烟（gated，默认跳过）；真实 provider 冒烟此前已跑通。
 >
 > 图例：`[x]` 已完成并有测试/验证；`[部分]` 可用但有明确缺口；`[ ]` 未实现。
 
@@ -14,16 +14,19 @@
 - Recipe 内存模型、强类型节点配置、多态 JSON 序列化、深拷贝、Recipe/Settings 持久化服务。
 - Recipe 文件生命周期闭环：新建、从示例新建、打开、保存、另存为、最近文件、脏标记、关闭确认、重启恢复上次文件。
 - 按 BlockType 生成端口 schema；连接前校验方向/类型/单输入/重复/环；校验问题列表与画布错误/警告徽标。
+- Expression 使用 Fluid 模板引擎（条件/循环/过滤器），带专属面板、语法校验与样本预览；输出 JSON 强校验。
+- Validator 支持表达式与 JSON Schema 规则、reject 文件、失败率日志；Sampler 支持确定性多文件切分。
+- Tool Profile 支持参数树编辑与 JSON 导入导出，并被 Simulation/LLM 复用。
 - JSONL 流式读取、SQLite 行索引缓存、分页读取。
 - DAG 校验、拓扑分层、顺序执行、fail-fast、下游 Skipped、取消、进度、日志、执行记录持久化与 Executions UI。
 - 10 种节点类型全部接入 Block Sheet、画布、默认配置与 Recipe JSON。
 - Query Source → Simulation → Cleaner → SFT Export 端到端 SFT 轨迹生成可用（脚本/真实 provider、模拟/真实工具均可切换）。
 - 真实 provider tool-calling（OpenAI Chat/Responses、Anthropic）与真实沙箱工具（python/PowerShell/bash/web_fetch）。
-- 285 个自动化测试 + 2 个 gated 真实 provider 冒烟测试。
+- 311 个自动化测试 + 2 个 gated 真实 provider 冒烟测试。
 
 ### 1.2 当前最大缺口
 
-1. **节点语义不完整**：Expression 仍是 `{{ path }}` 占位引擎；Validator 无 reject 分支；Sampler 的 `Splits` 未实现；Tool Profile 无执行器/无引用。
+1. **节点能力仍有边界**：Validator 暂无代码规则/超时；Sampler 有 Splits 多文件但无多输出端口与分层采样；Tool Profile 无 MCP 适配；LLM 仍不发送 tool definitions 给 provider。
 2. **数据工作台未接 UI**：CSV/Parquet、格式转换、校验修复、分页预览、数据编辑、去重/混洗/切分、搜索替换都还没有界面。
 3. **画布体验缺口**：网格背景/吸附、缩放锚点、Fit、自动布局、Mini-map 视口/点击、复制携带连线、可调分栏等。
 4. **发布工程化缺口**：Headless UI 测试、1M/10M 性能验收、CI、打包、主题切换、日志/崩溃处理、LICENSE/Assets。
@@ -71,11 +74,11 @@
 | 数组 `length` | [x] | `{{ messages.length }}` |
 | 字段别名映射 | [x] | `ExpressionBlockConfig.Fields` |
 | 无模板时字段映射 | [x] | 输出只含映射字段 |
-| 真实 Jinja2 / Liquid 引擎 | [ ] | 无条件、循环、过滤器 |
-| 输出 JSON 合法性校验 | [ ] | 模板结果未校验，下游解析失败才报错 |
-| 专属属性面板 | [ ] | 仅通用 Config JSON |
-| 渲染预览 / 语法校验 | [ ] | 无 |
-| 沙箱 / 超时 | [ ] | 纯字符串替换，无外部执行 |
+| 真实 Jinja2 / Liquid 引擎 | [x] | Fluid.Core；支持条件、循环、过滤器与 `json` 过滤器 |
+| 输出 JSON 合法性校验 | [x] | 渲染后立即解析；失败带行号与 JSON 位置 |
+| 专属属性面板 | [x] | 模板、字段别名、样本 JSON、预览输出 |
+| 渲染预览 / 语法校验 | [x] | 编辑期模板语法校验 + 样本渲染预览 |
+| 沙箱 / 超时 | [ ] | 纯模板渲染，无外部执行 |
 
 ### 2.4 Validator（规则校验与过滤）
 
@@ -85,10 +88,10 @@
 | 非法行处理 | [x] | 解析失败视为 reject |
 | 通过行可选清洗 | [x] | `ValidatorBlockConfig.Cleanup` |
 | 通过/拒绝计数日志 | [x] | 节点日志输出 |
-| reject 输出端口 / 失败文件 | [ ] | 拒绝行直接丢弃 |
-| JSON Schema / 代码规则 | [ ] | 仅 expression |
-| 专属属性面板 | [ ] | 仅通用 Config JSON |
-| 失败样本查看 / 失败率 / 超时 | [ ] | 无 |
+| reject 输出端口 / 失败文件 | [x] | `RejectOutputPath` 原子写 `{ lineNumber, reason, data }` JSONL |
+| JSON Schema / 代码规则 | [部分] | JSON Schema（JsonSchema.Net）；代码规则未实现 |
+| 专属属性面板 | [x] | 规则类型、规则/Schema、reject 开关与路径 |
+| 失败样本查看 / 失败率 / 超时 | [部分] | 失败样本落盘 + 失败率日志；无超时 |
 | 端口 schema 固定为输入/输出 | [x] | 输入 + 输出 `rows`；必需输入连接校验 |
 
 ### 2.5 Sampler（确定性采样）
@@ -98,22 +101,22 @@
 | 按数量采样 | [x] | reservoir sampling |
 | 按比例采样 | [x] | Bernoulli + 固定 seed |
 | 确定性种子 | [x] | `Seed` |
-| `Splits` 切分 | [ ] | 配置存在但执行器忽略 |
-| 多输出端口 / 多文件 | [ ] | 单输出 |
+| `Splits` 切分 | [x] | `name:ratio` / `name:count`；确定性、单行只进一个文件 |
+| 多输出端口 / 多文件 | [部分] | 多文件已实现；多输出端口未实现 |
 | 分层采样 | [ ] | 无 |
-| 专属属性面板 | [ ] | 仅通用 Config JSON |
-| 采样结果预览 / 统计 | [ ] | 无 |
+| 专属属性面板 | [x] | Count / Ratio / Seed / Splits / 输出目录 |
+| 采样结果预览 / 统计 | [ ] | 仅日志汇总各 split 行数 |
 
 ### 2.6 Tool Profile（工具配置）
 
 | 能力 | 状态 | 说明 |
 | --- | --- | --- |
-| 配置模型 | [部分] | `ToolProfileBlockConfig` + `ToolProfile` + `ToolSchemaNode` |
-| 默认配置与 JSON 编辑 | [x] | 可通过通用 Config JSON 编辑 |
-| 执行器 | [ ] | 未注册 `ToolProfileBlockExecutor` |
-| 被 Simulation / LLM 复用 | [ ] | Simulation 使用自己的 `Tools` 数组 |
-| Tool Schema 树形编辑器 | [ ] | `ToolSchemaNode` 未被任何 UI 引用 |
-| JSON 导入 / 导出 | [ ] | 无 |
+| 配置模型 | [x] | `ToolProfileBlockConfig` + `ToolProfile` + `ToolDefinition` |
+| 默认配置与 JSON 编辑 | [x] | 专属面板 + 通用 Config JSON |
+| 执行器 | [x] | `ToolProfileBlockExecutor` 配置型节点，无数据输出 |
+| 被 Simulation / LLM 复用 | [x] | Simulation 合并 profile tools；LLM 将 tools 写入输出元数据 |
+| Tool Schema 树形编辑器 | [x] | 参数树可增删/改名/改类型/必填；与 JSON Schema 双向同步 |
+| JSON 导入 / 导出 | [x] | 支持完整 profile、tool 数组或单个 tool |
 | MCP 工具 | [ ] | 无 |
 
 ### 2.7 Query Source（模拟用户 query）
@@ -185,6 +188,10 @@
 - [x] Recipe 文件生命周期：新建（空白/示例）、打开、保存、另存为、最近文件、脏标记、关闭确认与重启恢复。
 - [x] 端口契约：按 BlockType 生成端口；连接前校验方向、DataType、重复边、单输入与环；非法连接被拦截。
 - [x] 校验问题列表（属性面板）与画布节点错误/警告徽标，问题可定位到节点。
+- [x] Expression：Fluid 模板引擎（条件/循环/过滤器）、`json` 过滤器、输出 JSON 校验、专属面板与样本预览。
+- [x] Validator：JSON Schema 规则、reject 文件（lineNumber/reason/data）、失败率日志、专属面板。
+- [x] Sampler：ratio/count 多文件切分、确定性复现、原子写入与专属面板。
+- [x] Tool Profile：参数树编辑、JSON 导入导出、配置型执行器、Simulation/LLM 引用复用。
 - [x] JSONL 读取、索引缓存、LRU 容量清理、源文件指纹失效。
 - [x] DAG 校验：空 Recipe、重名、环、悬空边、孤立节点、重复边、端口归属/方向、DataType 兼容、节点配置告警。
 - [x] 执行引擎：拓扑分层、层内串行、fail-fast、下游 Skipped、取消、进度、日志。
@@ -210,14 +217,13 @@
 - [ ] 数据集分页预览、行跳转、数据编辑、搜索/正则替换。
 - [ ] CSV / Parquet 读写与格式转换 UI。
 - [ ] DPO / Pretrain 格式。
-- [ ] 校验问题列表、自动修复、失败行报告。
+- [ ] 数据校验自动修复、失败行报告。
 - [ ] 去重 / 混洗 / 切分。
 - [ ] 大文件 1M/10M 性能与内存验收。
 - [ ] Headless UI 测试、CI、打包、安装包、LICENSE/Assets。
 - [ ] 主题切换真正生效、硬编码颜色资源化。
 - [ ] 全局异常处理、滚动日志、崩溃报告。
 - [ ] 单实例 / 文件关联 / 命令行打开。
-- [ ] Prompt/Jinja 编辑器、Tool Schema 树形编辑器、样本预览。
 - [ ] 节点尺寸调整、边 hover 动画、标签避让。
 - [ ] 应用图标、README 截图。
 
@@ -229,10 +235,10 @@
 | --- | --- | --- | --- |
 | Seed | 是 | 路径、文件类型、Index Cache | 无（Streaming 未暴露） |
 | LLM | 是 | Provider、Model、温度、Max tokens、超时、重试、Endpoint、Prompt | 无 |
-| Expression | 否 | 无 | Template、Fields |
-| Validator | 否 | 无 | RuleKind、Rule、RejectOnFailure、Cleanup |
-| Sampler | 否 | 无 | Count、Ratio、Seed、Splits |
-| Tool Profile | 否 | 无 | Profile（工具 schema） |
+| Expression | 是 | 模板、字段别名、样本 JSON、预览输出 | 无 |
+| Validator | 是 | 规则类型、规则/Schema、reject 开关与路径 | Cleanup 正则规则 |
+| Sampler | 是 | Count、Ratio、Seed、Splits、输出目录 | 无 |
+| Tool Profile | 是 | 工具列表、参数 JSON、参数树、profile JSON 导入导出 | 无 |
 | Query Source | 是 | Queries、Mode、Repeat、System Prompt | 无 |
 | Simulation | 是 | Provider、模式、模型、轮数、并发、温度、tokens、超时、重试、Endpoint、System/Final、失败样本、成本、沙箱 | Tools、Rules、Script |
 | Cleaner | 是（部分） | 5 个布尔规则 | RegexReplacements |
@@ -267,12 +273,12 @@
 - 从 Block Sheet 添加的节点端口正确；错误连线被校验拦截。
 - `dotnet build` 0 警告，`dotnet test` 全绿。
 
-### Round 9 — 节点能力补齐（P0/P1）
+### Round 9 — 节点能力补齐（P0/P1，已完成 2026-11-16）
 
 **交付**
-1. Expression：替换为真实模板引擎（建议 Fluid 或 Scriban），支持条件/循环/过滤器；专属面板 + 变量说明 + 渲染预览 + 语法错误定位；输出必须是合法 JSON。
-2. Validator：专属面板；JSON Schema 规则；reject 分支（独立输出端口或 `RejectOutputPath`）；失败率与失败样本；坏行策略可配置。
-3. Sampler：`Splits` 真正生效（按比例/份数多文件或多输出端口）；专属面板；确定性测试。
+1. Expression：替换为真实模板引擎（Fluid），支持条件/循环/过滤器；专属面板 + 变量说明 + 渲染预览 + 语法错误定位；输出必须是合法 JSON。
+2. Validator：专属面板；JSON Schema 规则；reject 分支（`RejectOutputPath`）；失败率与失败样本；`RejectOnFailure=false` 时透传。
+3. Sampler：`Splits` 真正生效（ratio/count 多文件）；专属面板；确定性测试。
 4. Tool Profile：Tool Schema 树形编辑器、JSON 导入/导出、被 Simulation/LLM 复用；MCP 适配留到后续。
 5. 每个节点至少覆盖成功/失败/边界路径测试。
 
@@ -281,6 +287,8 @@
 - Validator 通过/拒绝行数守恒，拒绝样本可查看。
 - Sampler 输出行数守恒、同 seed 可复现、切分文件数正确。
 - Tool Profile 导出的 JSON 可被 OpenAI 工具格式消费。
+
+> 完成情况：新增 Fluid.Core 与 JsonSchema.Net；四个节点均接入专属面板；新增 Expression/Validator/Sampler/Tool Profile 测试，测试总数 311（+2 gated）。多输出端口、Validator 代码规则/超时、LLM 请求侧 tool definitions 与 MCP 留到后续。
 
 ### Round 10 — 数据工作台 A：预览与格式（P1）
 
@@ -326,14 +334,15 @@
 
 ## 六、建议的下一步
 
-Round 8 已完成，建议进入 **Round 9（节点能力补齐）**，按以下顺序落地：
+Round 9 已完成，建议进入 **Round 10（数据工作台 A）**，按以下顺序落地：
 
-1. **Expression**：替换为真实模板引擎（Fluid 或 Scriban），补专属面板、变量说明、渲染预览与语法错误定位；输出必须是合法 JSON。
-2. **Validator**：JSON Schema 规则、reject 独立输出端口/失败文件、失败率与失败样本、坏行策略。
-3. **Sampler**：`Splits` 与多输出/多文件真正生效，补确定性测试与专属面板。
-4. **Tool Profile**：Tool Schema 树形编辑器、JSON 导入导出，并被 Simulation/LLM 复用。
+1. **JSONL 分页预览**：虚拟化表格、行号跳转、只加载当前页，避免一次性读入大文件。
+2. **CSV / Parquet**：统一 `IDatasetReader/Writer`，Seed 读取与 SftExport/DatasetWriter 写出。
+3. **格式转换 UI**：OpenAI / ShareGPT / Alpaca 批量转换、进度、失败行 `.errors.jsonl`。
+4. **DPO / Pretrain** 格式模型与转换。
+5. **1M 行验收**：打开/预览/转换的内存与耗时基线（≤ 300MB）。
 
-理由：端口与持久化契约已稳定，可以安全地在节点语义层继续叠加功能；Validator/Sampler 的输出端口会进一步依赖本轮建立的端口契约。
+理由：节点语义与端口契约已稳定；数据工作台是当前最大的用户可见缺口，且会复用已有的 JSONL/index cache 与格式转换服务。
 
 ---
 

@@ -36,6 +36,9 @@ public partial class LlmConfigEditorViewModel : ObservableObject
     [ObservableProperty]
     private int _maxRetries;
 
+    [ObservableProperty]
+    private string _toolProfileName;
+
     public LlmConfigEditorViewModel(LlmBlockConfig config, Action<LlmBlockConfig> apply)
     {
         _apply = apply;
@@ -46,6 +49,7 @@ public partial class LlmConfigEditorViewModel : ObservableObject
         _endpoint = config.Endpoint ?? string.Empty;
         _timeoutSeconds = config.TimeoutSeconds;
         _maxRetries = config.MaxRetries;
+        _toolProfileName = config.ToolProfileName ?? string.Empty;
         _selectedProvider = Providers.FirstOrDefault(option =>
             option.Id == LlmProviderIds.Normalize(config.Provider)) ?? Providers[0];
     }
@@ -73,6 +77,8 @@ public partial class LlmConfigEditorViewModel : ObservableObject
 
     partial void OnMaxRetriesChanged(int value) => Push();
 
+    partial void OnToolProfileNameChanged(string value) => Push();
+
     private void Push() => _apply(new LlmBlockConfig(
         SelectedProvider.Id,
         ModelAlias ?? string.Empty,
@@ -81,5 +87,6 @@ public partial class LlmConfigEditorViewModel : ObservableObject
         string.IsNullOrWhiteSpace(Prompt) ? null : Prompt,
         string.IsNullOrWhiteSpace(Endpoint) ? null : Endpoint.Trim(),
         TimeoutSeconds,
-        MaxRetries));
+        MaxRetries,
+        string.IsNullOrWhiteSpace(ToolProfileName) ? null : ToolProfileName.Trim()));
 }

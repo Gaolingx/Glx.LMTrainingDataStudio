@@ -37,6 +37,12 @@ public sealed class LlmBlockExecutor : IBlockExecutor
             throw new InvalidOperationException($"LLM block '{context.Block.Name}' requires an input connection.");
         }
 
+        if (!string.IsNullOrWhiteSpace(config.ToolProfileName) && context.ToolProfile is null)
+        {
+            throw new InvalidOperationException(
+                $"LLM block '{context.Block.Name}' references unknown tool profile '{config.ToolProfileName}'.");
+        }
+
         return Task.FromResult(new BlockExecutionResult(GenerateAsync(context, config, cancellationToken)));
     }
 
@@ -56,17 +62,14 @@ public sealed class LlmBlockExecutor : IBlockExecutor
             else
             {
                 using var document = JsonRowReader.Parse(row, context.Block.Name);
-                prompt = TemplateRenderer.Render(config.Prompt, document.RootElement, jsonEscape: false);
+                prompt = await TemplateRenderer.RenderAsync(config.Prompt, document.RootElement);
             }
 
             var completion = await _client.CompleteAsync(prompt, config, ct);
-            var json = JsonSerializer.Serialize(new
-            {
-                messages = new[]
-                {
-                    new { role = "assistant", content = completion }
-                }
-            });
+            var message = new { role = "assistant", content = completion };
+            var json = context.ToolProfile is { Tools.Count: > 0 } profile
+                ? JsonSerializer.Serialize(new { messages = new[] { message }, tools = profile.Tools })
+                : JsonSerializer.Serialize(new { messages = new[] { message } });
 
             yield return new DatasetRow(index++, json);
             context.RowsProcessed?.Report(index);

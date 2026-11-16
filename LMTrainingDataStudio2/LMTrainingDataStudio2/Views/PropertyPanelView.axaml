@@ -164,7 +164,173 @@
                              Watermark="Empty sends raw row JSON. Supports {{ field }} placeholders." />
                 </StackPanel>
 
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Tool profile (optional)" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBox Text="{Binding SelectedBlock.LlmEditor.ToolProfileName, Mode=TwoWay}"
+                             FontSize="11" Padding="8,6"
+                             Watermark="Tool Profile block name" />
+                </StackPanel>
+
                 <TextBlock Text="API keys are read from OPENAI_API_KEY / ANTHROPIC_API_KEY."
+                           FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
+            </StackPanel>
+
+            <!-- Expression configuration -->
+            <StackPanel Spacing="8"
+                        IsVisible="{Binding SelectedBlock.ExpressionEditor, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <Border Height="1" Background="#3A3A4E" />
+                <TextBlock Text="Expression Configuration" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                <TextBlock Text="Fluid template: variables, {% if %}, {% for %} and filters. Use {{ value | json }} to embed a value as JSON."
+                           FontSize="10" Foreground="#888888" TextWrapping="Wrap" />
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Template" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBox Text="{Binding SelectedBlock.ExpressionEditor.Template, Mode=TwoWay}"
+                             FontSize="11" Padding="8,6" Height="120"
+                             AcceptsReturn="True" TextWrapping="NoWrap"
+                             FontFamily="Consolas"
+                             Watermark="{}{&quot;text&quot;:{{ content | json }}}" />
+                    <TextBlock Text="{Binding SelectedBlock.ExpressionEditor.TemplateError}"
+                               FontSize="10" Foreground="#FF6666" TextWrapping="Wrap"
+                               IsVisible="{Binding SelectedBlock.ExpressionEditor.TemplateError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                </StackPanel>
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Field aliases (JSON: alias → path)" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBox Text="{Binding SelectedBlock.ExpressionEditor.FieldsJson, Mode=TwoWay}"
+                             FontSize="11" Padding="8,6" Height="70"
+                             AcceptsReturn="True" TextWrapping="NoWrap"
+                             FontFamily="Consolas" />
+                    <TextBlock Text="{Binding SelectedBlock.ExpressionEditor.FieldsError}"
+                               FontSize="10" Foreground="#FF6666" TextWrapping="Wrap"
+                               IsVisible="{Binding SelectedBlock.ExpressionEditor.FieldsError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                </StackPanel>
+
+                <Border Height="1" Background="#2F2F42" />
+                <TextBlock Text="Preview" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Sample row JSON" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBox Text="{Binding SelectedBlock.ExpressionEditor.SampleJson, Mode=TwoWay}"
+                             FontSize="11" Padding="8,6" Height="80"
+                             AcceptsReturn="True" TextWrapping="NoWrap"
+                             FontFamily="Consolas" />
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="Validate" Command="{Binding SelectedBlock.ExpressionEditor.ValidateTemplateCommand}"
+                            Padding="10,5" Background="#3A3A4E" Foreground="#FFFFFF" />
+                    <Button Content="Render Preview" Command="{Binding SelectedBlock.ExpressionEditor.RenderPreviewCommand}"
+                            Padding="10,5" Background="#4A90D9" Foreground="#FFFFFF" />
+                </StackPanel>
+
+                <TextBlock Text="{Binding SelectedBlock.ExpressionEditor.PreviewError}"
+                           FontSize="10" Foreground="#FF6666" TextWrapping="Wrap"
+                           IsVisible="{Binding SelectedBlock.ExpressionEditor.PreviewError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+                <TextBox Text="{Binding SelectedBlock.ExpressionEditor.PreviewOutput}"
+                         IsReadOnly="True"
+                         FontSize="10" Padding="8,6" Height="110"
+                         AcceptsReturn="True" TextWrapping="NoWrap"
+                         FontFamily="Consolas"
+                         Background="#1A1A2A" />
+            </StackPanel>
+
+            <!-- Validator configuration -->
+            <StackPanel Spacing="8"
+                        IsVisible="{Binding SelectedBlock.ValidatorEditor, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <Border Height="1" Background="#3A3A4E" />
+                <TextBlock Text="Validator Configuration" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Rule kind" FontSize="11" Foreground="#AAAAAA" />
+                    <ComboBox ItemsSource="{Binding SelectedBlock.ValidatorEditor.RuleKinds}"
+                              SelectedItem="{Binding SelectedBlock.ValidatorEditor.SelectedRuleKind, Mode=TwoWay}"
+                              FontSize="11" HorizontalAlignment="Stretch">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ValidatorRuleKindOption">
+                                <TextBlock Text="{Binding DisplayName}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </StackPanel>
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Rule / Schema" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBox Text="{Binding SelectedBlock.ValidatorEditor.Rule, Mode=TwoWay}"
+                             FontSize="11" Padding="8,6" Height="130"
+                             AcceptsReturn="True" TextWrapping="NoWrap"
+                             FontFamily="Consolas"
+                             Watermark="messages.length > 0  |  JSON Schema" />
+                    <TextBlock Text="{Binding SelectedBlock.ValidatorEditor.RuleError}"
+                               FontSize="10" Foreground="#FF6666" TextWrapping="Wrap"
+                               IsVisible="{Binding SelectedBlock.ValidatorEditor.RuleError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <Button Content="Validate rule" Command="{Binding SelectedBlock.ValidatorEditor.ValidateRuleCommand}"
+                            HorizontalAlignment="Left" Padding="10,5"
+                            Background="#3A3A4E" Foreground="#FFFFFF" />
+                </StackPanel>
+
+                <CheckBox Content="Reject invalid rows"
+                          FontSize="11" Foreground="#CCCCCC"
+                          IsChecked="{Binding SelectedBlock.ValidatorEditor.RejectOnFailure, Mode=TwoWay}" />
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Reject output path (optional)" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBox Text="{Binding SelectedBlock.ValidatorEditor.RejectOutputPath, Mode=TwoWay}"
+                             FontSize="11" Padding="8,6" Watermark="out/rejected.jsonl" />
+                    <TextBlock Text="Rejected rows are written as { lineNumber, reason, data } JSONL."
+                               FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
+                </StackPanel>
+
+                <TextBlock Text="Cleanup rules remain in Config JSON below."
+                           FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
+            </StackPanel>
+
+            <!-- Sampler configuration -->
+            <StackPanel Spacing="8"
+                        IsVisible="{Binding SelectedBlock.SamplerEditor, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <Border Height="1" Background="#3A3A4E" />
+                <TextBlock Text="Sampler Configuration" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+
+                <Grid ColumnDefinitions="*,8,*">
+                    <StackPanel Grid.Column="0" Spacing="4">
+                        <TextBlock Text="Count" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBox Text="{Binding SelectedBlock.SamplerEditor.CountText, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="100" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Spacing="4">
+                        <TextBlock Text="Ratio (0–1)" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBox Text="{Binding SelectedBlock.SamplerEditor.RatioText, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="0.1" />
+                    </StackPanel>
+                </Grid>
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Seed" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBox Text="{Binding SelectedBlock.SamplerEditor.Seed, Mode=TwoWay}"
+                             FontSize="11" Padding="8,6" Watermark="42" />
+                </StackPanel>
+
+                <Border Height="1" Background="#2F2F42" />
+                <TextBlock Text="Splits (one per line: train:0.8 or valid:100)"
+                           FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                <TextBox Text="{Binding SelectedBlock.SamplerEditor.SplitsText, Mode=TwoWay}"
+                         FontSize="11" Padding="8,6" Height="90"
+                         AcceptsReturn="True" TextWrapping="NoWrap"
+                         FontFamily="Consolas"
+                         Watermark="train:0.8&#10;valid:0.1&#10;test:0.1" />
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Split output directory" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBox Text="{Binding SelectedBlock.SamplerEditor.OutputDirectory, Mode=TwoWay}"
+                             FontSize="11" Padding="8,6" Watermark="out/splits" />
+                </StackPanel>
+
+                <TextBlock Text="{Binding SelectedBlock.SamplerEditor.ValidationError}"
+                           FontSize="10" Foreground="#FF6666" TextWrapping="Wrap"
+                           IsVisible="{Binding SelectedBlock.SamplerEditor.ValidationError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+                <TextBlock Text="Splits pass all rows downstream and write one JSONL per split. Count/ratio are ignored when splits are set."
                            FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
             </StackPanel>
 
@@ -406,6 +572,13 @@
                              FontSize="11" Padding="8,6" Watermark="bash" />
                 </StackPanel>
 
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Tool profile (optional)" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBox Text="{Binding SelectedBlock.SimulationEditor.ToolProfileName, Mode=TwoWay}"
+                             FontSize="11" Padding="8,6"
+                             Watermark="Tool Profile block name" />
+                </StackPanel>
+
                 <TextBlock Text="Tools, harness rules and scripts are edited in Config JSON below."
                            FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
             </StackPanel>
@@ -441,6 +614,114 @@
                     <TextBox Text="{Binding SelectedBlock.SftExportEditor.OutputPath, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Watermark="out/sft.jsonl" />
                 </StackPanel>
+            </StackPanel>
+
+            <!-- Tool profile configuration -->
+            <StackPanel Spacing="8"
+                        IsVisible="{Binding SelectedBlock.ToolProfileEditor, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <Border Height="1" Background="#3A3A4E" />
+                <TextBlock Text="Tool Profile" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Profile name" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBox Text="{Binding SelectedBlock.ToolProfileEditor.Name, Mode=TwoWay}"
+                             FontSize="11" Padding="8,6" Watermark="agent_tools" />
+                </StackPanel>
+
+                <TextBlock Text="Tools" FontSize="11" Foreground="#AAAAAA" />
+                <ListBox ItemsSource="{Binding SelectedBlock.ToolProfileEditor.Tools}"
+                         SelectedItem="{Binding SelectedBlock.ToolProfileEditor.SelectedTool, Mode=TwoWay}"
+                         Height="100" Background="#1E1E2E">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ToolEditorViewModel">
+                            <TextBlock Text="{Binding DisplayName}" FontSize="11" Foreground="#CCCCCC" />
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="Add Tool" Command="{Binding SelectedBlock.ToolProfileEditor.AddToolCommand}"
+                            Padding="10,5" Background="#3A3A4E" Foreground="#FFFFFF" />
+                    <Button Content="Remove Tool" Command="{Binding SelectedBlock.ToolProfileEditor.RemoveSelectedToolCommand}"
+                            Padding="10,5" Background="#3A2020" Foreground="#FF6666" />
+                </StackPanel>
+
+                <StackPanel Spacing="6"
+                            IsVisible="{Binding SelectedBlock.ToolProfileEditor.SelectedTool, Converter={x:Static ObjectConverters.IsNotNull}}">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Tool name" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBox Text="{Binding SelectedBlock.ToolProfileEditor.SelectedTool.Name, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Description" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBox Text="{Binding SelectedBlock.ToolProfileEditor.SelectedTool.Description, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Height="50"
+                                 AcceptsReturn="True" TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Parameters JSON Schema" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBox Text="{Binding SelectedBlock.ToolProfileEditor.SelectedTool.ParametersJson, Mode=TwoWay}"
+                                 FontSize="10" Padding="8,6" Height="100"
+                                 AcceptsReturn="True" TextWrapping="NoWrap"
+                                 FontFamily="Consolas" />
+                        <TextBlock Text="{Binding SelectedBlock.ToolProfileEditor.SelectedTool.ParametersError}"
+                                   FontSize="10" Foreground="#FF6666" TextWrapping="Wrap"
+                                   IsVisible="{Binding SelectedBlock.ToolProfileEditor.SelectedTool.ParametersError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="Parameter tree" FontSize="11" Foreground="#AAAAAA" VerticalAlignment="Center" />
+                        <Button Content="Add parameter"
+                                Command="{Binding SelectedBlock.ToolProfileEditor.SelectedTool.AddParameterCommand}"
+                                Padding="8,4" Background="#3A3A4E" Foreground="#FFFFFF" />
+                    </StackPanel>
+
+                    <TreeView ItemsSource="{Binding SelectedBlock.ToolProfileEditor.SelectedTool.Parameters}"
+                              Height="220" Background="#1A1A2A">
+                        <TreeView.ItemTemplate>
+                            <TreeDataTemplate x:DataType="vm:ToolParameterNodeViewModel"
+                                              ItemsSource="{Binding Children}">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBox Text="{Binding Name, Mode=TwoWay}" Width="90"
+                                             FontSize="10" Padding="4,2" />
+                                    <ComboBox ItemsSource="{Binding Types}"
+                                              SelectedItem="{Binding Type, Mode=TwoWay}"
+                                              Width="90" FontSize="10" />
+                                    <CheckBox Content="Req" IsChecked="{Binding IsRequired, Mode=TwoWay}"
+                                              FontSize="10" Foreground="#CCCCCC" />
+                                    <TextBox Text="{Binding Description, Mode=TwoWay}" Width="120"
+                                             FontSize="10" Padding="4,2" Watermark="description" />
+                                    <Button Content="+" Command="{Binding AddChildCommand}"
+                                            Padding="5,2" Background="#3A3A4E" Foreground="#FFFFFF" />
+                                    <Button Content="×" Command="{Binding RemoveCommand}"
+                                            Padding="5,2" Background="#3A2020" Foreground="#FF6666" />
+                                </StackPanel>
+                            </TreeDataTemplate>
+                        </TreeView.ItemTemplate>
+                    </TreeView>
+                </StackPanel>
+
+                <Border Height="1" Background="#2F2F42" />
+                <TextBlock Text="Profile JSON (import / export)" FontSize="11" Foreground="#AAAAAA" />
+                <TextBox Text="{Binding SelectedBlock.ToolProfileEditor.ProfileJson, Mode=TwoWay}"
+                         FontSize="10" Padding="8,6" Height="130"
+                         AcceptsReturn="True" TextWrapping="NoWrap"
+                         FontFamily="Consolas" />
+                <TextBlock Text="{Binding SelectedBlock.ToolProfileEditor.ProfileJsonError}"
+                           FontSize="10" Foreground="#FF6666" TextWrapping="Wrap"
+                           IsVisible="{Binding SelectedBlock.ToolProfileEditor.ProfileJsonError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="Import JSON" Command="{Binding SelectedBlock.ToolProfileEditor.ImportJsonCommand}"
+                            Padding="10,5" Background="#4A90D9" Foreground="#FFFFFF" />
+                    <Button Content="Export JSON" Command="{Binding SelectedBlock.ToolProfileEditor.ExportJsonCommand}"
+                            Padding="10,5" Background="#3A3A4E" Foreground="#FFFFFF" />
+                </StackPanel>
+
+                <TextBlock Text="Simulation / LLM blocks reference this profile by Tool Profile block name or profile name."
+                           FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
             </StackPanel>
 
             <!-- Generic JSON configuration editor -->

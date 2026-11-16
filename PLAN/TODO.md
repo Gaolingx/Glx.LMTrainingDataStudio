@@ -8,7 +8,84 @@
 
 ---
 
-## 一、本轮进展（Round 8）
+## 一、本轮进展（Round 9）
+
+### 1.1 本轮做了什么
+
+- [x] Expression：接入 `Fluid.Core`，支持变量、条件、循环、过滤器与自定义 `json` 过滤器；渲染结果立即做 JSON 解析校验，失败带行号；专属面板覆盖模板、字段别名、样本 JSON、语法校验与预览输出。
+- [x] Validator：新增 `schema` 规则（`JsonSchema.Net`）、`RejectOutputPath` 拒绝行 JSONL（`lineNumber` / `reason` / `data`）、失败率日志；`RejectOnFailure=false` 时非法行透传；专属面板支持规则/Schema 与路径编辑。
+- [x] Sampler：`Splits` 支持 `name:ratio` 与 `name:count`，确定性、单行只进一个文件、原子写多文件；下游仍输出全部行；专属面板覆盖 Count/Ratio/Seed/Splits/输出目录。
+- [x] Tool Profile：`ToolProfileBlockExecutor` 配置型节点；参数树可增删/改名/改类型/必填并与 JSON Schema 双向同步；支持完整 profile、tool 数组或单 tool 的 JSON 导入导出；Simulation 合并 profile tools，LLM 将 tools 写入输出元数据；校验未知引用。
+- [x] 新增 26 个测试：Expression 模板/预览 5、Validator Schema/reject 6、Sampler splits 5、Tool Profile 复用/编辑 6、校验补强 4。
+- [x] 新增依赖：`Fluid.Core 2.41.1`、`JsonSchema.Net 9.7.0`。
+
+### 1.2 验证结果
+
+| 项目 | 命令 | 结果 |
+| --- | --- | --- |
+| 构建 | `dotnet build LMTrainingDataStudio2/LMTrainingDataStudio2.slnx` | 成功，0 警告，0 错误 |
+| 测试 | `dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx` | 311 通过，0 失败，2 跳过（真实 provider 冒烟需环境变量） |
+| 启动冒烟 | `dotnet run --project LMTrainingDataStudio2/LMTrainingDataStudio2/LMTrainingDataStudio2.csproj --no-build` | 进程持续运行 10s，无异常输出 |
+
+### 1.3 本轮改动文件
+
+```text
+PLAN/TODO.md
+PLAN/STATUS.md
+README.md
+LMTrainingDataStudio2/LMTrainingDataStudio2/LMTrainingDataStudio2.csproj
+LMTrainingDataStudio2/LMTrainingDataStudio2/Models/BlockConfig.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Models/SimulationConfig.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Models/ToolSchema.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/ToolProfileResolver.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/RecipeRunner.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/RecipeValidationService.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Executors/ExecutionContracts.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Executors/TemplateRenderer.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Executors/ExpressionBlockExecutor.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Executors/JsonSchemaRuleEvaluator.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Executors/ValidatorBlockExecutor.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Executors/SamplerSplitPlan.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Executors/SamplerSplitWriter.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Executors/SamplerBlockExecutor.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Executors/ToolProfileBlockExecutor.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Executors/SimulationBlockExecutor.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Executors/LlmBlockExecutor.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/ViewModels/BlockNodeViewModel.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/ViewModels/ExpressionConfigEditorViewModel.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/ViewModels/ValidatorConfigEditorViewModel.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/ViewModels/SamplerConfigEditorViewModel.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/ViewModels/ToolProfileEditorViewModel.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/ViewModels/ToolEditorViewModel.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/ViewModels/ToolParameterNodeViewModel.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/ViewModels/LlmConfigEditorViewModel.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/ViewModels/SimulationConfigEditorViewModel.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/ViewModels/MainWindowViewModel.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Views/PropertyPanelView.axaml
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/ExpressionTemplateTests.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/ValidatorSchemaAndRejectTests.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/SamplerSplitTests.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/ToolProfileReuseTests.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/BlockConfigSerializationTests.cs
+```
+
+### 1.4 技术决策与取舍
+
+1. **Expression 采用 Fluid 原生语义，JSON 值用 `| json` 过滤器嵌入。**
+   - 不再自动转义 `{{ value }}`；模板必须自己产出合法 JSON，执行时立即校验，避免错误延迟到下游。
+2. **Validator reject 写独立 JSONL，而不是新增输出端口。**
+   - 当前 Runner 仍按 block 单输出执行；文件方案可立即交付并保留失败行号/原因，多输出端口留到后续。
+3. **Sampler 采用“多文件 + 全量下游”语义。**
+   - 每个输入行只进一个 split 文件，同时全部行按原顺序传给下游；ratio 模式用固定 seed 的随机序列保证可复现。
+4. **Tool Profile 通过引用名解析，而不是数据边。**
+   - Tool Profile 是配置型节点（无端口）；引用可匹配 block 名称或 profile 名称；Simulation 实际使用，LLM 先写入输出 `tools` 元数据，请求侧 tool definitions 留到后续。
+5. **树编辑器与 JSON Schema 双向同步。**
+   - 参数树变更、JSON 文本框、工具名/描述都会回写 `ToolProfileBlockConfig`，保持单一事实来源。
+
+---
+
+## 附二：Round 8 历史进展（2026-11-16）
 
 ### 1.1 本轮做了什么
 
@@ -69,7 +146,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/SimulationExecutorsTests.cs
 
 ---
 
-## 附：Round 7 历史进展（2026-11-16）
+## 附一：Round 7 历史进展（2026-11-16）
 
 ### 1.1 本轮做了什么
 
@@ -967,8 +1044,8 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 
 1. [x] Recipe 新建/打开/保存/另存为 + 最近文件 + 脏标记 + 关闭确认（Round 8 完成）。
 2. [x] 按 BlockType 生成端口 schema；每种节点必需输入/输出校验；错误连接拦截与画布错误徽标（Round 8 完成）。
-3. Expression 真实模板引擎 + 专属面板 + 渲染预览/语法校验。
-4. Validator reject 分支 + Schema 规则 + 失败样本；Sampler Splits/多输出；Tool Profile 树形编辑器与复用。
+3. [x] Expression 真实模板引擎 + 专属面板 + 渲染预览/语法校验（Round 9 完成）。
+4. [x] Validator reject 分支 + Schema 规则 + 失败样本；Sampler Splits 多文件；Tool Profile 树形编辑器与复用（Round 9 完成；多输出端口/MCP 留后续）。
 5. 状态栏 `CurrentFilePath` 与真实文件路径；属性面板删除/修改接入 Undo。
 6. 设置持久化后的网格吸附、主题切换真正生效。
 7. 每个 Round 随代码补最小单测；Phase 5 做完整矩阵。
@@ -1007,7 +1084,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 | 11 | 数据工作台 B | P1 | 校验问题列表/自动修复；搜索/正则替换；去重/混洗/切分；数据集统计 | 行数守恒、同 seed 可复现、原文件不被修复破坏 |
 | 12 | 画布、执行与发布 | P1/P2 | 网格/吸附/锚点缩放/Fit/自动布局/Mini-map 交互；层内并行、暂停/重试、输出目录；Headless UI、CI、打包、主题、日志 | 手工脚本通过；500 节点无卡顿；干净环境可安装运行 |
 
-**Round 8 已完成（2026-11-16）**；下一步从 Round 9 的 Expression 真实模板引擎开始，随后补 Validator reject/Schema、Sampler Splits 与 Tool Profile 复用。
+**Round 9 已完成（2026-11-16）**；下一步进入 Round 10 数据工作台 A（JSONL 分页预览、CSV/Parquet、格式转换、DPO/Pretrain、1M 行验收）。
 
 ---
 

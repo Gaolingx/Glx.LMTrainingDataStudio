@@ -132,7 +132,8 @@ public sealed record SimulationBlockConfig(
     string? FailureOutputPath = null,
     int MaxFailureSamples = 100,
     double InputCostPerMillionTokens = 0,
-    double OutputCostPerMillionTokens = 0) : BlockConfig;
+    double OutputCostPerMillionTokens = 0,
+    string? ToolProfileName = null) : BlockConfig;
 
 /// <summary>
 /// Standalone cleanup node for OAI message rows.

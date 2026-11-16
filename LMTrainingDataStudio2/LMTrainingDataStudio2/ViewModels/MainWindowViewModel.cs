@@ -816,6 +816,7 @@ public partial class MainWindowViewModel : ObservableObject
             new ValidatorBlockExecutor(),
             new SamplerBlockExecutor(),
             new LlmBlockExecutor(new LlmApiClient(_llmHttpClient, new LlmCredentials(_settings))),
+            new ToolProfileBlockExecutor(),
             new QuerySourceBlockExecutor(),
             new SimulationBlockExecutor(new LlmCredentials(_settings), _llmHttpClient),
             new CleanerBlockExecutor(),

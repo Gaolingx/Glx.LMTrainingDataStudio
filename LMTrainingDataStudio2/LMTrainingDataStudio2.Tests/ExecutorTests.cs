@@ -78,7 +78,7 @@ public sealed class ExecutorTests
     {
         var block = CreateBlock(BlockType.Expression, "expr",
             new ExpressionBlockConfig(
-                "{\"input\":\"{{ prompt }}\"}",
+                "{\"input\":{{ prompt | json }}}",
                 new Dictionary<string, string> { ["prompt"] = "content" }));
         var input = new[] { new DatasetRow(0, "{\"content\":\"hello \\\"world\\\"\"}") };
 

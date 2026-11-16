@@ -592,6 +592,62 @@ public sealed class RecipeValidationServiceTests
             i.Message.Contains("accepts only one incoming connection")), Is.True);
     }
 
+    [Test]
+    public void Validate_InvalidExpressionTemplate_ReportsWarning()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("expr", BlockType.Expression, "render",
+            new ExpressionBlockConfig("{% if %}", new Dictionary<string, string>())));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Severity == ValidationSeverity.Warning &&
+            i.Message.Contains("invalid template")), Is.True);
+    }
+
+    [Test]
+    public void Validate_InvalidValidatorSchema_ReportsWarning()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("val", BlockType.Validator, "check",
+            new ValidatorBlockConfig("schema", "{ not a schema", RejectOnFailure: true)));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Severity == ValidationSeverity.Warning &&
+            i.Message.Contains("invalid JSON Schema")), Is.True);
+    }
+
+    [Test]
+    public void Validate_SamplerSplitsWithoutDirectory_ReportsWarning()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("sample", BlockType.Sampler, "sample",
+            new SamplerBlockConfig(null, null, 42, new[] { "train:0.8" }, OutputDirectory: null)));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Severity == ValidationSeverity.Warning &&
+            i.Message.Contains("no output directory")), Is.True);
+    }
+
+    [Test]
+    public void Validate_UnknownToolProfileReference_ReportsWarning()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("sim", BlockType.Simulation, "sim",
+            new SimulationBlockConfig("model", ToolProfileName: "missing_tools")));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Severity == ValidationSeverity.Warning &&
+            i.Message.Contains("unknown tool profile")), Is.True);
+    }
+
     private static BlockPort CreateSchemaPort(BlockType type, PortDirection direction) =>
         direction == PortDirection.Input
             ? BlockPortSchema.CreateInputPorts(type)[0]

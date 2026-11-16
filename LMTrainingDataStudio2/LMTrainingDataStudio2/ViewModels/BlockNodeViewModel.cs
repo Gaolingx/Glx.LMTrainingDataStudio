@@ -61,6 +61,18 @@ public partial class BlockNodeViewModel : ObservableObject
     private LlmConfigEditorViewModel? _llmEditor;
 
     [ObservableProperty]
+    private ExpressionConfigEditorViewModel? _expressionEditor;
+
+    [ObservableProperty]
+    private ValidatorConfigEditorViewModel? _validatorEditor;
+
+    [ObservableProperty]
+    private SamplerConfigEditorViewModel? _samplerEditor;
+
+    [ObservableProperty]
+    private ToolProfileEditorViewModel? _toolProfileEditor;
+
+    [ObservableProperty]
     private QuerySourceConfigEditorViewModel? _querySourceEditor;
 
     [ObservableProperty]
@@ -99,6 +111,22 @@ public partial class BlockNodeViewModel : ObservableObject
 
             LlmEditor = value is LlmBlockConfig llm
                 ? new LlmConfigEditorViewModel(llm, ApplyLlmConfig)
+                : null;
+
+            ExpressionEditor = value is ExpressionBlockConfig expression
+                ? new ExpressionConfigEditorViewModel(expression, ApplyConfig)
+                : null;
+
+            ValidatorEditor = value is ValidatorBlockConfig validator
+                ? new ValidatorConfigEditorViewModel(validator, ApplyConfig)
+                : null;
+
+            SamplerEditor = value is SamplerBlockConfig sampler
+                ? new SamplerConfigEditorViewModel(sampler, ApplyConfig)
+                : null;
+
+            ToolProfileEditor = value is ToolProfileBlockConfig { Profile: var profile }
+                ? new ToolProfileEditorViewModel(profile ?? new ToolProfile(), ApplyConfig)
                 : null;
 
             QuerySourceEditor = value is QuerySourceBlockConfig query

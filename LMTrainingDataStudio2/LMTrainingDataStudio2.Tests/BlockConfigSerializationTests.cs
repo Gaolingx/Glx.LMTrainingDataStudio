@@ -26,7 +26,11 @@ public sealed class BlockConfigSerializationTests
     [Test]
     public void RoundTrip_LlmConfig_PreservesFields()
     {
-        var config = new LlmBlockConfig("openai", "gpt-4o", Temperature: 0.2, MaxTokens: 4096, Prompt: "Rewrite {{ content }}");
+        var config = new LlmBlockConfig(
+            "openai", "gpt-4o",
+            Temperature: 0.2, MaxTokens: 4096,
+            Prompt: "Rewrite {{ content }}",
+            ToolProfileName: "agent_tools");
 
         var loaded = RoundTrip(config);
 
@@ -49,7 +53,11 @@ public sealed class BlockConfigSerializationTests
     [Test]
     public void RoundTrip_ValidatorConfig_PreservesFields()
     {
-        var config = new ValidatorBlockConfig("expression", "len(messages) > 0", RejectOnFailure: true);
+        var config = new ValidatorBlockConfig(
+            "schema",
+            """{"type":"object"}""",
+            RejectOnFailure: true,
+            RejectOutputPath: "out/rejected.jsonl");
 
         var loaded = RoundTrip(config);
 
@@ -60,7 +68,10 @@ public sealed class BlockConfigSerializationTests
     [Test]
     public void RoundTrip_SamplerConfig_PreservesFields()
     {
-        var config = new SamplerBlockConfig(Count: 1000, Ratio: null, Seed: 7, Splits: new[] { "train", "eval" });
+        var config = new SamplerBlockConfig(
+            Count: 1000, Ratio: null, Seed: 7,
+            Splits: new[] { "train", "eval" },
+            OutputDirectory: "out/splits");
 
         var loaded = RoundTrip(config);
 
@@ -70,6 +81,7 @@ public sealed class BlockConfigSerializationTests
         Assert.That(sampler.Ratio, Is.Null);
         Assert.That(sampler.Seed, Is.EqualTo(config.Seed));
         Assert.That(sampler.Splits, Is.EqualTo(config.Splits));
+        Assert.That(sampler.OutputDirectory, Is.EqualTo("out/splits"));
     }
 
     [Test]
@@ -229,7 +241,8 @@ public sealed class BlockConfigSerializationTests
             FailureOutputPath: "failures/out.jsonl",
             MaxFailureSamples: 25,
             InputCostPerMillionTokens: 1.5,
-            OutputCostPerMillionTokens: 3.5);
+            OutputCostPerMillionTokens: 3.5,
+            ToolProfileName: "agent_tools");
 
         var loaded = (SimulationBlockConfig)RoundTrip(config);
 
@@ -242,6 +255,7 @@ public sealed class BlockConfigSerializationTests
         Assert.That(loaded.ModelMode, Is.EqualTo(SimulationModelMode.Provider));
         Assert.That(loaded.ToolMode, Is.EqualTo(ToolExecutionMode.Real));
         Assert.That(loaded.Endpoint, Is.EqualTo("https://proxy.example/v1"));
+        Assert.That(loaded.ToolProfileName, Is.EqualTo("agent_tools"));
         Assert.That(loaded.MaxConcurrency, Is.EqualTo(6));
         Assert.That(loaded.FailureOutputPath, Is.EqualTo("failures/out.jsonl"));
         Assert.That(loaded.MaxFailureSamples, Is.EqualTo(25));

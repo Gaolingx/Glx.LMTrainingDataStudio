@@ -12,6 +12,9 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - Recipe / 设置持久化：原子写入、camelCase 多态 JSON、schema 版本校验
 - Recipe 文件生命周期：新建（空白/示例）、打开、保存、另存为、最近文件、脏标记、关闭确认与重启恢复
 - 按 BlockType 的端口契约与连接守卫：方向/类型/单输入/重复/环校验；校验问题列表与画布错误/警告徽标
+- Expression：Fluid 模板引擎（条件/循环/过滤器）、输出 JSON 校验、专属面板与样本预览
+- Validator：表达式 / JSON Schema 规则、reject JSONL、失败率日志；Sampler：确定性多文件切分
+- Tool Profile：参数树编辑、JSON 导入导出，并被 Simulation/LLM 引用复用
 - JSONL SQLite 行索引缓存与分页读取
 - OpenAI / ShareGPT / Alpaca 数据格式转换服务初版
 - 真实 RecipeRunner：Seed / Expression / Validator / Sampler / LLM 执行器，执行记录与 Executions UI
@@ -20,10 +23,10 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - 真实 provider tool-calling：OpenAI Chat function calling、OpenAI Responses `function_call`、Anthropic Messages `tool_use`，含 token usage / 延迟 / 成本统计；已通过真实 OpenAI 兼容端点冒烟（tool_calls + usage + 两轮 harness 往返）
 - 真实沙箱工具：python / PowerShell / bash / web_fetch；环境白名单、临时目录、超时杀进程树、输出上限，Windows 额外限制内存与进程数
 - Simulation 支持并发 query（输出保序）与失败轨迹独立 JSONL 输出
-- Query Source / Simulation / Cleaner / SFT Export 专属属性面板
+- Query Source / Simulation / Cleaner / SFT Export / Expression / Validator / Sampler / Tool Profile 专属属性面板
 - 通用 Block Config JSON 编辑器，可直接配置所有节点类型
 
-> 注意：当前仍是开发版。**数据工作台 UI、自动布局、输出预览弹窗、Expression/Validator/Sampler 完整语义尚未实现**；应用默认启动空白 Recipe，可通过 File → New from Sample 加载 4 节点示例，或恢复上次打开的文件。
+> 注意：当前仍是开发版。**数据工作台 UI、自动布局、输出预览弹窗、Validator 代码规则/超时、Sampler 多输出端口、MCP 适配尚未实现**；应用默认启动空白 Recipe，可通过 File → New from Sample 加载 4 节点示例，或恢复上次打开的文件。
 >
 > - 完整功能清单与节点能力矩阵：[PLAN/STATUS.md](PLAN/STATUS.md)
 > - 分阶段实施计划、阶段目标与验收标准：[PLAN/TODO.md](PLAN/TODO.md)
@@ -36,6 +39,8 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - **数据缓存**：SQLite / `Microsoft.Data.Sqlite`
 - **CSV 支持**：`CsvHelper`
 - **Parquet 支持**：`Parquet.Net`
+- **模板引擎**：`Fluid.Core`（Liquid 语法）
+- **JSON Schema**：`JsonSchema.Net`
 - **UI 主题**：Avalonia Fluent Theme + Inter Font
 - **架构模式**：MVVM
 
@@ -133,10 +138,10 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 | --- | --- | --- | --- |
 | Seed | JSONL 可用 | 有 | CSV/Parquet、数据预览、Streaming 开关 |
 | LLM | 三种 provider 可用 | 有 | 多轮/tools/结构化输出、并发、成本统计 |
-| Expression | `{{ path }}` 占位引擎 | 无 | Jinja、预览、语法校验 |
-| Validator | 表达式规则 | 无 | reject 分支、Schema、失败样本 |
-| Sampler | 数量/比例采样 | 无 | Splits、多输出、分层采样 |
-| Tool Profile | 仅配置模型 | 无 | 执行器、树形编辑器、被其他节点复用、MCP |
+| Expression | Fluid 模板 + JSON 校验 | 有 | 沙箱/超时、外部函数 |
+| Validator | 表达式 / JSON Schema + reject 文件 | 有 | 代码规则、超时、失败样本 UI |
+| Sampler | 数量/比例 + 多文件 splits | 有 | 多输出端口、分层采样、统计预览 |
+| Tool Profile | 参数树 + JSON 导入导出 + 复用 | 有 | MCP 适配、LLM 请求侧 tools |
 | Query Source | 单组/多组 query | 有 | 模板、外部来源 |
 | Simulation | 脚本/真实 provider + 模拟/真实工具 | 有 | Tools/Rules/Script UI、流式、容器隔离 |
 | Cleaner | 正则/格式/ANSI/reasoning/空消息 | 部分 | 正则规则 UI、预览、坏行报告 |
@@ -242,7 +247,7 @@ LMTrainingDataStudio2/                      # 主项目目录
 │   └── ValidationResult.cs                 # 验证结果与 Issue 模型
 │
 ├── Services/                               # 业务服务层（无 UI 依赖）
-│   ├── Executors/                          # 节点执行器（Seed/Expression/Validator/Sampler/LLM/Query/Simulation/Cleaner/SftExport）
+│   ├── Executors/                          # 节点执行器（Fluid 模板、JSON Schema、Sampler splits、Tool Profile 等）
 │   ├── Sandbox/                            # 真实沙箱：进程限制器、python/powershell/bash/web_fetch 运行时
 │   ├── Simulation/                         # 模拟 API：scripted/provider client、tool runtime、harness、清洗、OAI 序列化
 │   ├── ConnectionRules.cs                  # 入图前连接守卫（方向/类型/单输入/重复/环）
@@ -253,7 +258,8 @@ LMTrainingDataStudio2/                      # 主项目目录
 │   ├── JsonlDatasetReader.cs               # JSONL 分页读取
 │   ├── RecipeRunner.cs                     # DAG 执行器
 │   ├── RecipeStore.cs                      # Recipe 原子持久化
-│   ├── RecipeValidationService.cs          # Recipe DAG 验证（环检测、配置检查）
+│   ├── RecipeValidationService.cs          # Recipe DAG 验证（环检测、端口、Schema、引用检查）
+│   ├── ToolProfileResolver.cs              # Tool Profile 名称解析（Simulation/LLM 复用）
 │   └── SettingsStore.cs                    # 设置持久化
 │
 ├── ViewModels/                             # MVVM ViewModel 层
@@ -263,6 +269,12 @@ LMTrainingDataStudio2/                      # 主项目目录
 │   ├── BlockTemplateViewModel.cs           # Block Sheet 模板项 VM
 │   ├── QuerySourceConfigEditorViewModel.cs # Query Source 专属编辑器
 │   ├── SimulationConfigEditorViewModel.cs  # Simulation 专属编辑器（含沙箱参数）
+│   ├── ExpressionConfigEditorViewModel.cs  # Expression 模板 / 预览编辑器
+│   ├── ValidatorConfigEditorViewModel.cs   # Validator 规则 / reject 编辑器
+│   ├── SamplerConfigEditorViewModel.cs     # Sampler 采样 / splits 编辑器
+│   ├── ToolProfileEditorViewModel.cs       # Tool Profile 工具列表 / 导入导出
+│   ├── ToolEditorViewModel.cs              # 单个工具与参数树同步
+│   ├── ToolParameterNodeViewModel.cs       # 参数树节点
 │   ├── CleanerConfigEditorViewModel.cs     # Cleaner 专属编辑器
 │   ├── SftExportConfigEditorViewModel.cs   # SFT Export 专属编辑器
 │   └── EdgeViewModel.cs                    # 连线 VM
@@ -424,10 +436,10 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 - [x] Recipe / 设置持久化与 schema 版本
 - [x] OpenAI Chat / Responses、Anthropic Messages 客户端与节点级重试
 - [x] 真实 tool-calling provider（OpenAI Chat/Responses、Anthropic）与 python / PowerShell / bash 沙箱执行
-- [x] 新节点专属属性面板（Query Source / Simulation / Cleaner / SFT Export）
+- [x] 专属属性面板（Query / Simulation / Cleaner / SFT / Expression / Validator / Sampler / Tool Profile）
 - [x] 并发 query、tokens/延迟/成本统计、失败样本独立输出
 - [ ] 容器级沙箱隔离与非 Windows 平台资源限制
-- [ ] Recipe 新建 / 打开 / 保存 / 另存为（当前只有 Seed 数据源文件选择）
+- [x] Recipe 新建 / 打开 / 保存 / 另存为、最近文件与脏标记
 - [ ] JSONL / CSV / Parquet 流式读取与分页预览
 - [ ] 大文件随机行跳转
 - [ ] 数据增删查改
@@ -436,7 +448,7 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 - [ ] OpenAI / ShareGPT / Alpaca 完整批量互转
 - [ ] DPO / Pretrain 格式支持
 - [ ] 语法错误弹窗与一键修复交互
-- [ ] Tool Schema 可视化增删改
+- [x] Tool Schema 可视化增删改与 JSON 导入导出
 - [x] Canvas 节点拖拽、Port 连线、多选/框选、平移与基础缩放
 - [ ] 网格背景/吸附、鼠标中心缩放、Fit、自动布局
 - [ ] Edge 动画与样本预览弹窗
@@ -445,9 +457,9 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 - [ ] 亮色 / 暗色主题切换
 - [ ] LiveCharts2 或 OxyPlot 进度图表
 - [ ] 执行完成后的 output 目录摘要预览
-- [x] 单元测试与集成测试（287 个：285 自动化通过 + 2 个需环境变量的真实 provider 冒烟）
-- [ ] Round 8：Recipe 新建/打开/保存、脏标记、最近文件、按类型端口契约
-- [ ] Round 9：Expression/Validator/Sampler/Tool Profile 节点能力补齐
+- [x] 单元测试与集成测试（313 个：311 自动化通过 + 2 个需环境变量的真实 provider 冒烟）
+- [x] Round 8：Recipe 新建/打开/保存、脏标记、最近文件、按类型端口契约
+- [x] Round 9：Expression/Validator/Sampler/Tool Profile 节点能力补齐
 - [ ] Round 10：数据预览、CSV/Parquet、格式转换、DPO/Pretrain
 - [ ] Round 11：校验修复、去重/混洗/切分、搜索替换、统计
 - [ ] Round 12：画布体验、并行/暂停/重试、CI/打包/主题/日志

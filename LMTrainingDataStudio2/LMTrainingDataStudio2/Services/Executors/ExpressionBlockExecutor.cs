@@ -31,6 +31,13 @@ public sealed class ExpressionBlockExecutor : IBlockExecutor
                 $"Expression block '{context.Block.Name}' has no template or fields configured.");
         }
 
+        var templateValidation = TemplateRenderer.Validate(config.Template);
+        if (!templateValidation.IsValid)
+        {
+            throw new InvalidOperationException(
+                $"Expression block '{context.Block.Name}' has an invalid template: {templateValidation.Error}");
+        }
+
         return Task.FromResult(new BlockExecutionResult(TransformAsync(context, config, cancellationToken)));
     }
 
@@ -48,7 +55,17 @@ public sealed class ExpressionBlockExecutor : IBlockExecutor
             string json;
             if (!string.IsNullOrWhiteSpace(config.Template))
             {
-                json = TemplateRenderer.Render(config.Template, root, config.Fields);
+                json = await TemplateRenderer.RenderAsync(config.Template, root, config.Fields);
+                try
+                {
+                    using var _ = JsonDocument.Parse(json);
+                }
+                catch (JsonException ex)
+                {
+                    throw new InvalidOperationException(
+                        $"Expression block '{context.Block.Name}' produced invalid JSON for line {row.LineNumber}: {ex.Message}",
+                        ex);
+                }
             }
             else
             {

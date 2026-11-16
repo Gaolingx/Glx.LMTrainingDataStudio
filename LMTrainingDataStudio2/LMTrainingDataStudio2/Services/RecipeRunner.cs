@@ -114,7 +114,8 @@ public sealed class RecipeRunner
                         Log = message => run.Logs.Add($"[{block.Name}] {message}"),
                         RowsProcessed = new InlineProgress<long>(rows =>
                             progress?.Report(new ExecutionProgress(
-                                block.Id, block.Name, completedBlocks, totalBlocks, rowsProcessedBefore + rows)))
+                                block.Id, block.Name, completedBlocks, totalBlocks, rowsProcessedBefore + rows))),
+                        ToolProfile = ToolProfileResolver.Resolve(recipe, block)
                     };
 
                     var execution = await executor.ExecuteAsync(context, cancellationToken);

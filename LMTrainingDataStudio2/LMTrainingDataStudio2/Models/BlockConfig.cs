@@ -141,7 +141,8 @@ public sealed record LlmBlockConfig(
     string? Prompt,
     string? Endpoint = null,
     int TimeoutSeconds = 100,
-    int MaxRetries = 2) : BlockConfig;
+    int MaxRetries = 2,
+    string? ToolProfileName = null) : BlockConfig;
 
 public sealed record ExpressionBlockConfig(
     string Template,
@@ -151,12 +152,14 @@ public sealed record ValidatorBlockConfig(
     string RuleKind,
     string Rule,
     bool RejectOnFailure,
-    DatasetCleanupRules? Cleanup = null) : BlockConfig;
+    DatasetCleanupRules? Cleanup = null,
+    string? RejectOutputPath = null) : BlockConfig;
 
 public sealed record SamplerBlockConfig(
     long? Count,
     double? Ratio,
     int Seed,
-    string[] Splits) : BlockConfig;
+    string[] Splits,
+    string? OutputDirectory = null) : BlockConfig;
 
 public sealed record ToolProfileBlockConfig(ToolProfile Profile) : BlockConfig;

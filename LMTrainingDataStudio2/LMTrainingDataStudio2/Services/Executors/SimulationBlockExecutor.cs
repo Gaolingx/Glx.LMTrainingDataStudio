@@ -81,6 +81,18 @@ public sealed class SimulationBlockExecutor : IBlockExecutor
                 $"Simulation block '{context.Block.Name}' uses the provider mode but no LLM credentials are available.");
         }
 
+        if (!string.IsNullOrWhiteSpace(config.ToolProfileName) && context.ToolProfile is null)
+        {
+            throw new InvalidOperationException(
+                $"Simulation block '{context.Block.Name}' references unknown tool profile '{config.ToolProfileName}'.");
+        }
+
+        config = ApplyToolProfile(config, context.ToolProfile);
+        if (context.ToolProfile is { } profile)
+        {
+            context.Log($"Using tool profile '{profile.Name}' ({profile.Tools.Count} tool(s)).");
+        }
+
         return Task.FromResult(new BlockExecutionResult(
             GenerateAsync(context, config, cancellationToken)));
     }
@@ -336,6 +348,48 @@ public sealed class SimulationBlockExecutor : IBlockExecutor
             ? new RealToolRuntime(config.Sandbox, _sandboxRunner)
             : new SimulatedToolRuntime(_delay);
     }
+
+    private static SimulationBlockConfig ApplyToolProfile(
+        SimulationBlockConfig config,
+        ToolProfile? profile)
+    {
+        if (profile is not { Tools.Count: > 0 })
+        {
+            return config;
+        }
+
+        var merged = new Dictionary<string, SimulatedToolRule>(StringComparer.OrdinalIgnoreCase);
+        foreach (var tool in profile.Tools)
+        {
+            if (string.IsNullOrWhiteSpace(tool.Function.Name))
+            {
+                continue;
+            }
+
+            merged[tool.Function.Name] = ToSimulatedRule(tool);
+        }
+
+        foreach (var tool in config.Tools ?? Array.Empty<SimulatedToolRule>())
+        {
+            if (!string.IsNullOrWhiteSpace(tool.Name))
+            {
+                merged[tool.Name] = tool;
+            }
+        }
+
+        return config with { Tools = merged.Values.ToArray() };
+    }
+
+    private static SimulatedToolRule ToSimulatedRule(ToolDefinition tool) => new()
+    {
+        Name = tool.Function.Name,
+        Description = tool.Function.Description ?? string.Empty,
+        ParametersJson = JsonSerializer.Serialize(tool.Function.Parameters ?? new Dictionary<string, object>
+        {
+            ["type"] = "object",
+            ["properties"] = new Dictionary<string, object>()
+        })
+    };
 
     private static string FormatUsage(RowOutcome outcome)
     {
