@@ -530,7 +530,8 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 - [ ] Seed Streaming 开关、数据预览、过滤。
 - [x] LLM Provider（OpenAI Chat Completions / Responses / Anthropic Messages）、ModelAlias、Endpoint、温度、max tokens、Prompt（Round 5）。
 - [x] LLM 节点级超时与指数退避重试（Round 5）。
-- [ ] LLM 结构化输出、并发控制、密钥 UI 管理（当前读环境变量）。
+- [x] LLM 密钥设置界面：settings.json 本机保存，环境变量兜底（Round 5）。
+- [ ] LLM 结构化输出、并发控制。
 - [ ] Expression：Jinja2 模板、变量映射、渲染预览、语法校验、沙箱。
 - [ ] Validator：代码/Schema 编辑、pass/reject 双输出、失败样本、失败率、超时/沙箱。
 - [ ] Sampler：数量/比例、随机种子、切分、多输出、分层采样。
@@ -597,6 +598,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 - [ ] 网格吸附设置生效。
 - [ ] 数值输入校验与范围提示。
 - [ ] 缓存目录浏览按钮与可写性检查。
+- [ ] API 密钥加密存储（当前 settings.json 明文，仅限本机使用）。
 - [ ] 设置变更通知已创建的服务。
 - [ ] 窗口/应用图标（`Assets/` 为空）。
 - [ ] 单实例 / 文件关联 / 命令行打开。
@@ -633,6 +635,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 - [x] `ExecutionsViewModel`：刷新排序、状态过滤、详情/日志加载、刷新并选中（4 个）。
 - [x] Seed 配置编辑：字段回写、编辑器保持、Config 替换重建、非 Seed 无编辑器、错误清除、非 JSONL 校验警告（6 个）。
 - [x] LLM 接入：三种 Provider 请求/解析、密钥与错误、别名路由、重试/超时（12 个）；LLM 配置编辑器（4 个）；未知 Provider/超时/重试校验（3 个）。
+- [x] `LlmCredentials`：设置优先、环境兜底、未知 Provider、无环境变量（4 个）；设置往返包含密钥。
 - [ ] ViewModel 单测：加载/保存、运行状态、异常恢复。
 - [ ] Avalonia Headless UI 测试。
 - [ ] 集成测试：1M 行全链路。

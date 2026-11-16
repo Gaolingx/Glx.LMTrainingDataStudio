@@ -13,14 +13,26 @@ public interface ILlmCredentials
 }
 
 /// <summary>
-/// Reads credentials from environment variables so keys never enter recipe files.
+/// Resolves API keys from application settings first, then environment variables.
+/// Keys are stored in settings.json on this machine and never in recipe files.
 /// </summary>
-public sealed class EnvironmentLlmCredentials : ILlmCredentials
+public sealed class LlmCredentials : ILlmCredentials
 {
+    private readonly AppSettings _settings;
+    private readonly Func<string, string?> _readEnvironment;
+
+    public LlmCredentials(AppSettings settings, Func<string, string?>? readEnvironment = null)
+    {
+        _settings = settings;
+        _readEnvironment = readEnvironment ?? Environment.GetEnvironmentVariable;
+    }
+
     public string? GetApiKey(string provider) => LlmProviderIds.Normalize(provider) switch
     {
-        LlmProviderIds.OpenAiChat or LlmProviderIds.OpenAiResponses => Read("OPENAI_API_KEY"),
-        LlmProviderIds.Anthropic => Read("ANTHROPIC_API_KEY"),
+        LlmProviderIds.OpenAiChat or LlmProviderIds.OpenAiResponses =>
+            FirstNonEmpty(_settings.OpenAiApiKey, Read("OPENAI_API_KEY")),
+        LlmProviderIds.Anthropic =>
+            FirstNonEmpty(_settings.AnthropicApiKey, Read("ANTHROPIC_API_KEY")),
         _ => null
     };
 
@@ -31,9 +43,12 @@ public sealed class EnvironmentLlmCredentials : ILlmCredentials
         _ => null
     };
 
-    private static string? Read(string name)
+    private string? Read(string name)
     {
-        var value = Environment.GetEnvironmentVariable(name);
+        var value = _readEnvironment(name);
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
+
+    private static string? FirstNonEmpty(string? preferred, string? fallback) =>
+        string.IsNullOrWhiteSpace(preferred) ? fallback : preferred.Trim();
 }

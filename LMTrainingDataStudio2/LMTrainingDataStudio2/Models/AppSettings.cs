@@ -19,4 +19,10 @@ public sealed class AppSettings
 
     /// <summary>Whether to enable grid snapping.</summary>
     public bool EnableGridSnap { get; set; } = true;
+
+    /// <summary>OpenAI API key; falls back to OPENAI_API_KEY when empty.</summary>
+    public string? OpenAiApiKey { get; set; }
+
+    /// <summary>Anthropic API key; falls back to ANTHROPIC_API_KEY when empty.</summary>
+    public string? AnthropicApiKey { get; set; }
 }

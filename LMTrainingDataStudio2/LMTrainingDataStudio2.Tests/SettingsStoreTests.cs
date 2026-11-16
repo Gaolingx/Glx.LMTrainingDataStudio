@@ -59,7 +59,9 @@ public sealed class SettingsStoreTests
             CacheDirectory = Path.Combine(_directory, "cache"),
             EnableGridSnap = false,
             GridSnapSize = 32,
-            IsDarkTheme = false
+            IsDarkTheme = false,
+            OpenAiApiKey = "sk-openai-test",
+            AnthropicApiKey = "sk-ant-test"
         };
 
         await _store.SaveAsync(settings);
@@ -70,6 +72,8 @@ public sealed class SettingsStoreTests
         Assert.That(result.Settings.EnableGridSnap, Is.False);
         Assert.That(result.Settings.GridSnapSize, Is.EqualTo(32));
         Assert.That(result.Settings.IsDarkTheme, Is.False);
+        Assert.That(result.Settings.OpenAiApiKey, Is.EqualTo("sk-openai-test"));
+        Assert.That(result.Settings.AnthropicApiKey, Is.EqualTo("sk-ant-test"));
         Assert.That(result.Warnings, Is.Empty);
     }
 
@@ -82,7 +86,8 @@ public sealed class SettingsStoreTests
             CacheDirectory = "C:/cache",
             EnableGridSnap = true,
             GridSnapSize = 8,
-            IsDarkTheme = false
+            IsDarkTheme = false,
+            OpenAiApiKey = "sk-test"
         });
 
         using var document = JsonDocument.Parse(await File.ReadAllTextAsync(_path));
@@ -93,6 +98,7 @@ public sealed class SettingsStoreTests
         Assert.That(root.GetProperty("enableGridSnap").GetBoolean(), Is.True);
         Assert.That(root.GetProperty("gridSnapSize").GetInt32(), Is.EqualTo(8));
         Assert.That(root.GetProperty("isDarkTheme").GetBoolean(), Is.False);
+        Assert.That(root.GetProperty("openAiApiKey").GetString(), Is.EqualTo("sk-test"));
     }
 
     [Test]

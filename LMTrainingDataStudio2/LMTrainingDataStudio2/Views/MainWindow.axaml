@@ -305,6 +305,24 @@
 
                         <Border Background="#1E1E2E" BorderBrush="#3A3A4E" BorderThickness="1" CornerRadius="8" Padding="16">
                             <StackPanel Spacing="12">
+                                <TextBlock Text="LLM API Keys" FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                <TextBlock Text="Stored in settings.json on this machine. Leave empty to use OPENAI_API_KEY / ANTHROPIC_API_KEY."
+                                           FontSize="11" Foreground="#9A9AAD" TextWrapping="Wrap" />
+                                <Grid ColumnDefinitions="180,*" RowDefinitions="Auto,Auto" RowSpacing="10" ColumnSpacing="12">
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="OpenAI API key"
+                                               VerticalAlignment="Center" Foreground="#CCCCCC" />
+                                    <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding OpenAiApiKey, Mode=TwoWay}"
+                                             PasswordChar="●" Watermark="sk-..." />
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Anthropic API key"
+                                               VerticalAlignment="Center" Foreground="#CCCCCC" />
+                                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding AnthropicApiKey, Mode=TwoWay}"
+                                             PasswordChar="●" Watermark="sk-ant-..." />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="#1E1E2E" BorderBrush="#3A3A4E" BorderThickness="1" CornerRadius="8" Padding="16">
+                            <StackPanel Spacing="12">
                                 <TextBlock Text="Canvas" FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF" />
                                 <Grid ColumnDefinitions="180,*" RowDefinitions="Auto,Auto" RowSpacing="10" ColumnSpacing="12">
                                     <TextBlock Grid.Row="0" Grid.Column="0" Text="Enable grid snap" VerticalAlignment="Center" Foreground="#CCCCCC" />

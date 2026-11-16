@@ -80,6 +80,12 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private string _cacheSizeText = "0 MB";
 
+    [ObservableProperty]
+    private string _openAiApiKey = string.Empty;
+
+    [ObservableProperty]
+    private string _anthropicApiKey = string.Empty;
+
     public ObservableCollection<BlockNodeViewModel> Blocks { get; } = new();
     public ObservableCollection<EdgeViewModel> Edges { get; } = new();
     public ObservableCollection<BlockTemplateViewModel> BlockTemplates { get; } = new();
@@ -121,6 +127,8 @@ public partial class MainWindowViewModel : ObservableObject
         EnableGridSnap = _settings.EnableGridSnap;
         GridSnapSize = _settings.GridSnapSize;
         IsDarkTheme = _settings.IsDarkTheme;
+        OpenAiApiKey = _settings.OpenAiApiKey ?? string.Empty;
+        AnthropicApiKey = _settings.AnthropicApiKey ?? string.Empty;
         UpdateCacheSizeText();
     }
 
@@ -374,7 +382,9 @@ public partial class MainWindowViewModel : ObservableObject
                 : CacheDirectory.Trim(),
             EnableGridSnap = EnableGridSnap,
             GridSnapSize = Math.Clamp(GridSnapSize, SettingsStore.MinGridSnapSize, SettingsStore.MaxGridSnapSize),
-            IsDarkTheme = IsDarkTheme
+            IsDarkTheme = IsDarkTheme,
+            OpenAiApiKey = NullIfBlank(OpenAiApiKey),
+            AnthropicApiKey = NullIfBlank(AnthropicApiKey)
         };
 
         try
@@ -459,8 +469,11 @@ public partial class MainWindowViewModel : ObservableObject
             new ExpressionBlockExecutor(),
             new ValidatorBlockExecutor(),
             new SamplerBlockExecutor(),
-            new LlmBlockExecutor(new LlmApiClient(_llmHttpClient, new EnvironmentLlmCredentials()))
+            new LlmBlockExecutor(new LlmApiClient(_llmHttpClient, new LlmCredentials(_settings)))
         });
+
+    private static string? NullIfBlank(string value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private void OnExecutionProgress(ExecutionProgress progress)
     {
