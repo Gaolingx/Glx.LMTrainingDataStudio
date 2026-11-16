@@ -19,6 +19,8 @@ public sealed class LlmConfigEditorTests
         editor.MaxTokens = 4096;
         editor.Prompt = string.Empty;
         editor.Endpoint = "https://proxy.example/v1";
+        editor.TimeoutSeconds = 30;
+        editor.MaxRetries = 5;
 
         var config = (LlmBlockConfig)block.Config;
         Assert.That(config.Provider, Is.EqualTo(LlmProviderIds.Anthropic));
@@ -27,6 +29,8 @@ public sealed class LlmConfigEditorTests
         Assert.That(config.MaxTokens, Is.EqualTo(4096));
         Assert.That(config.Prompt, Is.Null);
         Assert.That(config.Endpoint, Is.EqualTo("https://proxy.example/v1"));
+        Assert.That(config.TimeoutSeconds, Is.EqualTo(30));
+        Assert.That(config.MaxRetries, Is.EqualTo(5));
         Assert.That(block.LlmEditor, Is.SameAs(editor));
     }
 

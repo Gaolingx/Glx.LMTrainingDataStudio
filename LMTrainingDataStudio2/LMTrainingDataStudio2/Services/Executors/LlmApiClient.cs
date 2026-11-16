@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -23,16 +24,33 @@ public sealed class LlmApiClient : ILlmClient
 
     private readonly HttpClient _httpClient;
     private readonly ILlmCredentials _credentials;
+    private readonly Func<TimeSpan, CancellationToken, Task> _delay;
 
-    public LlmApiClient(HttpClient httpClient, ILlmCredentials credentials)
+    public LlmApiClient(
+        HttpClient httpClient,
+        ILlmCredentials credentials,
+        Func<TimeSpan, CancellationToken, Task>? delay = null)
     {
         _httpClient = httpClient;
         _credentials = credentials;
+        _delay = delay ?? ((duration, token) => Task.Delay(duration, token));
     }
 
     public async Task<string> CompleteAsync(
         string prompt, LlmBlockConfig config, CancellationToken cancellationToken = default)
     {
+        if (config.TimeoutSeconds <= 0)
+        {
+            throw new InvalidOperationException(
+                $"LLM timeout must be greater than 0 seconds; got {config.TimeoutSeconds}.");
+        }
+
+        if (config.MaxRetries < 0)
+        {
+            throw new InvalidOperationException(
+                $"LLM max retries must not be negative; got {config.MaxRetries}.");
+        }
+
         var provider = LlmProviderIds.Normalize(config.Provider)
             ?? throw new InvalidOperationException($"LLM provider '{config.Provider}' is not supported.");
 
@@ -56,13 +74,20 @@ public sealed class LlmApiClient : ILlmClient
             config.Temperature,
             config.MaxTokens);
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/chat/completions")
-        {
-            Content = JsonContent.Create(payload, options: JsonOptions)
-        };
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        var body = await SendWithRetryAsync(
+            () =>
+            {
+                var request = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/chat/completions")
+                {
+                    Content = JsonContent.Create(payload, options: JsonOptions)
+                };
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+                return request;
+            },
+            "OpenAI chat completion",
+            config,
+            ct);
 
-        var body = await SendAsync(request, "OpenAI chat completion", ct);
         using var document = JsonDocument.Parse(body);
 
         var content = document.RootElement
@@ -86,13 +111,20 @@ public sealed class LlmApiClient : ILlmClient
             config.Temperature,
             config.MaxTokens);
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/responses")
-        {
-            Content = JsonContent.Create(payload, options: JsonOptions)
-        };
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        var body = await SendWithRetryAsync(
+            () =>
+            {
+                var request = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/responses")
+                {
+                    Content = JsonContent.Create(payload, options: JsonOptions)
+                };
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+                return request;
+            },
+            "OpenAI response",
+            config,
+            ct);
 
-        var body = await SendAsync(request, "OpenAI response", ct);
         using var document = JsonDocument.Parse(body);
         var root = document.RootElement;
 
@@ -137,14 +169,21 @@ public sealed class LlmApiClient : ILlmClient
             config.Temperature,
             new[] { new AnthropicMessage("user", prompt) });
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/v1/messages")
-        {
-            Content = JsonContent.Create(payload, options: JsonOptions)
-        };
-        request.Headers.Add("x-api-key", apiKey);
-        request.Headers.Add("anthropic-version", "2023-06-01");
+        var body = await SendWithRetryAsync(
+            () =>
+            {
+                var request = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/v1/messages")
+                {
+                    Content = JsonContent.Create(payload, options: JsonOptions)
+                };
+                request.Headers.Add("x-api-key", apiKey);
+                request.Headers.Add("anthropic-version", "2023-06-01");
+                return request;
+            },
+            "Anthropic message",
+            config,
+            ct);
 
-        var body = await SendAsync(request, "Anthropic message", ct);
         using var document = JsonDocument.Parse(body);
         var content = document.RootElement.GetProperty("content");
 
@@ -159,21 +198,78 @@ public sealed class LlmApiClient : ILlmClient
         throw new InvalidOperationException("Anthropic Messages API returned no text content.");
     }
 
-    private async Task<string> SendAsync(
-        HttpRequestMessage request, string operation, CancellationToken ct)
+    private async Task<string> SendWithRetryAsync(
+        Func<HttpRequestMessage> requestFactory,
+        string operation,
+        LlmBlockConfig config,
+        CancellationToken ct)
     {
-        using var response = await _httpClient.SendAsync(request, ct);
-        var body = await response.Content.ReadAsStringAsync(ct);
+        var attempts = config.MaxRetries + 1;
+        var timeout = TimeSpan.FromSeconds(config.TimeoutSeconds);
+        Exception? lastFailure = null;
 
-        if (!response.IsSuccessStatusCode)
+        for (var attempt = 0; attempt < attempts; attempt++)
         {
-            var snippet = body.Length > 500 ? body[..500] : body;
-            throw new InvalidOperationException(
-                $"{operation} failed with HTTP {(int)response.StatusCode} ({response.StatusCode}): {snippet}");
+            ct.ThrowIfCancellationRequested();
+
+            using var request = requestFactory();
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeoutCts.CancelAfter(timeout);
+
+            try
+            {
+                using var response = await _httpClient.SendAsync(request, timeoutCts.Token);
+                var body = await response.Content.ReadAsStringAsync(timeoutCts.Token);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    return body;
+                }
+
+                var error = CreateHttpError(operation, response.StatusCode, body);
+                if (!IsRetryable(response.StatusCode))
+                {
+                    throw error;
+                }
+
+                lastFailure = error;
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                lastFailure = new TimeoutException(
+                    $"{operation} timed out after {timeout.TotalSeconds:0.#}s.");
+            }
+            catch (HttpRequestException ex)
+            {
+                lastFailure = ex;
+            }
+
+            if (attempt < attempts - 1)
+            {
+                await _delay(ComputeBackoff(attempt), ct);
+            }
         }
 
-        return body;
+        throw new InvalidOperationException(
+            $"{operation} failed after {attempts} attempt(s): {lastFailure?.Message ?? "unknown error"}",
+            lastFailure);
     }
+
+    private static bool IsRetryable(HttpStatusCode status) =>
+        status == HttpStatusCode.RequestTimeout ||
+        (int)status == 429 ||
+        (int)status >= 500;
+
+    private static InvalidOperationException CreateHttpError(
+        string operation, HttpStatusCode status, string body)
+    {
+        var snippet = body.Length > 500 ? body[..500] : body;
+        return new InvalidOperationException(
+            $"{operation} failed with HTTP {(int)status} ({status}): {snippet}");
+    }
+
+    private static TimeSpan ComputeBackoff(int attempt) =>
+        TimeSpan.FromMilliseconds(Math.Min(500 * Math.Pow(2, attempt), 5000));
 
     private string RequireApiKey(string provider, string environmentVariable)
     {

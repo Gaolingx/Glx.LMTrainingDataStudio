@@ -275,6 +275,24 @@ public sealed class RecipeValidationService
                     });
                     break;
 
+                case LlmBlockConfig llm when llm.TimeoutSeconds <= 0:
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"LLM block '{block.Name}' timeout must be greater than 0 seconds.",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case LlmBlockConfig llm when llm.MaxRetries < 0:
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"LLM block '{block.Name}' max retries must not be negative.",
+                        BlockId = block.Id
+                    });
+                    break;
+
                 case ExpressionBlockConfig expression when string.IsNullOrWhiteSpace(expression.Template):
                     result.Issues.Add(new ValidationIssue
                     {

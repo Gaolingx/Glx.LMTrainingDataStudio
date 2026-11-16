@@ -101,6 +101,34 @@ public sealed class RecipeValidationServiceTests
     }
 
     [Test]
+    public void Validate_LlmWithInvalidTimeout_ReportsWarning()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("llm1", BlockType.Llm, "generator",
+            new LlmBlockConfig("openai_chat", "gpt-4o", Temperature: 0.7, MaxTokens: 2048, Prompt: null,
+                TimeoutSeconds: 0)));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Severity == ValidationSeverity.Warning && i.Message.Contains("timeout")), Is.True);
+    }
+
+    [Test]
+    public void Validate_LlmWithNegativeRetries_ReportsWarning()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("llm1", BlockType.Llm, "generator",
+            new LlmBlockConfig("openai_chat", "gpt-4o", Temperature: 0.7, MaxTokens: 2048, Prompt: null,
+                MaxRetries: -1)));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Severity == ValidationSeverity.Warning && i.Message.Contains("max retries")), Is.True);
+    }
+
+    [Test]
     public void Validate_LlmWithUnknownProvider_ReportsWarning()
     {
         var recipe = new Recipe();

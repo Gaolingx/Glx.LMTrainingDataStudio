@@ -131,6 +131,19 @@
                     </StackPanel>
                 </Grid>
 
+                <Grid ColumnDefinitions="*,8,*">
+                    <StackPanel Grid.Column="0" Spacing="4">
+                        <TextBlock Text="Timeout (s)" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBox Text="{Binding SelectedBlock.LlmEditor.TimeoutSeconds, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="100" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Spacing="4">
+                        <TextBlock Text="Max retries" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBox Text="{Binding SelectedBlock.LlmEditor.MaxRetries, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="2" />
+                    </StackPanel>
+                </Grid>
+
                 <StackPanel Spacing="4">
                     <TextBlock Text="Endpoint (optional)" FontSize="11" Foreground="#AAAAAA" />
                     <TextBox Text="{Binding SelectedBlock.LlmEditor.Endpoint, Mode=TwoWay}"

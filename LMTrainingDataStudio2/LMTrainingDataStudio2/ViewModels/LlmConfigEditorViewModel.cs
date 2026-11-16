@@ -30,6 +30,12 @@ public partial class LlmConfigEditorViewModel : ObservableObject
     [ObservableProperty]
     private string _endpoint;
 
+    [ObservableProperty]
+    private int _timeoutSeconds;
+
+    [ObservableProperty]
+    private int _maxRetries;
+
     public LlmConfigEditorViewModel(LlmBlockConfig config, Action<LlmBlockConfig> apply)
     {
         _apply = apply;
@@ -38,6 +44,8 @@ public partial class LlmConfigEditorViewModel : ObservableObject
         _maxTokens = config.MaxTokens;
         _prompt = config.Prompt ?? string.Empty;
         _endpoint = config.Endpoint ?? string.Empty;
+        _timeoutSeconds = config.TimeoutSeconds;
+        _maxRetries = config.MaxRetries;
         _selectedProvider = Providers.FirstOrDefault(option =>
             option.Id == LlmProviderIds.Normalize(config.Provider)) ?? Providers[0];
     }
@@ -61,11 +69,17 @@ public partial class LlmConfigEditorViewModel : ObservableObject
 
     partial void OnEndpointChanged(string value) => Push();
 
+    partial void OnTimeoutSecondsChanged(int value) => Push();
+
+    partial void OnMaxRetriesChanged(int value) => Push();
+
     private void Push() => _apply(new LlmBlockConfig(
         SelectedProvider.Id,
         ModelAlias ?? string.Empty,
         Temperature,
         MaxTokens,
         string.IsNullOrWhiteSpace(Prompt) ? null : Prompt,
-        string.IsNullOrWhiteSpace(Endpoint) ? null : Endpoint.Trim()));
+        string.IsNullOrWhiteSpace(Endpoint) ? null : Endpoint.Trim(),
+        TimeoutSeconds,
+        MaxRetries));
 }

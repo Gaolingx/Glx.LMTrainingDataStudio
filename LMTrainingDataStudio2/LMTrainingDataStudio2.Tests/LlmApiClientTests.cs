@@ -144,10 +144,81 @@ public sealed class LlmApiClientTests
             JsonResponse(HttpStatusCode.TooManyRequests, """{"error":{"message":"rate limited"}}"""));
 
         var ex = Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await client.CompleteAsync("hi", CreateConfig(LlmProviderIds.OpenAiChat)));
+            async () => await client.CompleteAsync("hi", CreateConfig(LlmProviderIds.OpenAiChat, maxRetries: 0)));
 
         Assert.That(ex!.Message, Does.Contain("429"));
         Assert.That(ex.Message, Does.Contain("rate limited"));
+    }
+
+    [Test]
+    public async Task TransientServerError_IsRetried()
+    {
+        var calls = 0;
+        var delays = new List<TimeSpan>();
+        var client = CreateClient((_, _) =>
+        {
+            calls++;
+            return calls == 1
+                ? JsonResponse(HttpStatusCode.InternalServerError, "boom")
+                : JsonResponse(HttpStatusCode.OK, """{"choices":[{"message":{"content":"ok"}}]}""");
+        }, delays: delays);
+
+        var result = await client.CompleteAsync(
+            "hi", CreateConfig(LlmProviderIds.OpenAiChat, maxRetries: 2));
+
+        Assert.That(result, Is.EqualTo("ok"));
+        Assert.That(calls, Is.EqualTo(2));
+        Assert.That(delays, Has.Count.EqualTo(1));
+        Assert.That(delays[0], Is.EqualTo(TimeSpan.FromMilliseconds(500)));
+    }
+
+    [Test]
+    public void RetriesExhausted_ThrowsAfterConfiguredAttempts()
+    {
+        var calls = 0;
+        var client = CreateClient((_, _) =>
+        {
+            calls++;
+            return JsonResponse(HttpStatusCode.InternalServerError, "boom");
+        }, delays: new List<TimeSpan>());
+
+        var ex = Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await client.CompleteAsync(
+                "hi", CreateConfig(LlmProviderIds.OpenAiChat, maxRetries: 1)));
+
+        Assert.That(calls, Is.EqualTo(2));
+        Assert.That(ex!.Message, Does.Contain("failed after 2 attempt(s)"));
+        Assert.That(ex.Message, Does.Contain("500"));
+    }
+
+    [Test]
+    public void ClientError_IsNotRetried()
+    {
+        var calls = 0;
+        var client = CreateClient((_, _) =>
+        {
+            calls++;
+            return JsonResponse(HttpStatusCode.BadRequest, "bad request");
+        });
+
+        var ex = Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await client.CompleteAsync(
+                "hi", CreateConfig(LlmProviderIds.OpenAiChat, maxRetries: 3)));
+
+        Assert.That(calls, Is.EqualTo(1));
+        Assert.That(ex!.Message, Does.Contain("400"));
+    }
+
+    [Test]
+    public void Timeout_ThrowsAfterConfiguredTimeout()
+    {
+        var client = new LlmApiClient(new HttpClient(new HangingHandler()), new FakeCredentials("test-key"));
+
+        var ex = Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await client.CompleteAsync(
+                "hi", CreateConfig(LlmProviderIds.OpenAiChat, timeoutSeconds: 1, maxRetries: 0)));
+
+        Assert.That(ex!.Message, Does.Contain("timed out after 1s"));
     }
 
     [Test]
@@ -161,11 +232,26 @@ public sealed class LlmApiClientTests
 
     private static LlmApiClient CreateClient(
         Func<HttpRequestMessage, string, HttpResponseMessage> responder,
-        string? apiKey = "test-key")
-        => new(new HttpClient(new StubHandler(responder)), new FakeCredentials(apiKey));
+        string? apiKey = "test-key",
+        List<TimeSpan>? delays = null)
+        => new(
+            new HttpClient(new StubHandler(responder)),
+            new FakeCredentials(apiKey),
+            delays is null
+                ? null
+                : (duration, _) =>
+                {
+                    delays.Add(duration);
+                    return Task.CompletedTask;
+                });
 
-    private static LlmBlockConfig CreateConfig(string provider, string model = "gpt-4o") =>
-        new(provider, model, Temperature: 0.2, MaxTokens: 2048, Prompt: "ignored");
+    private static LlmBlockConfig CreateConfig(
+        string provider,
+        string model = "gpt-4o",
+        int timeoutSeconds = 100,
+        int maxRetries = 2) =>
+        new(provider, model, Temperature: 0.2, MaxTokens: 2048, Prompt: "ignored",
+            Endpoint: null, TimeoutSeconds: timeoutSeconds, MaxRetries: maxRetries);
 
     private static HttpResponseMessage JsonResponse(HttpStatusCode status, string body) => new(status)
     {
@@ -182,6 +268,16 @@ public sealed class LlmApiClientTests
                 ? string.Empty
                 : await request.Content.ReadAsStringAsync(cancellationToken);
             return responder(request, content);
+        }
+    }
+
+    private sealed class HangingHandler : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            throw new InvalidOperationException("unreachable");
         }
     }
 

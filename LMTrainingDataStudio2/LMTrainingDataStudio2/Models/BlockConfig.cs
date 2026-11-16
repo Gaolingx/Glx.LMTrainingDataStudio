@@ -91,7 +91,9 @@ public sealed record LlmBlockConfig(
     double Temperature,
     int MaxTokens,
     string? Prompt,
-    string? Endpoint = null) : BlockConfig;
+    string? Endpoint = null,
+    int TimeoutSeconds = 100,
+    int MaxRetries = 2) : BlockConfig;
 
 public sealed record ExpressionBlockConfig(
     string Template,
