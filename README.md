@@ -6,19 +6,18 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 
 ## 当前状态
 
-当前版本已完成应用骨架和核心服务初版：
+当前版本已完成应用骨架、核心服务与可执行 Recipe 引擎：
 
-- Avalonia 桌面应用启动框架
-- 三栏式 Studio UI 布局
-- Block Sheet / Canvas / Property Panel / Status Bar
-- Recipe DAG 节点模型与示例流程
-- 异步 Validate / Run 命令框架
-- JSONL SQLite 行索引缓存服务
+- Avalonia 桌面应用与三栏式 Studio UI（Block Sheet / Canvas / Property Panel / Status Bar）
+- Recipe / 设置持久化：原子写入、camelCase 多态 JSON、schema 版本校验
+- JSONL SQLite 行索引缓存与分页读取
 - OpenAI / ShareGPT / Alpaca 数据格式转换服务初版
-- JSONL 语法验证与简单自动修复入口
-- Tool Schema 数据模型
+- 真实 RecipeRunner：Seed / Expression / Validator / Sampler / LLM 执行器，执行记录与 Executions UI
+- OpenAI Chat Completions / Responses、Anthropic Messages 客户端；密钥从设置或环境变量读取，支持节点级超时与指数退避重试
+- 模拟 API 测试：Query Source → Simulation（mini harness）→ Cleaner → SFT Export，多轮 tool 轨迹与 OpenAI messages JSONL 导出
+- 通用 Block Config JSON 编辑器，可直接配置所有节点类型
 
-> 注意：当前仍是早期开发版，部分交互如真实节点拖拽、连线创建、自动布局、完整文件读写和输出预览弹窗仍在开发中。
+> 注意：当前仍是早期开发版，部分交互如完整文件打开/保存、自动布局和输出预览弹窗仍在开发中。
 >
 > 详细实施计划、阶段目标与验收标准见 [PLAN/TODO.md](PLAN/TODO.md)。
 
@@ -34,6 +33,51 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - **架构模式**：MVVM
 
 ## 主要功能规划
+
+### 0. 模拟 API 测试与 SFT 轨迹生成
+
+无需真实 API Key 即可生成可复现的 agent SFT 轨迹：
+
+- `QuerySourceBlockConfig`：`SameQuery`（同 query 重复）或 `MultipleQueries`（多组 query）。
+- `SimulationBlockConfig`：
+  - `Script` 确定性回放 assistant 回合；未配置脚本时依次调用所有已暴露工具再收尾。
+  - `Tools` 声明工具 schema 与行为；`SimulatedToolCatalog` 内置 python / web_fetch / powershell / bash 模拟工具。
+  - `Rules` 控制工具白名单、单次超时、重试次数、重试延迟、失败是否中止。
+  - `MaxRounds` / `TimeoutSeconds` / `ModelMaxRetries` 控制整体循环与模型调用。
+- `DatasetCleanupRules`：正则替换、空白/换行规范化、ANSI 清理、移除 reasoning、丢弃空消息；Cleaner 节点与 Validator 均可使用。
+- `SftExportBlockExecutor`：流式写临时文件，成功后原子替换目标 JSONL；只输出 `messages` 与 `tools`。
+
+示例配置（Simulation 节点 Config JSON，可粘贴到属性面板的 Config JSON 编辑器）：
+
+```json
+{
+  "kind": "simulation",
+  "modelAlias": "sim-model",
+  "maxRounds": 4,
+  "systemPrompt": "You are a tool-using agent.",
+  "tools": [
+    {
+      "name": "python",
+      "description": "Execute Python source code in a sandbox (simulated).",
+      "parametersJson": "{\"type\":\"object\",\"properties\":{\"code\":{\"type\":\"string\"}},\"required\":[\"code\"]}",
+      "responseTemplate": "[simulated python] executed: {{arguments}}"
+    }
+  ],
+  "rules": { "allowedTools": ["python"], "defaultTimeoutMs": 5000, "maxRetries": 1 },
+  "script": [
+    { "content": "I will run the code.", "toolCalls": [{ "name": "python", "argumentsJson": "{\"code\":\"print(1)\"}" }] }
+  ],
+  "finalContent": "Done.",
+  "timeoutSeconds": 60
+}
+```
+
+相关实现：
+
+- `LMTrainingDataStudio2/Services/Simulation/`
+- `LMTrainingDataStudio2/Models/SimulationConfig.cs`
+- `LMTrainingDataStudio2/Models/DatasetCleanup.cs`
+- `LMTrainingDataStudio2/Services/Executors/SimulationBlockExecutor.cs`
 
 ### 1. 大文件流式处理
 
@@ -80,9 +124,13 @@ UI 采用 Recipe Graph / DAG 的设计：
 - Seed Block：数据输入源
 - LLM / Model Block：模型调用
 - Expression Block：Jinja 风格字段变换
-- Validator Block：Schema / 代码 / 数据质量校验
+- Validator Block：Schema / 代码 / 数据质量校验（可选轨迹清洗）
 - Sampler Block：确定性采样与数据切分
 - Tool Profile Block：OpenAI-compatible Tool Schema / MCP 工具配置
+- Query Source Block：模拟用户 query（同 query 重复 / 多组 query）
+- Simulation Block：模拟 API + mini harness（多轮工具调用、白名单、失败、超时、重试）
+- Cleaner Block：正则替换与格式规范化
+- SFT Export Block：OAI messages JSONL 原子导出
 
 当前 UI 已包含：
 
@@ -113,17 +161,28 @@ LMTrainingDataStudio2/                      # 主项目目录
 │
 ├── Models/                                 # 数据模型层
 │   ├── AppSettings.cs                      # 全局设置（缓存容量、主题、网格吸附等）
+│   ├── BlockConfig.cs                      # 强类型节点配置（多态 kind）
 │   ├── ChatMessage.cs                      # 规范化聊天消息、ToolDefinition、ToolCall、SftSample
+│   ├── DatasetCleanup.cs                   # 轨迹清洗规则（正则/格式规范化）
 │   ├── DatasetFormat.cs                    # DatasetFormat / DataFileType 枚举
+│   ├── ExecutionRun.cs                     # 执行记录模型
 │   ├── RecipeBlock.cs                      # Recipe DAG 节点、端口、边、Recipe 容器
+│   ├── SimulationConfig.cs                 # Query/Simulation/Cleaner/SFT Export 配置与模拟工具目录
 │   ├── ToolSchema.cs                       # Tool Schema 树形节点模型、ToolProfile
 │   └── ValidationResult.cs                 # 验证结果与 Issue 模型
 │
 ├── Services/                               # 业务服务层（无 UI 依赖）
+│   ├── Executors/                          # 节点执行器（Seed/Expression/Validator/Sampler/LLM/Query/Simulation/Cleaner/SftExport）
+│   ├── Simulation/                         # 模拟 API：scripted client、tool runtime、harness、清洗、OAI 序列化
 │   ├── DatasetFormatConverter.cs           # OpenAI / ShareGPT / Alpaca 格式互转
 │   ├── DatasetValidationService.cs         # JSONL 逐行语法验证 + 自动修复
+│   ├── ExecutionStore.cs                   # 执行记录持久化
 │   ├── IndexCacheService.cs                # SQLite 行偏移索引缓存（大文件随机访问）
-│   └── RecipeValidationService.cs          # Recipe DAG 验证（环检测、配置检查）
+│   ├── JsonlDatasetReader.cs               # JSONL 分页读取
+│   ├── RecipeRunner.cs                     # DAG 执行器
+│   ├── RecipeStore.cs                      # Recipe 原子持久化
+│   ├── RecipeValidationService.cs          # Recipe DAG 验证（环检测、配置检查）
+│   └── SettingsStore.cs                    # 设置持久化
 │
 ├── ViewModels/                             # MVVM ViewModel 层
 │   ├── MainWindowViewModel.cs              # 主窗口 VM（Recipe 管理、Run/Validate 命令）
@@ -194,7 +253,7 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 
 ### Block Sheet
 
-展示可添加的 Block 模板，包括 Seed、LLM、Expression、Validator、Sampler 和 Tool Profile。
+展示可添加的 Block 模板，包括 Seed、LLM、Expression、Validator、Sampler、Tool Profile、Query Source、Simulation、Cleaner 和 SFT Export。
 
 ### Canvas Area
 
@@ -213,10 +272,8 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 根据当前选中的 Block 显示配置项，包括：
 
 - Jinja 引用名
-- Streaming 配置
-- Index Cache 配置
-- Prompt / Jinja 编辑器占位
-- OpenAI Tool Schema 树形编辑器占位
+- 节点专属配置（Seed / LLM）
+- 通用 Config JSON 编辑器（适用于所有节点，包含 kind 与 BlockType 一致性校验）
 - Validation 摘要
 - Progress / Logs
 
@@ -230,6 +287,12 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 
 ```json
 {"messages":[{"role":"system","content":"You are helpful."},{"role":"user","content":"Hello"},{"role":"assistant","content":"Hi!"}]}
+```
+
+### OpenAI tool-call 轨迹（模拟 API 输出）
+
+```json
+{"messages":[{"role":"system","content":"You are a tool-using agent."},{"role":"user","content":"运行 print(1)"},{"role":"assistant","content":"","tool_calls":[{"id":"call_0_0","type":"function","function":{"name":"python","arguments":"{\"code\":\"print(1)\"}"}}]},{"role":"tool","tool_call_id":"call_0_0","content":"[simulated python] executed: {\"code\":\"print(1)\"}"},{"role":"assistant","content":"Done."}],"tools":[{"type":"function","function":{"name":"python","description":"Execute Python source code in a sandbox (simulated).","parameters":{"type":"object","properties":{"code":{"type":"string"}},"required":["code"]}}}]}
 ```
 
 ### ShareGPT
@@ -258,6 +321,12 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 
 ## 开发路线图
 
+- [x] Recipe 执行引擎、执行记录与 Executions UI
+- [x] 模拟 API 测试子节点（Query / Simulation / Cleaner / SFT Export）与 OAI 轨迹导出
+- [x] Recipe / 设置持久化与 schema 版本
+- [x] OpenAI Chat / Responses、Anthropic Messages 客户端与节点级重试
+- [ ] 真实 tool-calling provider 与 python / PowerShell / bash 沙箱执行
+- [ ] 新节点专属属性面板（当前使用通用 Config JSON 编辑器）
 - [ ] 文件打开 / 保存 / 另存为
 - [ ] JSONL / CSV / Parquet 流式读取与分页预览
 - [ ] 大文件随机行跳转
@@ -271,11 +340,11 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 - [ ] Canvas 节点拖拽与 Port 连线
 - [ ] Edge 动画与样本预览弹窗
 - [ ] Mini-map 真实视口同步
-- [ ] Command Pattern 撤销 / 重做
+- [x] Command Pattern 撤销 / 重做
 - [ ] 亮色 / 暗色主题切换
 - [ ] LiveCharts2 或 OxyPlot 进度图表
 - [ ] 执行完成后的 output 目录摘要预览
-- [ ] 单元测试与集成测试
+- [x] 单元测试与集成测试（198 个，`dotnet test` 全绿）
 
 ## 编码约定
 

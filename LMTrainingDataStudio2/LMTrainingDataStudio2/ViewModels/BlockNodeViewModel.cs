@@ -1,6 +1,8 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using LMTrainingDataStudio2.Models;
+using LMTrainingDataStudio2.Services;
 using System.Collections.ObjectModel;
+using System.Text.Json;
 
 namespace LMTrainingDataStudio2.ViewModels;
 
@@ -45,6 +47,12 @@ public partial class BlockNodeViewModel : ObservableObject
     [ObservableProperty]
     private LlmConfigEditorViewModel? _llmEditor;
 
+    [ObservableProperty]
+    private string _configJson = string.Empty;
+
+    [ObservableProperty]
+    private string? _configJsonError;
+
     private BlockConfig _config = null!;
 
     /// <summary>
@@ -57,6 +65,9 @@ public partial class BlockNodeViewModel : ObservableObject
         {
             if (!SetProperty(ref _config, value)) return;
 
+            ConfigJson = JsonSerializer.Serialize(value, RecipeStore.SerializerOptions);
+            ConfigJsonError = null;
+
             SeedEditor = value is SeedBlockConfig seed
                 ? new SeedConfigEditorViewModel(seed, ApplySeedConfig)
                 : null;
@@ -67,11 +78,55 @@ public partial class BlockNodeViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Replaces the configuration from JSON. The config kind must match the block type.
+    /// </summary>
+    public bool TryApplyConfigJson(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            ConfigJsonError = "Config JSON is empty.";
+            return false;
+        }
+
+        BlockConfig? config;
+        try
+        {
+            config = JsonSerializer.Deserialize<BlockConfig>(json, RecipeStore.SerializerOptions);
+        }
+        catch (JsonException ex)
+        {
+            ConfigJsonError = $"Invalid config JSON: {ex.Message}";
+            return false;
+        }
+        catch (NotSupportedException ex)
+        {
+            ConfigJsonError = ex.Message;
+            return false;
+        }
+
+        if (config is null)
+        {
+            ConfigJsonError = "Config JSON did not produce a block configuration.";
+            return false;
+        }
+
+        if (config.GetBlockType() != Type)
+        {
+            ConfigJsonError = $"Config kind '{config.GetBlockType()}' does not match block type '{Type}'.";
+            return false;
+        }
+
+        Config = config;
+        return true;
+    }
+
     private void ApplySeedConfig(SeedBlockConfig config)
     {
         if (_config.Equals(config)) return;
 
         _config = config;
+        ConfigJson = JsonSerializer.Serialize(config, RecipeStore.SerializerOptions);
         OnPropertyChanged(nameof(Config));
         ConfigError = null;
     }
@@ -81,6 +136,7 @@ public partial class BlockNodeViewModel : ObservableObject
         if (_config.Equals(config)) return;
 
         _config = config;
+        ConfigJson = JsonSerializer.Serialize(config, RecipeStore.SerializerOptions);
         OnPropertyChanged(nameof(Config));
         ConfigError = null;
     }
@@ -99,6 +155,10 @@ public partial class BlockNodeViewModel : ObservableObject
         BlockType.Validator => "ValidatorBlockBrush",
         BlockType.Sampler => "SamplerBlockBrush",
         BlockType.ToolProfile => "ToolProfileBlockBrush",
+        BlockType.QuerySource => "QuerySourceBlockBrush",
+        BlockType.Simulation => "SimulationBlockBrush",
+        BlockType.Cleaner => "CleanerBlockBrush",
+        BlockType.SftExport => "SftExportBlockBrush",
         _ => "SeedBlockBrush"
     };
 
@@ -113,6 +173,10 @@ public partial class BlockNodeViewModel : ObservableObject
         BlockType.Validator => "✓",
         BlockType.Sampler => "🎲",
         BlockType.ToolProfile => "🔧",
+        BlockType.QuerySource => "⌕",
+        BlockType.Simulation => "◎",
+        BlockType.Cleaner => "✧",
+        BlockType.SftExport => "⇩",
         _ => "?"
     };
 }

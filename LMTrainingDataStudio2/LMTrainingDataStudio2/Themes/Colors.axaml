@@ -8,6 +8,10 @@
     <Color x:Key="ValidatorBlockColor">#D0021B</Color>
     <Color x:Key="SamplerBlockColor">#417505</Color>
     <Color x:Key="ToolProfileBlockColor">#9B9B9B</Color>
+    <Color x:Key="QuerySourceBlockColor">#E67E22</Color>
+    <Color x:Key="SimulationBlockColor">#00A3A3</Color>
+    <Color x:Key="CleanerBlockColor">#8E44AD</Color>
+    <Color x:Key="SftExportBlockColor">#2E8B57</Color>
 
     <!-- Edge Colors -->
     <Color x:Key="EdgeDefaultColor">#AAAAAA</Color>
@@ -33,6 +37,10 @@
     <SolidColorBrush x:Key="ValidatorBlockBrush" Color="{StaticResource ValidatorBlockColor}" />
     <SolidColorBrush x:Key="SamplerBlockBrush" Color="{StaticResource SamplerBlockColor}" />
     <SolidColorBrush x:Key="ToolProfileBlockBrush" Color="{StaticResource ToolProfileBlockColor}" />
+    <SolidColorBrush x:Key="QuerySourceBlockBrush" Color="{StaticResource QuerySourceBlockColor}" />
+    <SolidColorBrush x:Key="SimulationBlockBrush" Color="{StaticResource SimulationBlockColor}" />
+    <SolidColorBrush x:Key="CleanerBlockBrush" Color="{StaticResource CleanerBlockColor}" />
+    <SolidColorBrush x:Key="SftExportBlockBrush" Color="{StaticResource SftExportBlockColor}" />
     <SolidColorBrush x:Key="EdgeDefaultBrush" Color="{StaticResource EdgeDefaultColor}" />
     <SolidColorBrush x:Key="EdgeHoverBrush" Color="{StaticResource EdgeHoverColor}" />
     <SolidColorBrush x:Key="CanvasBackgroundBrush" Color="{StaticResource CanvasBackgroundColor}" />

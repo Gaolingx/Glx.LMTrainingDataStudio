@@ -6,70 +6,96 @@
 
 ---
 
-## 一、本轮进展（Round 1）
+## 一、本轮进展（Round 6）
 
 ### 1.1 本轮做了什么
 
-- [x] 将目标框架从 `net10.0` 切换到 `net9.0`，解决本机 SDK 不匹配导致的构建失败。
-- [x] 新增 `global.json` 锁定 .NET 9 SDK，避免机器上同时安装 .NET 10 时选错 SDK。
-- [x] 新增最小 core 单元测试项目 `LMTrainingDataStudio2.Tests`，加入解决方案。
-- [x] 为 5 个纯逻辑模块补齐 29 个测试：格式转换、JSONL 校验、Recipe 校验、索引缓存、Undo/Redo 历史。
-- [x] 同步 README 中的 .NET 版本说明。
-- [x] 将本文档从“缺口清单”升级为“分阶段实施计划 + 验收标准”。
+- [x] 新增 4 个模拟测试子节点：Query Source、Simulation（mini harness）、Cleaner、SFT Export；`BlockType` / `BlockConfig` / 默认配置 / 深拷贝 / 校验 / UI 模板全部接线。
+- [x] 模拟用户 query：`QuerySourceBlockConfig` 支持同 query 重复（`SameQuery`）与多组 query（`MultipleQueries`），可带 system prompt。
+- [x] 模拟 API 多轮轨迹：`SimulationHarness` 记录 system → user → assistant(tool_calls) → tool → final assistant 的完整 OpenAI messages 轨迹。
+- [x] mini harness 规则：工具白名单、每工具超时、失败注入（成功 / 失败 / 超时 / 前 N 次失败）、失败重试与重试延迟、失败回填或中止、模型级超时/重试、最大轮数。
+- [x] 内置 `SimulatedToolCatalog`：python / web_fetch / powershell / bash 四个确定性模拟工具（只模拟响应，不真实执行进程或网络）。
+- [x] 轨迹清洗：`TrajectoryCleaner` 支持正则替换（可忽略大小写）、空白规范化、换行规范化、ANSI 转义清理、移除 `reasoning_content`、丢弃空消息；Validator 节点也可配置 `Cleanup`。
+- [x] SFT 导出：Simulation 直接输出 OAI `messages` + `tools`；`SftExportBlockExecutor` 以临时文件 + 原子替换写入 JSONL。
+- [x] UI：新增 4 个 Block Sheet 模板、执行器注册、每个节点通用 Config JSON 编辑器（Apply 后即时生效并有错误提示）。
+- [x] 新增 52 个测试：harness 13、清洗 9、执行器与端到端流水线 15、配置序列化/深拷贝 5、配置 JSON 编辑器 5、配置校验 5。
 
 ### 1.2 验证结果
 
 | 项目 | 命令 | 结果 |
 | --- | --- | --- |
 | 构建 | `dotnet build LMTrainingDataStudio2/LMTrainingDataStudio2.slnx` | 成功，0 警告，0 错误 |
-| 测试 | `dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx` | 29 通过，0 失败，0 跳过 |
+| 测试 | `dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx` | 198 通过，0 失败，0 跳过 |
 
-测试分布：
+本轮新增/扩展测试：
 
 | 测试类 | 数量 | 覆盖内容 |
 | --- | --- | --- |
-| `DatasetFormatConverterTests` | 7 | 格式检测、OpenAI/ShareGPT/Alpaca 转规范模型、反向转换、工具调用保留 |
-| `DatasetValidationServiceTests` | 7 | 合法/非法 JSONL、缺失文件、缺括号/缺方括号/尾逗号自动修复 |
-| `RecipeValidationServiceTests` | 7 | 空 Recipe、合法 DAG、重名、环、悬空边、Seed/LLM 缺失配置 |
-| `IndexCacheServiceTests` | 4 | 索引构建、行读取、末行无换行、缓存大小、空缓存清理 |
-| `CommandHistoryTests` | 4 | 执行/撤销/重做、重做栈清空、100 条上限、Clear |
+| `SimulationHarnessTests` | 13 | 单轮/多轮、工具白名单、失败重试、超时、max rounds、abort、默认脚本、取消、模型超时、参数 JSON、OAI 序列化 |
+| `TrajectoryCleanerTests` | 9 | 正则、空白/换行、ANSI、reasoning、空消息、数组 content、非样本行透传、非法正则 |
+| `SimulationExecutorsTests` | 15 | Query 同/多组、Simulation 输出与 system 覆盖、未完成轨迹丢弃/保留、Cleaner、Validator cleanup、SFT 导出、四节点端到端 |
+| `BlockNodeViewModelTests` | 5 | JSON 配置编辑器回写、类型不匹配、非法 JSON、空输入 |
+| `BlockConfigSerializationTests` 扩展 | 5 | Query/Simulation/Cleaner/Export 往返、嵌套规则、深拷贝 |
+| `RecipeValidationServiceTests` 扩展 | 5 | 新节点必填项、重复工具名、max rounds/timeout 校验 |
 
 ### 1.3 本轮改动文件
 
 ```text
-global.json
-README.md
 PLAN/TODO.md
-LMTrainingDataStudio2/LMTrainingDataStudio2.slnx
-LMTrainingDataStudio2/LMTrainingDataStudio2/LMTrainingDataStudio2.csproj
-LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/LMTrainingDataStudio2.Tests.csproj
-LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/GlobalUsings.cs
-LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/DatasetFormatConverterTests.cs
-LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/DatasetValidationServiceTests.cs
+README.md
+LMTrainingDataStudio2/LMTrainingDataStudio2/Models/BlockConfig.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Models/RecipeBlock.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Models/DatasetCleanup.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Models/SimulationConfig.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Models/ChatMessage.cs（沿用）
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Simulation/ChatCompletionContracts.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Simulation/ScriptedChatClient.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Simulation/SimulatedToolRuntime.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Simulation/SimulationHarness.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Simulation/TrajectoryCleaner.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Simulation/TrajectorySerializer.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Executors/QuerySourceBlockExecutor.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Executors/SimulationBlockExecutor.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Executors/CleanerBlockExecutor.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Executors/SftExportBlockExecutor.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/Executors/ValidatorBlockExecutor.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Services/RecipeValidationService.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/ViewModels/BlockNodeViewModel.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/ViewModels/MainWindowViewModel.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/ViewModels/BlockTemplateViewModel.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Views/PropertyPanelView.axaml
+LMTrainingDataStudio2/LMTrainingDataStudio2/Views/RecipeCanvasView.axaml.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2/Themes/Colors.axaml
+LMTrainingDataStudio2/LMTrainingDataStudio2/Converters/BlockTypeToColorConverter.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/SimulationHarnessTests.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/TrajectoryCleanerTests.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/SimulationExecutorsTests.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/BlockNodeViewModelTests.cs
+LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/BlockConfigSerializationTests.cs
 LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.cs
-LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/IndexCacheServiceTests.cs
-LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 ```
 
 ### 1.4 技术决策与取舍
 
-1. **目标框架改为 `net9.0`，但不设置 `LangVersion=9`。**
-   - 用户所说的 “C# 9.0” 落地为 .NET 9 目标框架；语言版本继续跟随 SDK 默认（C# 13）。
-   - 现有代码使用 file-scoped namespace、collection expression 等 C# 10+ 语法，强制 `LangVersion=9` 会大面积无法编译，收益为零。
-2. **用 `global.json` 固定 SDK 9.0.100 + `rollForward: latestFeature`。**
-   - 保证有 9.x 时优先用 9.x，不因机器装了 .NET 10 而漂移。
-3. **测试框架选 NUnit 4.3.2。**
-   - 本机 NuGet 缓存已具备 NUnit / NUnit3TestAdapter / Microsoft.NET.Test.Sdk，可离线恢复；无需额外引入 xUnit。
-4. **本轮只测 core 纯逻辑，不铺开 UI 测试。**
-   - 遵循“先最小 core，后大规模”的策略；UI、集成、大规模数据测试放到 Phase 3–5。
-5. **不保留旧模型兼容。**
-   - 后续允许直接删除 `RecipeBlock.Properties` 等过渡结构，不写迁移代码、不保留旧文件格式读取。
+1. **模拟 API 默认使用确定性脚本，而不是真实供应商调用。**
+   - `ScriptedChatClient` 按 `SimulationBlockConfig.Script` 回放 assistant 回合；未配置脚本时调用每个已暴露工具一次再收尾。
+   - 这样轨迹可复现、零网络、零费用，适合先打通“query → 轨迹 → 清洗 → SFT”链路。
+2. **工具是声明式模拟，不执行真实进程/网络。**
+   - `SimulatedToolRule` 只描述 schema、成功模板、失败消息、延迟和超时；`SimulatedToolRuntime` 不落地任何命令。
+   - 避免在数据生成器里引入任意代码执行安全面；真实沙箱执行列为后续项。
+3. **未完成轨迹默认丢弃。**
+   - 超过 max rounds / abort 的轨迹只有显式开启 `EmitIncompleteTrajectories` 才会输出，避免污染 SFT 数据。
+4. **清洗规则同时挂到 Cleaner 节点和 Validator。**
+   - 独立 Cleaner 便于单独编排；Validator 可选 `Cleanup` 满足“验证通过后顺手清洗”的用法。
+5. **SFT 输出只保留 OAI `messages` + `tools`。**
+   - 轮数、工具重试次数、停止原因只写入 run log，不进入训练样本。
 
 ### 1.5 本轮未做
 
-- 未改动任何 UI 行为，未修复执行引擎、文件 IO、设置持久化等既有缺口。
-- 未接线格式转换、JSONL 校验、索引缓存到界面；这些仍属于 Phase 1–4。
-- 未引入 UI 自动化、集成测试、性能基准；这些放在 Phase 5 做完整矩阵。
+- 真实 tool-calling provider（OpenAI function calling / Anthropic tool_use）HTTP 客户端。
+- 真实 python / PowerShell / bash 沙箱执行与资源限制。
+- Query / Simulation / Cleaner / SFT Export 的专属属性面板（当前使用通用 Config JSON 编辑器）。
+- 并发 query 生成、模型成本/延迟统计、失败样本单独落盘。
 
 ---
 
@@ -155,6 +181,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 | 3 | 编辑器 UI | 属性配置、网格/吸附/Fit/Mini-map、Tool Schema | 全编辑链路手工验收通过 |
 | 4 | 数据能力 | CSV/Parquet、批量转换、校验/修复、数据编辑 | 数据处理闭环可用 |
 | 5 | 收尾 | 全量测试、大规模性能、CI、打包、文档 | 发布候选可安装运行 |
+| 6 | 模拟 API 测试 | Query Source / Simulation Harness / Cleaner / SFT Export 子节点，确定性多轮轨迹与 OAI 导出 | 已完成 Round 6；真实 provider tool-calling 与沙箱执行留待后续 |
 
 ---
 
@@ -482,6 +509,87 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 
 ---
 
+### Phase 6 — 模拟 API 测试与 SFT 轨迹生成（P0，Round 6）
+
+#### 目标
+
+在不调用真实模型、不执行真实工具的前提下，模拟“用户 query → 多轮 LLM/tool 交互 → 清洗 → OAI messages 导出”的完整数据生成链路，并让工具行为、失败、超时、重试规则可配置、可复现。
+
+#### 当前进度（Round 6，2026-11-16）
+
+- [x] Query Source 节点：同 query 重复（`SameQuery`）、多组 query（`MultipleQueries`）、可配置 system prompt。
+- [x] Simulation 节点：`ScriptedChatClient` + `SimulationHarness` 多轮轨迹；记录 assistant `tool_calls` 与 `tool` 消息。
+- [x] mini harness 规则：`ToolHarnessRules`（工具白名单、默认超时、重试次数、重试延迟、失败中止）+ 单工具规则（成功/失败/超时/前 N 次失败/延迟）。
+- [x] 模拟工具目录：python / web_fetch / powershell / bash；只返回确定性模拟响应。
+- [x] 轨迹清洗：正则替换、空白/换行规范化、ANSI 清理、移除 reasoning、丢弃空消息；Validator 可选 `Cleanup`。
+- [x] SFT 导出：Simulation 输出 OAI `messages` + `tools`；SftExport 节点原子写 JSONL。
+- [x] 4 个新 BlockType 接入 `BlockConfig`、默认配置、深拷贝、Recipe 校验、Block Sheet、执行器注册。
+- [x] 通用 Block Config JSON 编辑器（带类型校验与错误提示）。
+- [x] 端到端测试：Query → Simulation → Cleaner → SftExport 由 `RecipeRunner` 真跑并产出 JSONL。
+- [ ] 真实 tool-calling provider 客户端（OpenAI Chat function calling / Anthropic tool_use）。
+- [ ] 真实 python / PowerShell / bash 沙箱执行（进程隔离、超时、资源限制）。
+- [ ] 新节点专属属性面板（当前用 JSON 编辑器）。
+- [ ] 并发 query、模型成本/延迟统计、失败样本单独输出。
+
+#### 范围与实现方式
+
+1. **数据模型（`Models/SimulationConfig.cs`、`Models/DatasetCleanup.cs`）**
+   - `QuerySourceBlockConfig(string[] Queries, QuerySetMode Mode, int Repeat, string? SystemPrompt)`。
+   - `SimulationBlockConfig(ModelAlias, MaxRounds, SystemPrompt, Tools, Rules, Script, FinalContent, Provider, Temperature, MaxTokens, TimeoutSeconds, ModelMaxRetries, EmitIncompleteTrajectories)`。
+   - `SimulatedToolRule`：name / description / OpenAI parameters JSON / behavior / response template / error / delay / failures-before-success / timeout。
+   - `ToolHarnessRules`：allowed tools、default timeout、max retries、retry delay、abort-on-tool-failure。
+   - `SimulatedTurn` / `SimulatedToolCallSpec`：确定性脚本回合。
+   - `DatasetCleanupRules`：regex replacements、whitespace、newline、ANSI、reasoning、empty-message 规则。
+2. **Mini harness（`Services/Simulation/`）**
+   - `IChatCompletionClient` + `ScriptedChatClient`：请求携带过滤后的 tool definitions 与轮次。
+   - `IToolRuntime` + `SimulatedToolRuntime`：单次工具尝试；失败计数按轨迹重置。
+   - `SimulationHarness`：system/user 初始化、逐轮模型调用、工具白名单、每工具超时、重试与延迟、错误回填/中止、max rounds、取消、诊断日志。
+   - `TrajectoryResult`：messages、tools、status（Completed / MaxRoundsExceeded / Aborted）、轮数、工具调用/重试次数。
+3. **清洗与导出**
+   - `TrajectoryCleaner`：对 `messages[].content`（字符串或 text 数组）与 `tools[].function.description` 应用规则；未知字段保留。
+   - `TrajectorySerializer`：仅输出 `messages` + `tools`，使用宽松 JSON 编码保留中文。
+   - `SftExportBlockExecutor`：流式写临时文件，完整枚举后 `File.Move(overwrite: true)`；取消/异常删除临时文件。
+4. **执行器**
+   - `QuerySourceBlockExecutor`、`SimulationBlockExecutor`、`CleanerBlockExecutor`、`SftExportBlockExecutor`。
+   - `SimulationBlockExecutor` 每行独立 harness/runtime；未完成轨迹默认跳过并写日志。
+   - `ValidatorBlockExecutor` 在规则通过后可选应用 `DatasetCleanupRules`。
+5. **UI**
+   - Block Sheet 新增 Query Source / Simulation / Cleaner / SFT Export。
+   - 属性面板新增通用 Config JSON 编辑器：反序列化为 `BlockConfig`，校验 kind 与 BlockType 一致后替换配置。
+   - 新节点颜色与图标资源。
+
+#### 交付物
+
+- `Models/SimulationConfig.cs`、`Models/DatasetCleanup.cs`
+- `Services/Simulation/ChatCompletionContracts.cs`、`ScriptedChatClient.cs`、`SimulatedToolRuntime.cs`、`SimulationHarness.cs`、`TrajectoryCleaner.cs`、`TrajectorySerializer.cs`
+- `Services/Executors/QuerySourceBlockExecutor.cs`、`SimulationBlockExecutor.cs`、`CleanerBlockExecutor.cs`、`SftExportBlockExecutor.cs`
+- 修改 `Models/BlockConfig.cs`、`Models/RecipeBlock.cs`、`Services/RecipeValidationService.cs`、`Services/Executors/ValidatorBlockExecutor.cs`、`ViewModels/*`、`Views/PropertyPanelView.axaml`
+- 测试：`SimulationHarnessTests`、`TrajectoryCleanerTests`、`SimulationExecutorsTests`、`BlockNodeViewModelTests`，扩展 `BlockConfigSerializationTests`、`RecipeValidationServiceTests`
+
+#### 验收标准
+
+- [x] `SameQuery` 输出固定重复次数；`MultipleQueries` 按列表与重复次数展开。
+- [x] 脚本化多轮轨迹包含 assistant `tool_calls`、tool 结果与最终 assistant 消息，`tool_call_id` 对应。
+- [x] 工具白名单外调用被拒绝且不执行，错误作为 tool 消息回填。
+- [x] 工具失败按 `MaxRetries` 重试；超过后错误回填并继续，或按 `AbortOnToolFailure` 中止。
+- [x] 工具超时被记录为失败并进入重试策略；模型调用受 `TimeoutSeconds` 约束。
+- [x] 超过 `MaxRounds` 的轨迹标记 `MaxRoundsExceeded`，默认不输出。
+- [x] 取消能中止 harness；取消不产生 SFT 输出文件。
+- [x] 清洗后的行仍是合法 OAI messages JSON，未知字段保留。
+- [x] SFT 导出文件为逐行 JSONL，原子替换，不残留 `.tmp`。
+- [x] Query → Simulation → Cleaner → SftExport 端到端测试通过。
+- [ ] 真实 provider function calling 往返（留待后续）。
+- [ ] 真实沙箱工具执行与资源限制（留待后续）。
+
+#### 收尾动作
+
+- [x] 更新本文件 Round 6 进展与 Phase 6 状态。
+- [x] 更新 README 当前状态、节点列表与路线图。
+- [x] 运行 `dotnet build` / `dotnet test`，记录 0 警告与 198 通过。
+- [ ] 真实 provider / 沙箱执行 / 专属面板完成后再次验收。
+
+---
+
 ## 四、详细缺口清单（按领域）
 
 > 以下是当前代码的全部已知未完成项，作为 Phase 1–5 的工作池。完成后在对应项打勾。
@@ -538,6 +646,14 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 - [ ] Tool Profile：`ToolSchemaNode`/`ToolProfile` 全文件未被引用；树形编辑器、JSON 导入导出、MCP。
 - [ ] 节点配置校验覆盖所有类型。
 - [x] 环、孤立节点、重复边、端口方向/类型兼容校验（Round 3）。
+- [x] 模拟 API 测试子节点：Query Source / Simulation / Cleaner / SFT Export（Round 6）。
+- [x] 多轮 tool-calling 轨迹记录与工具白名单 / 失败 / 超时 / 重试规则（Round 6）。
+- [x] 轨迹清洗（正则替换、格式规范化、ANSI、reasoning、空消息）与 Validator 可选清洗（Round 6）。
+- [x] OAI messages JSONL 导出（Round 6）。
+- [ ] 真实 tool-calling provider 客户端（OpenAI function calling / Anthropic tool_use）。
+- [ ] 真实 python / PowerShell / bash 沙箱执行与资源限制。
+- [ ] Query / Simulation / Cleaner / SFT Export 专属属性面板（当前通用 JSON 编辑器）。
+- [ ] 并发 query、模型成本/延迟统计、失败样本单独输出。
 
 ### 4.4 编辑器 UI / Canvas
 
@@ -565,6 +681,8 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 - [ ] 其余节点（Expression/Validator/Sampler/ToolProfile）专属配置项。
 - [ ] Prompt / Jinja 编辑器。
 - [ ] Tool Schema 树形编辑器。
+- [x] 通用 Block Config JSON 编辑器（Round 6）。
+- [ ] Query / Simulation / Cleaner / SFT Export 专属属性面板。
 - [ ] 节点校验摘要与画布错误标记。
 - [x] Executions 视图与运行详情（Round 4）。
 - [ ] 状态栏 `TotalLines`、`CurrentFilePath`、缩放真实数据。
@@ -589,6 +707,8 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 - [ ] 输出目录、命名、结果摘要。
 - [ ] 中断恢复与临时文件清理。
 - [ ] 节点间输出当前在内存物化，需改为流式或溢写磁盘。
+- [x] 模拟 API 多轮执行（确定性模型 + 模拟工具）与四节点 SFT 轨迹流水线（Round 6）。
+- [ ] 真实模型 tool-calling 与真实工具执行。
 
 ### 4.6 设置、主题与生命周期
 
@@ -636,6 +756,10 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 - [x] Seed 配置编辑：字段回写、编辑器保持、Config 替换重建、非 Seed 无编辑器、错误清除、非 JSONL 校验警告（6 个）。
 - [x] LLM 接入：三种 Provider 请求/解析、密钥与错误、别名路由、重试/超时（12 个）；LLM 配置编辑器（4 个）；未知 Provider/超时/重试校验（3 个）。
 - [x] `LlmCredentials`：设置优先、环境兜底、未知 Provider、无环境变量（4 个）；设置往返包含密钥。
+- [x] 模拟 harness：多轮、白名单、失败重试、超时、max rounds、abort、取消、OAI 序列化（13 个）。
+- [x] 轨迹清洗：正则、空白/换行、ANSI、reasoning、空消息、数组 content（9 个）。
+- [x] 模拟执行器与端到端流水线：Query / Simulation / Cleaner / SftExport（15 个）。
+- [x] 新配置序列化/深拷贝、Config JSON 编辑器、配置校验（15 个）。
 - [ ] ViewModel 单测：加载/保存、运行状态、异常恢复。
 - [ ] Avalonia Headless UI 测试。
 - [ ] 集成测试：1M 行全链路。
@@ -668,6 +792,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/CommandHistoryTests.cs
 5. 设置持久化、网格吸附、主题切换真正生效。
 6. 格式转换/校验服务接线。
 7. 每个 Phase 随代码补最小单测；Phase 5 做完整矩阵。
+8. 模拟 API 测试与 SFT 轨迹生成（Round 6 已完成核心；真实 provider/沙箱为 P1）。
 
 ### P1（补齐数据工作台能力）
 

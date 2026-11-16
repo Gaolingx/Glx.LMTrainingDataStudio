@@ -362,6 +362,80 @@ public sealed class RecipeValidationServiceTests
         Assert.That(result.Issues.Any(i => i.Message.Contains("Port type mismatch")), Is.False);
     }
 
+    [Test]
+    public void Validate_QuerySourceWithoutQueries_ReportsWarning()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("q", BlockType.QuerySource, "queries",
+            new QuerySourceBlockConfig(Array.Empty<string>())));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Severity == ValidationSeverity.Warning && i.Message.Contains("no queries")), Is.True);
+    }
+
+    [Test]
+    public void Validate_SimulationWithInvalidSettings_ReportsWarnings()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("sim1", BlockType.Simulation, "sim_missing_model",
+            new SimulationBlockConfig(string.Empty)));
+        recipe.Blocks.Add(CreateBlock("sim2", BlockType.Simulation, "sim_rounds",
+            new SimulationBlockConfig("model", MaxRounds: 0)));
+        recipe.Blocks.Add(CreateBlock("sim3", BlockType.Simulation, "sim_timeout",
+            new SimulationBlockConfig("model", TimeoutSeconds: 0)));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i => i.Message.Contains("no model alias")), Is.True);
+        Assert.That(result.Issues.Any(i => i.Message.Contains("max rounds")), Is.True);
+        Assert.That(result.Issues.Any(i => i.Message.Contains("timeout")), Is.True);
+    }
+
+    [Test]
+    public void Validate_SimulationWithDuplicateTools_ReportsWarning()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("sim", BlockType.Simulation, "sim",
+            new SimulationBlockConfig(
+                "model",
+                Tools: new[]
+                {
+                    new SimulatedToolRule { Name = "python" },
+                    new SimulatedToolRule { Name = "PYTHON" }
+                })));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i => i.Message.Contains("duplicate tool names")), Is.True);
+    }
+
+    [Test]
+    public void Validate_CleanerWithoutRules_ReportsWarning()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("clean", BlockType.Cleaner, "clean",
+            new CleanerBlockConfig(new DatasetCleanupRules())));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Severity == ValidationSeverity.Warning && i.Message.Contains("no cleanup rules")), Is.True);
+    }
+
+    [Test]
+    public void Validate_SftExportWithoutPath_ReportsWarning()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("export", BlockType.SftExport, "export",
+            new SftExportBlockConfig(string.Empty)));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i => i.Message.Contains("no output path")), Is.True);
+    }
+
     private static RecipeBlock CreateBlock(string id, BlockType type, string name, BlockConfig? config = null) => new()
     {
         Id = id,

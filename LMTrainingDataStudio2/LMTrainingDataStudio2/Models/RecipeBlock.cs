@@ -10,7 +10,11 @@ public enum BlockType
     Expression,
     Validator,
     Sampler,
-    ToolProfile
+    ToolProfile,
+    QuerySource,
+    Simulation,
+    Cleaner,
+    SftExport
 }
 
 /// <summary>

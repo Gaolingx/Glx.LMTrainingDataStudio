@@ -724,6 +724,10 @@ public partial class RecipeCanvasView : UserControl
                 BlockType.Validator => "Validator",
                 BlockType.Sampler => "Sampler",
                 BlockType.ToolProfile => "Tool Profile",
+                BlockType.QuerySource => "Query Source",
+                BlockType.Simulation => "Simulation / Harness",
+                BlockType.Cleaner => "Cleaner",
+                BlockType.SftExport => "SFT Export",
                 _ => $"New {type}"
             },
             X = position.X,
@@ -984,6 +988,10 @@ public partial class RecipeCanvasView : UserControl
             BlockType.Validator => "#D0021B",
             BlockType.Sampler => "#417505",
             BlockType.ToolProfile => "#9B9B9B",
+            BlockType.QuerySource => "#E67E22",
+            BlockType.Simulation => "#00A3A3",
+            BlockType.Cleaner => "#8E44AD",
+            BlockType.SftExport => "#2E8B57",
             _ => "#4A90D9"
         };
 

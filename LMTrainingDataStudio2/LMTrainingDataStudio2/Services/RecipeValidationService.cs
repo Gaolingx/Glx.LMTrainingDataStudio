@@ -328,6 +328,127 @@ public sealed class RecipeValidationService
                         BlockId = block.Id
                     });
                     break;
+
+                case QuerySourceBlockConfig query when query.Queries is not { Length: > 0 } ||
+                                                       query.Queries.All(string.IsNullOrWhiteSpace):
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Query source block '{block.Name}' has no queries configured.",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case QuerySourceBlockConfig query when query.Repeat < 1:
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Query source block '{block.Name}' repeat must be at least 1; got {query.Repeat}.",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case SimulationBlockConfig simulation when string.IsNullOrWhiteSpace(simulation.ModelAlias):
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Simulation block '{block.Name}' has no model alias configured.",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case SimulationBlockConfig simulation when LlmProviderIds.Normalize(simulation.Provider) is null:
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Simulation block '{block.Name}' uses unknown provider '{simulation.Provider}'.",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case SimulationBlockConfig simulation when simulation.MaxRounds <= 0:
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Simulation block '{block.Name}' max rounds must be greater than 0.",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case SimulationBlockConfig simulation when simulation.TimeoutSeconds <= 0:
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Simulation block '{block.Name}' timeout must be greater than 0 seconds.",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case SimulationBlockConfig simulation when simulation.ModelMaxRetries < 0:
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Simulation block '{block.Name}' model max retries must not be negative.",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case SimulationBlockConfig simulation when simulation.Tools is { Length: > 0 } tools &&
+                                                            tools.Any(tool => string.IsNullOrWhiteSpace(tool.Name)):
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Simulation block '{block.Name}' has a tool with an empty name.",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case SimulationBlockConfig simulation when simulation.Tools is { Length: > 0 } tools &&
+                                                            tools.GroupBy(tool => tool.Name, StringComparer.OrdinalIgnoreCase)
+                                                                .Any(group => group.Count() > 1):
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Simulation block '{block.Name}' declares duplicate tool names.",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case SimulationBlockConfig simulation when simulation.Rules is { MaxRetries: < 0 }:
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Simulation block '{block.Name}' tool max retries must not be negative.",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case SimulationBlockConfig simulation when simulation.Rules is { DefaultTimeoutMs: < 0 }:
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Simulation block '{block.Name}' tool timeout must not be negative.",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case CleanerBlockConfig cleaner when !cleaner.Rules.HasAnyRule:
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Cleaner block '{block.Name}' has no cleanup rules enabled.",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case SftExportBlockConfig export when string.IsNullOrWhiteSpace(export.OutputPath):
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"SFT export block '{block.Name}' has no output path configured.",
+                        BlockId = block.Id
+                    });
+                    break;
             }
         }
     }

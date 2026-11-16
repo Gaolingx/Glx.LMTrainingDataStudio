@@ -35,6 +35,10 @@ public partial class BlockTemplateViewModel : ObservableObject
         BlockType.Validator => "✓",
         BlockType.Sampler => "🎲",
         BlockType.ToolProfile => "🔧",
+        BlockType.QuerySource => "⌕",
+        BlockType.Simulation => "◎",
+        BlockType.Cleaner => "✧",
+        BlockType.SftExport => "⇩",
         _ => "?"
     };
 
@@ -49,6 +53,10 @@ public partial class BlockTemplateViewModel : ObservableObject
         BlockType.Validator => "#D0021B",
         BlockType.Sampler => "#417505",
         BlockType.ToolProfile => "#9B9B9B",
+        BlockType.QuerySource => "#E67E22",
+        BlockType.Simulation => "#00A3A3",
+        BlockType.Cleaner => "#8E44AD",
+        BlockType.SftExport => "#2E8B57",
         _ => "#FFFFFF"
     };
 }

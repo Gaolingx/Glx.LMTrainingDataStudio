@@ -102,7 +102,11 @@ public sealed class BlockConfigSerializationTests
             (new ExpressionBlockConfig("x", new Dictionary<string, string>()), "expression"),
             (new ValidatorBlockConfig("expression", "x", true), "validator"),
             (new SamplerBlockConfig(1, null, 42, Array.Empty<string>()), "sampler"),
-            (new ToolProfileBlockConfig(new ToolProfile()), "tool_profile")
+            (new ToolProfileBlockConfig(new ToolProfile()), "tool_profile"),
+            (new QuerySourceBlockConfig(new[] { "q" }, QuerySetMode.SameQuery, 2, "sys"), "query_source"),
+            (new SimulationBlockConfig("sim", MaxRounds: 3), "simulation"),
+            (new CleanerBlockConfig(new DatasetCleanupRules { NormalizeWhitespace = true }), "cleaner"),
+            (new SftExportBlockConfig("out.jsonl"), "sft_export")
         };
 
         foreach (var (config, kind) in cases)
@@ -146,6 +150,139 @@ public sealed class BlockConfigSerializationTests
         const string json = """{"kind":"mystery"}""";
 
         Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<BlockConfig>(json, Options));
+    }
+
+    [Test]
+    public void RoundTrip_QuerySourceConfig_PreservesFields()
+    {
+        var config = new QuerySourceBlockConfig(
+            new[] { "q1", "q2" },
+            QuerySetMode.SameQuery,
+            Repeat: 3,
+            SystemPrompt: "be brief");
+
+        var loaded = (QuerySourceBlockConfig)RoundTrip(config);
+
+        Assert.That(loaded.Queries, Is.EqualTo(config.Queries));
+        Assert.That(loaded.Mode, Is.EqualTo(QuerySetMode.SameQuery));
+        Assert.That(loaded.Repeat, Is.EqualTo(3));
+        Assert.That(loaded.SystemPrompt, Is.EqualTo("be brief"));
+    }
+
+    [Test]
+    public void RoundTrip_SimulationConfig_PreservesNestedRules()
+    {
+        var config = new SimulationBlockConfig(
+            "sim-model",
+            MaxRounds: 5,
+            SystemPrompt: "system",
+            Tools: new[]
+            {
+                new SimulatedToolRule
+                {
+                    Name = "python",
+                    Description = "Run Python",
+                    ParametersJson = """{"type":"object","properties":{"code":{"type":"string"}}}""",
+                    ResponseTemplate = "{{arguments}}",
+                    DelayMs = 10,
+                    FailuresBeforeSuccess = 1,
+                    TimeoutMs = 1000
+                }
+            },
+            Rules: new ToolHarnessRules
+            {
+                AllowedTools = new[] { "python" },
+                DefaultTimeoutMs = 2000,
+                MaxRetries = 2,
+                RetryDelayMs = 1,
+                AbortOnToolFailure = true
+            },
+            Script: new[]
+            {
+                new SimulatedTurn(null, new[] { new SimulatedToolCallSpec("python", """{"code":"1"}""") }),
+                new SimulatedTurn("done", null)
+            },
+            FinalContent: "final",
+            Provider: "anthropic",
+            Temperature: 0.2,
+            MaxTokens: 512,
+            TimeoutSeconds: 30,
+            ModelMaxRetries: 1,
+            EmitIncompleteTrajectories: true);
+
+        var loaded = (SimulationBlockConfig)RoundTrip(config);
+
+        Assert.That(loaded.ModelAlias, Is.EqualTo("sim-model"));
+        Assert.That(loaded.MaxRounds, Is.EqualTo(5));
+        Assert.That(loaded.Provider, Is.EqualTo("anthropic"));
+        Assert.That(loaded.TimeoutSeconds, Is.EqualTo(30));
+        Assert.That(loaded.ModelMaxRetries, Is.EqualTo(1));
+        Assert.That(loaded.EmitIncompleteTrajectories, Is.True);
+
+        Assert.That(loaded.Tools, Has.Length.EqualTo(1));
+        Assert.That(loaded.Tools![0].Name, Is.EqualTo("python"));
+        Assert.That(loaded.Tools[0].FailuresBeforeSuccess, Is.EqualTo(1));
+        Assert.That(loaded.Tools[0].TimeoutMs, Is.EqualTo(1000));
+
+        Assert.That(loaded.Rules, Is.Not.Null);
+        Assert.That(loaded.Rules!.AllowedTools, Is.EqualTo(new[] { "python" }));
+        Assert.That(loaded.Rules.MaxRetries, Is.EqualTo(2));
+        Assert.That(loaded.Rules.AbortOnToolFailure, Is.True);
+
+        Assert.That(loaded.Script, Has.Length.EqualTo(2));
+        Assert.That(loaded.Script![0].ToolCalls![0].Name, Is.EqualTo("python"));
+        Assert.That(loaded.Script[0].ToolCalls![0].ArgumentsJson, Is.EqualTo("""{"code":"1"}"""));
+        Assert.That(loaded.Script[1].Content, Is.EqualTo("done"));
+    }
+
+    [Test]
+    public void RoundTrip_CleanerConfig_PreservesRules()
+    {
+        var config = new CleanerBlockConfig(new DatasetCleanupRules
+        {
+            RegexReplacements = new[] { new RegexReplacementRule(@"\s+$", "", IgnoreCase: true) },
+            NormalizeWhitespace = true,
+            NormalizeNewlines = true,
+            StripAnsi = true,
+            RemoveReasoningContent = true,
+            DropEmptyMessages = true
+        });
+
+        var loaded = (CleanerBlockConfig)RoundTrip(config);
+
+        Assert.That(loaded.Rules.RegexReplacements, Has.Length.EqualTo(1));
+        Assert.That(loaded.Rules.RegexReplacements![0].Pattern, Is.EqualTo(@"\s+$"));
+        Assert.That(loaded.Rules.RegexReplacements[0].IgnoreCase, Is.True);
+        Assert.That(loaded.Rules.NormalizeWhitespace, Is.True);
+        Assert.That(loaded.Rules.StripAnsi, Is.True);
+        Assert.That(loaded.Rules.RemoveReasoningContent, Is.True);
+        Assert.That(loaded.Rules.DropEmptyMessages, Is.True);
+    }
+
+    [Test]
+    public void RoundTrip_SftExportConfig_PreservesPath()
+    {
+        var loaded = (SftExportBlockConfig)RoundTrip(new SftExportBlockConfig("data/sft.jsonl"));
+
+        Assert.That(loaded.OutputPath, Is.EqualTo("data/sft.jsonl"));
+    }
+
+    [Test]
+    public void DeepClone_SimulationConfig_DoesNotShareArrays()
+    {
+        var config = new SimulationBlockConfig(
+            "sim",
+            Tools: new[] { new SimulatedToolRule { Name = "python" } },
+            Rules: new ToolHarnessRules { AllowedTools = new[] { "python" } },
+            Script: new[] { new SimulatedTurn(null, new[] { new SimulatedToolCallSpec("python") }) });
+
+        var clone = (SimulationBlockConfig)config.DeepClone();
+
+        Assert.That(clone.Tools, Is.Not.SameAs(config.Tools));
+        Assert.That(clone.Rules, Is.Not.SameAs(config.Rules));
+        Assert.That(clone.Rules!.AllowedTools, Is.Not.SameAs(config.Rules!.AllowedTools));
+        Assert.That(clone.Script, Is.Not.SameAs(config.Script));
+        Assert.That(clone.Script![0].ToolCalls, Is.Not.SameAs(config.Script![0].ToolCalls));
     }
 
     private static BlockConfig RoundTrip(BlockConfig config)

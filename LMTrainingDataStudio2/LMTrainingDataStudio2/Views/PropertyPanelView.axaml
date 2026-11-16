@@ -163,6 +163,26 @@
                            FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
             </StackPanel>
 
+            <!-- Generic JSON configuration editor -->
+            <StackPanel Spacing="8">
+                <Border Height="1" Background="#3A3A4E" />
+                <TextBlock Text="Config JSON (advanced)" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                <TextBox Text="{Binding SelectedBlock.ConfigJson, Mode=TwoWay}"
+                         FontSize="11" Padding="8,6" Height="150"
+                         AcceptsReturn="True" TextWrapping="NoWrap"
+                         FontFamily="Consolas"
+                         Watermark="Edit the block config as JSON and press Apply." />
+                <TextBlock Text="{Binding SelectedBlock.ConfigJsonError}"
+                           FontSize="11" Foreground="#FF6666" TextWrapping="Wrap"
+                           IsVisible="{Binding SelectedBlock.ConfigJsonError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <Button Content="Apply config JSON"
+                        Command="{Binding ApplyBlockConfigJsonCommand}"
+                        HorizontalAlignment="Stretch"
+                        Padding="10,6" FontSize="11"
+                        Background="#3A3A4E" Foreground="#FFFFFF"
+                        HorizontalContentAlignment="Center" />
+            </StackPanel>
+
             <!-- Position -->
             <StackPanel Spacing="4">
                 <TextBlock Text="Position" FontSize="11" Foreground="#AAAAAA" />

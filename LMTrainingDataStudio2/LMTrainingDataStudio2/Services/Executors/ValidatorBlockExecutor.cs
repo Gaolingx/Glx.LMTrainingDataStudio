@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using LMTrainingDataStudio2.Models;
+using LMTrainingDataStudio2.Services.Simulation;
 
 namespace LMTrainingDataStudio2.Services.Executors;
 
@@ -62,7 +63,22 @@ public sealed class ValidatorBlockExecutor : IBlockExecutor
 
             if (passed)
             {
-                yield return new DatasetRow(outputIndex++, row.Json);
+                var outputJson = row.Json;
+                if (config.Cleanup is { HasAnyRule: true } cleanup)
+                {
+                    try
+                    {
+                        outputJson = TrajectoryCleaner.CleanJson(row.Json, cleanup);
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        throw new InvalidOperationException(
+                            $"Validator block '{context.Block.Name}' cleanup failed on line {row.LineNumber}: {ex.Message}",
+                            ex);
+                    }
+                }
+
+                yield return new DatasetRow(outputIndex++, outputJson);
             }
             else
             {

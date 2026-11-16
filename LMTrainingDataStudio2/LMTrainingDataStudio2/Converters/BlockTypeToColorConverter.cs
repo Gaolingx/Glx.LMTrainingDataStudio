@@ -24,6 +24,10 @@ public sealed class BlockTypeToColorConverter : IValueConverter
                 BlockType.Validator => "#D0021B",
                 BlockType.Sampler => "#417505",
                 BlockType.ToolProfile => "#9B9B9B",
+                BlockType.QuerySource => "#E67E22",
+                BlockType.Simulation => "#00A3A3",
+                BlockType.Cleaner => "#8E44AD",
+                BlockType.SftExport => "#2E8B57",
                 _ => "#4A90D9"
             };
             return new SolidColorBrush(Color.Parse(color));

@@ -13,6 +13,10 @@ namespace LMTrainingDataStudio2.Models;
 [JsonDerivedType(typeof(ValidatorBlockConfig), "validator")]
 [JsonDerivedType(typeof(SamplerBlockConfig), "sampler")]
 [JsonDerivedType(typeof(ToolProfileBlockConfig), "tool_profile")]
+[JsonDerivedType(typeof(QuerySourceBlockConfig), "query_source")]
+[JsonDerivedType(typeof(SimulationBlockConfig), "simulation")]
+[JsonDerivedType(typeof(CleanerBlockConfig), "cleaner")]
+[JsonDerivedType(typeof(SftExportBlockConfig), "sft_export")]
 public abstract record BlockConfig
 {
     /// <summary>
@@ -26,6 +30,17 @@ public abstract record BlockConfig
         BlockType.Validator => new ValidatorBlockConfig("expression", string.Empty, RejectOnFailure: true),
         BlockType.Sampler => new SamplerBlockConfig(Count: null, Ratio: null, Seed: 42, Splits: Array.Empty<string>()),
         BlockType.ToolProfile => new ToolProfileBlockConfig(new ToolProfile()),
+        BlockType.QuerySource => new QuerySourceBlockConfig(Array.Empty<string>()),
+        BlockType.Simulation => new SimulationBlockConfig(
+            string.Empty,
+            Tools: SimulatedToolCatalog.Common(),
+            Rules: new ToolHarnessRules()),
+        BlockType.Cleaner => new CleanerBlockConfig(new DatasetCleanupRules
+        {
+            NormalizeNewlines = true,
+            NormalizeWhitespace = true
+        }),
+        BlockType.SftExport => new SftExportBlockConfig(string.Empty),
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unsupported block type.")
     };
 
@@ -40,6 +55,10 @@ public abstract record BlockConfig
         ValidatorBlockConfig => BlockType.Validator,
         SamplerBlockConfig => BlockType.Sampler,
         ToolProfileBlockConfig => BlockType.ToolProfile,
+        QuerySourceBlockConfig => BlockType.QuerySource,
+        SimulationBlockConfig => BlockType.Simulation,
+        CleanerBlockConfig => BlockType.Cleaner,
+        SftExportBlockConfig => BlockType.SftExport,
         _ => throw new NotSupportedException($"Unsupported block configuration type: {GetType().Name}.")
     };
 
@@ -54,7 +73,7 @@ public abstract record BlockConfig
         {
             Fields = new Dictionary<string, string>(expression.Fields)
         },
-        ValidatorBlockConfig validator => validator with { },
+        ValidatorBlockConfig validator => validator with { Cleanup = CloneCleanup(validator.Cleanup) },
         SamplerBlockConfig sampler => sampler with { Splits = [.. sampler.Splits] },
         ToolProfileBlockConfig { Profile: var profile } => new ToolProfileBlockConfig(new ToolProfile
         {
@@ -62,8 +81,36 @@ public abstract record BlockConfig
             Name = profile.Name,
             Tools = profile.Tools.Select(CloneTool).ToList()
         }),
+        QuerySourceBlockConfig query => query with { Queries = [.. query.Queries] },
+        SimulationBlockConfig simulation => simulation with
+        {
+            Tools = simulation.Tools?.Select(tool => tool with { }).ToArray(),
+            Rules = simulation.Rules is null
+                ? null
+                : simulation.Rules with
+                {
+                    AllowedTools = simulation.Rules.AllowedTools is null
+                        ? null
+                        : [.. simulation.Rules.AllowedTools]
+                },
+            Script = simulation.Script?
+                .Select(turn => turn with
+                {
+                    ToolCalls = turn.ToolCalls?.Select(call => call with { }).ToArray()
+                })
+                .ToArray()
+        },
+        CleanerBlockConfig cleaner => cleaner with { Rules = CloneCleanup(cleaner.Rules)! },
+        SftExportBlockConfig export => export with { },
         _ => throw new NotSupportedException($"Unsupported block configuration type: {GetType().Name}.")
     };
+
+    private static DatasetCleanupRules? CloneCleanup(DatasetCleanupRules? rules) => rules is null
+        ? null
+        : rules with
+        {
+            RegexReplacements = rules.RegexReplacements?.Select(rule => rule with { }).ToArray()
+        };
 
     private static ToolDefinition CloneTool(ToolDefinition tool) => new()
     {
@@ -102,7 +149,8 @@ public sealed record ExpressionBlockConfig(
 public sealed record ValidatorBlockConfig(
     string RuleKind,
     string Rule,
-    bool RejectOnFailure) : BlockConfig;
+    bool RejectOnFailure,
+    DatasetCleanupRules? Cleanup = null) : BlockConfig;
 
 public sealed record SamplerBlockConfig(
     long? Count,

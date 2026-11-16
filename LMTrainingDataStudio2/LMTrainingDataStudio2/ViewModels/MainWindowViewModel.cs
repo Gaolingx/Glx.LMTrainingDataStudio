@@ -140,6 +140,10 @@ public partial class MainWindowViewModel : ObservableObject
         BlockTemplates.Add(new BlockTemplateViewModel("Validator", BlockType.Validator, "Code validation and filtering"));
         BlockTemplates.Add(new BlockTemplateViewModel("Sampler", BlockType.Sampler, "Deterministic sampling and splitting"));
         BlockTemplates.Add(new BlockTemplateViewModel("Tool Profile", BlockType.ToolProfile, "MCP tool configuration"));
+        BlockTemplates.Add(new BlockTemplateViewModel("Query Source", BlockType.QuerySource, "Simulated user queries (single or multiple groups)"));
+        BlockTemplates.Add(new BlockTemplateViewModel("Simulation", BlockType.Simulation, "Mini harness: simulated model, tools, retries, timeouts"));
+        BlockTemplates.Add(new BlockTemplateViewModel("Cleaner", BlockType.Cleaner, "Regex and formatting cleanup for OAI messages"));
+        BlockTemplates.Add(new BlockTemplateViewModel("SFT Export", BlockType.SftExport, "Write OAI messages JSONL for SFT"));
     }
 
     private void LoadSampleRecipe()
@@ -333,6 +337,22 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void ApplyBlockConfigJson()
+    {
+        if (SelectedBlock == null) return;
+
+        if (SelectedBlock.TryApplyConfigJson(SelectedBlock.ConfigJson))
+        {
+            StatusText = "Block configuration applied ✓";
+            LogMessages.Add($"[Info] Applied JSON configuration to block '{SelectedBlock.DisplayName}'.");
+            return;
+        }
+
+        StatusText = "Invalid block configuration";
+        LogMessages.Add($"[Error] Block '{SelectedBlock.DisplayName}': {SelectedBlock.ConfigJsonError}");
+    }
+
+    [RelayCommand]
     private void ToggleBlockSheet()
     {
         IsBlockSheetVisible = !IsBlockSheetVisible;
@@ -469,7 +489,11 @@ public partial class MainWindowViewModel : ObservableObject
             new ExpressionBlockExecutor(),
             new ValidatorBlockExecutor(),
             new SamplerBlockExecutor(),
-            new LlmBlockExecutor(new LlmApiClient(_llmHttpClient, new LlmCredentials(_settings)))
+            new LlmBlockExecutor(new LlmApiClient(_llmHttpClient, new LlmCredentials(_settings))),
+            new QuerySourceBlockExecutor(),
+            new SimulationBlockExecutor(),
+            new CleanerBlockExecutor(),
+            new SftExportBlockExecutor()
         });
 
     private static string? NullIfBlank(string value) =>
