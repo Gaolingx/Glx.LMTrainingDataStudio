@@ -39,7 +39,7 @@
 ```text
 global.json
 README.md
-TODO.md
+PLAN/TODO.md
 LMTrainingDataStudio2/LMTrainingDataStudio2.slnx
 LMTrainingDataStudio2/LMTrainingDataStudio2/LMTrainingDataStudio2.csproj
 LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/LMTrainingDataStudio2.Tests.csproj
