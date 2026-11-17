@@ -1,10 +1,16 @@
-# PLAN / TODO — 实施计划与验收标准
+# HANDOFF — 01-BuildALL（建设期总计划，已归档）
+
+> **归档冻结（2026-11-17）**
+> - 本文件记录 Round 0–16 的建设期计划、验收标准与技术决策，已冻结，不再修改。
+> - 冻结基线：`895c08e feat(release): Round 16 发布与体验`
+> - 当前工作入口：[PLAN/TODO/01-Bugfix1/HANDOFF.md](../../TODO/01-Bugfix1/HANDOFF.md)
+> - 后续修订只写入当前 HANDOFF；本文件仅作历史追溯。
 
 > 最后更新：2026-11-17（Round 16 发布与体验完成）
 > 当前基线：.NET 9 / Avalonia 11.3 / NUnit 4；505 常规测试 + 7 gated；构建 0 警告（分析器开启）
 > 工作方式：小步提交，每个 Phase 独立验收；开发期允许 break change，不保留兼容层。
 >
-> 完整“已做/未做”清单与 10 个节点的能力矩阵见 [STATUS.md](STATUS.md)。本文保留分阶段计划、验收标准与详细缺口池。
+> 完整“已做/未做”清单与 10 个节点的能力矩阵见 [STATUS.md](../../STATUS.md)。本文保留分阶段计划、验收标准与详细缺口池。
 
 ---
 
@@ -1485,7 +1491,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 
 ## 五、优先级与建议顺序
 
-> 历史 P0（Phase 1 持久化、Phase 2 执行引擎、Round 6/7 模拟与真实 provider/沙箱、Round 8–12）已完成，见 [STATUS.md](STATUS.md)。
+> 历史 P0（Phase 1 持久化、Phase 2 执行引擎、Round 6/7 模拟与真实 provider/沙箱、Round 8–12）已完成，见 [STATUS.md](../../STATUS.md)。
 
 ### P0 — Round 13：执行与 IO 韧性（已完成，见附七）
 
@@ -1531,7 +1537,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 
 ## 六、阶段规划
 
-> 目标、交付与验收的完整版本见 [STATUS.md](STATUS.md) 第六节；这里保留执行顺序与出口标准。
+> 目标、交付与验收的完整版本见 [STATUS.md](../../STATUS.md) 第六节；这里保留执行顺序与出口标准。
 
 ### 6.1 已完成：Round 8–12
 

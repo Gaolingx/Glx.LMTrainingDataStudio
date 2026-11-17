@@ -58,7 +58,8 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 > 注意：当前仍是开发版。**LLM tool_calls 回填、Anthropic 结构化输出约束、Sampler count 模式分层、Tool Profile MCP 适配、跨格式数据编辑保存、容器级隔离尚未实现**；应用默认启动空白 Recipe，可通过 File → New from Sample 加载 4 节点示例，或恢复上次打开的文件。
 >
 > - 完整功能清单与节点能力矩阵：[PLAN/STATUS.md](PLAN/STATUS.md)
-> - 分阶段实施计划、阶段目标与验收标准：[PLAN/TODO.md](PLAN/TODO.md)
+> - 当前修复计划与验收标准：[PLAN/TODO/01-Bugfix1/HANDOFF.md](PLAN/TODO/01-Bugfix1/HANDOFF.md)
+> - 建设期已归档计划（Round 0–16）：[PLAN/Done/01-BuildALL/HANDOFF.md](PLAN/Done/01-BuildALL/HANDOFF.md)
 
 ## 工作流预设与节点说明
 
@@ -338,7 +339,12 @@ UI 采用 Recipe Graph / DAG 的设计：
 LMTrainingDataStudio2.slnx                  # 解决方案文件
 README.md
 PLAN/
-├── TODO.md                                 # 分阶段实施计划与验收标准
+├── TODO/
+│   └── 01-Bugfix1/
+│       └── HANDOFF.md                      # 当前修复计划与验收标准
+├── Done/
+│   └── 01-BuildALL/
+│       └── HANDOFF.md                      # Round 0–16 建设期计划（已冻结）
 └── STATUS.md                               # 功能清单、节点矩阵与下一阶段规划
 LMTrainingDataStudio2/                      # 主项目目录
 ├── Program.cs                              # 应用入口，配置 Avalonia AppBuilder
