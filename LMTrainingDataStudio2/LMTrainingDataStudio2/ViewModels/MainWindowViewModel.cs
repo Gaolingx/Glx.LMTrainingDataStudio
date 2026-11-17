@@ -699,6 +699,36 @@ public partial class MainWindowViewModel : ObservableObject
         });
     }
 
+    public void PruneRecentFiles()
+    {
+        for (var index = RecentFiles.Count - 1; index >= 0; index--)
+        {
+            if (!File.Exists(RecentFiles[index]))
+            {
+                RecentFiles.RemoveAt(index);
+            }
+        }
+    }
+
+    [RelayCommand]
+    private async Task ClearRecentFilesAsync()
+    {
+        RecentFiles.Clear();
+        _settings.RecentFiles = new List<string>();
+
+        try
+        {
+            await _settingsStore.SaveAsync(_settings);
+            StatusText = "Recent files cleared";
+            LogMessages.Add("[Info] Recent files cleared.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            StatusText = "Failed to save settings";
+            LogMessages.Add($"[Error] Failed to clear recent files: {ex.Message}");
+        }
+    }
+
     private void AddRecentFile(string path)
     {
         var existing = RecentFiles.FirstOrDefault(

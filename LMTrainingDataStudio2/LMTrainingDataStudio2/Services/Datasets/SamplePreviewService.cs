@@ -37,15 +37,17 @@ public sealed class SamplePreviewService
     public async Task<SamplePreviewDocument> LoadFileAsync(
         string path,
         int maxRows = DefaultMaxRows,
+        long startRow = 0,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         ArgumentOutOfRangeException.ThrowIfLessThan(maxRows, 1);
+        ArgumentOutOfRangeException.ThrowIfNegative(startRow);
 
         var fileType = DatasetIO.DetectFileType(path);
         await using var reader = DatasetIO.CreateReader(fileType, _settings);
         await reader.OpenAsync(path, cancellationToken);
-        var page = await reader.ReadPageAsync(0, maxRows, cancellationToken);
+        var page = await reader.ReadPageAsync(startRow, maxRows, cancellationToken);
 
         var rows = page
             .Select(row => new SamplePreviewRow(row.LineNumber + 1, string.Empty, row.Json, false))
@@ -58,10 +60,12 @@ public sealed class SamplePreviewService
         string path,
         DatasetCleanupRules rules,
         int maxRows = DefaultMaxRows,
+        long startRow = 0,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         ArgumentNullException.ThrowIfNull(rules);
+        ArgumentOutOfRangeException.ThrowIfNegative(startRow);
 
         var fileType = DatasetIO.DetectFileType(path);
         if (fileType != DataFileType.Jsonl)
@@ -71,7 +75,7 @@ public sealed class SamplePreviewService
 
         await using var reader = DatasetIO.CreateReader(fileType, _settings);
         await reader.OpenAsync(path, cancellationToken);
-        var page = await reader.ReadPageAsync(0, maxRows, cancellationToken);
+        var page = await reader.ReadPageAsync(startRow, maxRows, cancellationToken);
 
         var rows = new List<SamplePreviewRow>(page.Count);
         foreach (var row in page)

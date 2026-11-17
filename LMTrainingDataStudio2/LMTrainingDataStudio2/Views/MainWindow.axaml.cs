@@ -347,6 +347,7 @@ public partial class MainWindow : Window
     {
         if (DataContext is not MainWindowViewModel vm || sender is not MenuItem menu) return;
 
+        vm.PruneRecentFiles();
         menu.Items.Clear();
         if (vm.RecentFiles.Count == 0)
         {
@@ -355,18 +356,24 @@ public partial class MainWindow : Window
                 Header = LocalizationService.L("dialog.no_recent_files"),
                 IsEnabled = false
             });
-            return;
         }
-
-        foreach (var path in vm.RecentFiles)
+        else
         {
-            var item = new MenuItem
+            foreach (var path in vm.RecentFiles)
             {
-                Header = Path.GetFileName(path)
-            };
-            ToolTip.SetTip(item, path);
-            item.Click += async (_, _) => await OpenRecentAsync(vm, path);
-            menu.Items.Add(item);
+                var item = new MenuItem
+                {
+                    Header = Path.GetFileName(path)
+                };
+                ToolTip.SetTip(item, path);
+                item.Click += async (_, _) => await OpenRecentAsync(vm, path);
+                menu.Items.Add(item);
+            }
+
+            menu.Items.Add(new Separator());
+            var clear = new MenuItem { Header = LocalizationService.L("main.clear_recent_files") };
+            clear.Click += async (_, _) => await vm.ClearRecentFilesCommand.ExecuteAsync(null);
+            menu.Items.Add(clear);
         }
     }
 

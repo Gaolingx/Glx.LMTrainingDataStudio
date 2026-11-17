@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using LMTrainingDataStudio2.Localization;
 using LMTrainingDataStudio2.Models;
 using LMTrainingDataStudio2.Services.Datasets;
@@ -11,7 +12,13 @@ namespace LMTrainingDataStudio2.ViewModels;
 /// </summary>
 public partial class SamplePreviewViewModel : ObservableObject
 {
+    public const int PageSize = 50;
+
     private readonly SamplePreviewService _service;
+    private string _path = string.Empty;
+    private DatasetCleanupRules? _rules;
+    private int _pageIndex;
+    private int _pageCount = 1;
 
     [ObservableProperty]
     private string _title = string.Empty;
@@ -26,6 +33,8 @@ public partial class SamplePreviewViewModel : ObservableObject
     private string _statusText = string.Empty;
 
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(PreviousPageCommand))]
+    [NotifyCanExecuteChangedFor(nameof(NextPageCommand))]
     private bool _isBusy;
 
     [ObservableProperty]
@@ -33,6 +42,17 @@ public partial class SamplePreviewViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _hasRows;
+
+    [ObservableProperty]
+    private string _pageText = string.Empty;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(PreviousPageCommand))]
+    private bool _canGoPreviousPage;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(NextPageCommand))]
+    private bool _canGoNextPage;
 
     public SamplePreviewViewModel(AppSettings settings)
     {
@@ -64,6 +84,16 @@ public partial class SamplePreviewViewModel : ObservableObject
             rules,
             cancellationToken);
 
+    [RelayCommand(CanExecute = nameof(CanNavigatePrevious))]
+    private Task PreviousPageAsync() => LoadPageAsync(_pageIndex - 1, CancellationToken.None);
+
+    [RelayCommand(CanExecute = nameof(CanNavigateNext))]
+    private Task NextPageAsync() => LoadPageAsync(_pageIndex + 1, CancellationToken.None);
+
+    private bool CanNavigatePrevious() => CanGoPreviousPage && !IsBusy;
+
+    private bool CanNavigateNext() => CanGoNextPage && !IsBusy;
+
     public async Task OpenInDataAsync()
     {
         if (OpenInDataRequested is not null && CanOpenInData)
@@ -72,22 +102,38 @@ public partial class SamplePreviewViewModel : ObservableObject
         }
     }
 
-    private async Task LoadAsync(
+    private Task LoadAsync(
         string path,
         string title,
         DatasetCleanupRules? rules,
         CancellationToken cancellationToken)
     {
+        _path = path;
+        _rules = rules;
         Title = title;
         FilePath = path;
         PathText = path;
+        return LoadPageAsync(0, cancellationToken);
+    }
+
+    private async Task LoadPageAsync(int pageIndex, CancellationToken cancellationToken)
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
         StatusText = LocalizationService.L("common.loading");
         IsBusy = true;
         try
         {
-            var document = rules is null
-                ? await _service.LoadFileAsync(path, cancellationToken: cancellationToken)
-                : await _service.BuildCleanerDiffAsync(path, rules, cancellationToken: cancellationToken);
+            var startRow = (long)Math.Max(0, pageIndex) * PageSize;
+            var document = _rules is null
+                ? await _service.LoadFileAsync(_path, PageSize, startRow, cancellationToken)
+                : await _service.BuildCleanerDiffAsync(_path, _rules, PageSize, startRow, cancellationToken);
+
+            _pageCount = Math.Max(1, (int)Math.Ceiling((double)document.TotalRows / PageSize));
+            _pageIndex = Math.Clamp(pageIndex, 0, _pageCount - 1);
 
             IsDiff = document.IsDiff;
             Rows.Clear();
@@ -97,6 +143,10 @@ public partial class SamplePreviewViewModel : ObservableObject
             }
 
             HasRows = Rows.Count > 0;
+            PageText = string.Format(
+                LocalizationService.L("data.position_format"), _pageIndex + 1, _pageCount);
+            CanGoPreviousPage = _pageIndex > 0;
+            CanGoNextPage = _pageIndex + 1 < _pageCount;
             Summary = string.Format(
                 LocalizationService.L("preview.rows_format"), Rows.Count, document.TotalRows) +
                 $" · {document.FileType}";
@@ -111,6 +161,9 @@ public partial class SamplePreviewViewModel : ObservableObject
         {
             Rows.Clear();
             HasRows = false;
+            CanGoPreviousPage = false;
+            CanGoNextPage = false;
+            PageText = string.Empty;
             Summary = string.Empty;
             StatusText = string.Format(LocalizationService.L("preview.load_failed"), ex.Message);
         }

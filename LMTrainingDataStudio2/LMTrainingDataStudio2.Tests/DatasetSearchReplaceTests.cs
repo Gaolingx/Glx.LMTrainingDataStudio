@@ -1,5 +1,6 @@
 using LMTrainingDataStudio2.Models;
 using LMTrainingDataStudio2.Services.Datasets;
+using LMTrainingDataStudio2.ViewModels;
 
 namespace LMTrainingDataStudio2.Tests;
 
@@ -182,6 +183,42 @@ public sealed class DatasetSearchReplaceTests
 
         Assert.ThrowsAsync<ArgumentException>(() => _service.PreviewAsync(
             path, DataFileType.Jsonl, new DatasetSearchRequest("(", "x", true, true)));
+    }
+
+    [Test]
+    public async Task ViewModel_NavigatesMatchesInBothDirectionsAndWraps()
+    {
+        var path = CreateJsonl(
+            """{"text":"hit one"}""",
+            """{"text":"miss"}""",
+            """{"text":"hit two"}""");
+        var vm = new DatasetSearchReplaceViewModel(new AppSettings
+        {
+            CacheDirectory = Path.Combine(_directory, "cache")
+        });
+        vm.SetSource(path, DataFileType.Jsonl);
+        vm.Query = "hit";
+        await vm.PreviewCommand.ExecuteAsync(null);
+
+        var jumps = new List<long>();
+        vm.JumpRequested += line => jumps.Add(line);
+
+        Assert.That(vm.Matches, Has.Count.EqualTo(2));
+        Assert.That(vm.NextMatchCommand.CanExecute(null), Is.True);
+
+        vm.NextMatchCommand.Execute(null);
+        Assert.That(vm.SelectedMatch!.LineNumber, Is.EqualTo(1));
+
+        vm.NextMatchCommand.Execute(null);
+        Assert.That(vm.SelectedMatch!.LineNumber, Is.EqualTo(3));
+
+        vm.NextMatchCommand.Execute(null);
+        Assert.That(vm.SelectedMatch!.LineNumber, Is.EqualTo(1), "next wraps to the first match");
+
+        vm.PreviousMatchCommand.Execute(null);
+        Assert.That(vm.SelectedMatch!.LineNumber, Is.EqualTo(3), "previous wraps to the last match");
+
+        Assert.That(jumps, Is.EqualTo(new long[] { 1, 3, 1, 3 }));
     }
 
     private string CreateJsonl(params string[] lines)

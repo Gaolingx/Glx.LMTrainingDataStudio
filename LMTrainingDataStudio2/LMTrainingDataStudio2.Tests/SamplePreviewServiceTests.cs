@@ -1,5 +1,7 @@
+using LMTrainingDataStudio2.Localization;
 using LMTrainingDataStudio2.Models;
 using LMTrainingDataStudio2.Services.Datasets;
+using LMTrainingDataStudio2.ViewModels;
 
 namespace LMTrainingDataStudio2.Tests;
 
@@ -89,6 +91,55 @@ public sealed class SamplePreviewServiceTests
 
         Assert.ThrowsAsync<DatasetFormatException>(() =>
             _service.BuildCleanerDiffAsync(path, new DatasetCleanupRules { NormalizeWhitespace = true }));
+    }
+
+    [Test]
+    public async Task LoadFile_StartRow_ReturnsRequestedWindow()
+    {
+        var path = Path.Combine(_directory, "paged.jsonl");
+        await File.WriteAllLinesAsync(path, Enumerable.Range(1, 10)
+            .Select(id => $$"""{"id":{{id}}}"""));
+
+        var document = await _service.LoadFileAsync(path, maxRows: 3, startRow: 6);
+
+        Assert.That(document.TotalRows, Is.EqualTo(10));
+        Assert.That(document.Rows, Has.Count.EqualTo(3));
+        Assert.That(document.Rows[0].LineNumber, Is.EqualTo(7));
+        Assert.That(document.Rows[2].LineNumber, Is.EqualTo(9));
+    }
+
+    [Test]
+    public async Task ViewModel_PagesThroughRows()
+    {
+        var path = Path.Combine(_directory, "paging.jsonl");
+        await File.WriteAllLinesAsync(path, Enumerable.Range(1, 120)
+            .Select(id => $$"""{"id":{{id}}}"""));
+        var vm = new SamplePreviewViewModel(_settings);
+
+        await vm.LoadFileAsync(path, "paging");
+
+        Assert.That(vm.Rows, Has.Count.EqualTo(SamplePreviewViewModel.PageSize));
+        Assert.That(vm.CanGoPreviousPage, Is.False);
+        Assert.That(vm.CanGoNextPage, Is.True);
+
+        await vm.NextPageCommand.ExecuteAsync(null);
+
+        Assert.That(vm.Rows, Has.Count.EqualTo(SamplePreviewViewModel.PageSize));
+        Assert.That(vm.Rows[0].Header, Is.EqualTo("51"));
+        Assert.That(vm.CanGoPreviousPage, Is.True);
+        Assert.That(vm.CanGoNextPage, Is.True);
+
+        await vm.NextPageCommand.ExecuteAsync(null);
+
+        Assert.That(vm.Rows, Has.Count.EqualTo(20));
+        Assert.That(vm.Rows[0].Header, Is.EqualTo("101"));
+        Assert.That(vm.CanGoNextPage, Is.False);
+        Assert.That(vm.PageText, Is.EqualTo(string.Format(
+            LocalizationService.L("data.position_format"), 3, 3)));
+
+        await vm.PreviousPageCommand.ExecuteAsync(null);
+        Assert.That(vm.Rows[0].Header, Is.EqualTo("51"));
+        Assert.That(vm.CanGoNextPage, Is.True);
     }
 
     [Test]

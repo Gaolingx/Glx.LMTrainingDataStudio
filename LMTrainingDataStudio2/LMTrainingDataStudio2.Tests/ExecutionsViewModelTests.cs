@@ -52,6 +52,21 @@ public sealed class ExecutionsViewModelTests
     }
 
     [Test]
+    public void CanOpenOutputFolder_RequiresExistingDirectory()
+    {
+        var output = Path.Combine(_directory, "run-output");
+        _viewModel.SelectedRun = new ExecutionRun { OutputDirectory = output };
+        Assert.That(_viewModel.CanOpenOutputFolder, Is.False);
+
+        Directory.CreateDirectory(output);
+        _viewModel.SelectedRun = new ExecutionRun { OutputDirectory = output };
+        Assert.That(_viewModel.CanOpenOutputFolder, Is.True);
+
+        _viewModel.SelectedRun = new ExecutionRun { OutputDirectory = null };
+        Assert.That(_viewModel.CanOpenOutputFolder, Is.False);
+    }
+
+    [Test]
     public async Task RefreshAsync_LoadsRunsNewestFirst()
     {
         var start = new DateTimeOffset(2026, 11, 16, 8, 0, 0, TimeSpan.Zero);

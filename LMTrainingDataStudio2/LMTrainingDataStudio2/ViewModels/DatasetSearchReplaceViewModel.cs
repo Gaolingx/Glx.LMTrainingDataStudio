@@ -64,6 +64,14 @@ public partial class DatasetSearchReplaceViewModel : ObservableObject
 
     public event Action<long>? JumpRequested;
 
+    partial void OnSelectedMatchChanged(DatasetSearchMatchViewModel? value)
+    {
+        if (value is not null)
+        {
+            RequestJump(value.LineNumber);
+        }
+    }
+
     public DatasetSearchReplaceViewModel(AppSettings settings)
     {
         _service = new DatasetSearchReplaceService(settings);
@@ -80,10 +88,12 @@ public partial class DatasetSearchReplaceViewModel : ObservableObject
         _fileType = fileType;
         _hasSource = true;
         Matches.Clear();
+        SelectedMatch = null;
         HasResults = false;
         Summary = string.Empty;
         StatusText = $"Ready to search '{Path.GetFileName(path)}'.";
         SetSuggestedTargetPath(path);
+        RefreshMatchNavigation();
     }
 
     public void SetPageWindow(long startRow, int rowCount)
@@ -93,6 +103,34 @@ public partial class DatasetSearchReplaceViewModel : ObservableObject
     }
 
     public void RequestJump(long lineNumber) => JumpRequested?.Invoke(lineNumber);
+
+    [RelayCommand(CanExecute = nameof(CanNavigateMatches))]
+    private void NextMatch() => MoveSelection(1);
+
+    [RelayCommand(CanExecute = nameof(CanNavigateMatches))]
+    private void PreviousMatch() => MoveSelection(-1);
+
+    private bool CanNavigateMatches() => Matches.Count > 0;
+
+    private void MoveSelection(int delta)
+    {
+        if (Matches.Count == 0)
+        {
+            return;
+        }
+
+        var current = SelectedMatch is null ? -1 : Matches.IndexOf(SelectedMatch);
+        var next = current < 0
+            ? (delta > 0 ? 0 : Matches.Count - 1)
+            : (current + delta + Matches.Count) % Matches.Count;
+        SelectedMatch = Matches[next];
+    }
+
+    private void RefreshMatchNavigation()
+    {
+        NextMatchCommand.NotifyCanExecuteChanged();
+        PreviousMatchCommand.NotifyCanExecuteChanged();
+    }
 
     [RelayCommand]
     private async Task PreviewAsync()
@@ -114,12 +152,14 @@ public partial class DatasetSearchReplaceViewModel : ObservableObject
                 progress: progress, cancellationToken: _operation!.Token);
 
             Matches.Clear();
+            SelectedMatch = null;
             foreach (var match in preview.Matches)
             {
                 Matches.Add(new DatasetSearchMatchViewModel(match));
             }
 
             HasResults = preview.MatchingRows > 0;
+            RefreshMatchNavigation();
             var truncated = preview.Truncated ? " Showing the first 200 matches." : string.Empty;
             Summary =
                 $"{preview.MatchingRows:N0} matching row(s), {preview.TotalMatches:N0} match(es) " +

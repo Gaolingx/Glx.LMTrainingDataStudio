@@ -499,6 +499,18 @@
 
                             <TextBlock Classes="sectionTitle"
                                        Text="{loc:Loc data.matches_double_click_to_jump}" />
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Content="{loc:Loc data.previous_match}"
+                                        Command="{Binding Search.PreviousMatchCommand}"
+                                        Background="{DynamicResource ButtonSurfaceBrush}"
+                                        Foreground="{DynamicResource ButtonSurfaceTextBrush}"
+                                        FontSize="11" Padding="10,4" />
+                                <Button Content="{loc:Loc data.next_match}"
+                                        Command="{Binding Search.NextMatchCommand}"
+                                        Background="{DynamicResource ButtonSurfaceBrush}"
+                                        Foreground="{DynamicResource ButtonSurfaceTextBrush}"
+                                        FontSize="11" Padding="10,4" />
+                            </StackPanel>
                             <ListBox ItemsSource="{Binding Search.Matches}"
                                      SelectedItem="{Binding Search.SelectedMatch, Mode=TwoWay}"
                                      DoubleTapped="OnSearchMatchDoubleTapped"

@@ -127,6 +127,11 @@
                                    FontSize="10" Foreground="{DynamicResource TextPrimaryBrush}"
                                    MaxWidth="420" TextTrimming="CharacterEllipsis"
                                    ToolTip.Tip="{Binding Executions.SelectedRun.OutputDirectory}" />
+                        <Button Content="{loc:Loc executions.open_folder}"
+                                Click="OnOpenOutputFolderClick"
+                                IsVisible="{Binding Executions.CanOpenOutputFolder}"
+                                Background="Transparent" Foreground="{DynamicResource TextMutedBrush}"
+                                FontSize="10" Padding="6,2" />
                     </StackPanel>
                 </StackPanel>
 
