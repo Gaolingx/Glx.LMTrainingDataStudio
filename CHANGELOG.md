@@ -2,6 +2,29 @@
 
 本文件记录用户可见变更与工程化修复。完整未完成清单见 [PLAN/TODO/01-Bugfix1/HANDOFF.md](PLAN/TODO/01-Bugfix1/HANDOFF.md)。
 
+## [Unreleased] — 2026-11-18（Round 24 / API Key DPAPI 加密）
+
+### Added
+
+- 设置中的 OpenAI / Anthropic API Key 改用 Windows DPAPI（当前用户作用域）加密后写入 `settings.json`；内存中仍保持明文供请求使用。
+- 加载设置时自动识别旧明文 Key 并原地加密回写，磁盘文件不再保留明文；加密值带 `dpapi:v1:` 前缀，便于识别与后续版本迁移。
+- 无法解密（换用户、损坏、跨平台）时给出明确警告并忽略该 Key，回退到同名环境变量。
+
+### Changed
+
+- 非 Windows 平台不再持久化 API Key（只使用环境变量），避免在不支持 DPAPI 的环境写入明文。
+- 诊断包导出仍先清空 Key；加密后的值同样不会出现在脱敏设置中。
+
+### Tests
+
+- `--list-tests`：632 个用例；`dotnet test`：624 通过 / 0 失败 / 7 跳过（另 1 个 `[Explicit]`）。
+- 新增 DPAPI 落盘断言、旧明文迁移、损坏密文告警、无保护能力时丢弃 Key 等 6 项 `SettingsStoreTests`。
+
+### Known Issues
+
+- DPAPI 绑定当前 Windows 用户；更换用户或迁移机器后需重新输入 Key（环境变量仍可兜底）。
+- 设置变更通知、`Settings`/索引缓存 schema 版本与迁移策略仍未做。
+
 ## [Unreleased] — 2026-11-18（Round 23 / Tool Profile 枚举与输出冲突校验）
 
 ### Added

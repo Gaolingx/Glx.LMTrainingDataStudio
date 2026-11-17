@@ -1,7 +1,7 @@
 # STATUS — 功能清单、节点能力矩阵与下一阶段规划
 
-> 最后核对：2026-11-17（Round 16 完成）
-> 验证基线：`dotnet build` 0 警告 0 错误（分析器开启）；`dotnet test` 556 通过 + 7 个 gated 测试（2 个真实 provider 冒烟 + 5 个性能 gated，默认跳过），另有 1 个 `[Explicit]` 示例生成；`--list-tests` 563 个用例；`dotnet format --verify-no-changes` 通过；覆盖率总行 74.64%、Services/Commands 84.32%；Headless UI 测试通过；1M 行 JSONL、1M 行质量操作与 1M 行编辑保存基线通过；10M 行链路与 CSV/Parquet 大规模基线入口已提供；win-x64 单文件发布与 Debug 启动冒烟通过。
+> 最后核对：2026-11-18（Round 24 完成）
+> 验证基线：`dotnet build` 0 警告 0 错误（分析器开启）；`dotnet test` 624 通过 + 7 个 gated 测试（2 个真实 provider 冒烟 + 5 个性能 gated，默认跳过），另有 1 个 `[Explicit]` 示例生成；`--list-tests` 632 个用例；`dotnet format --verify-no-changes` 通过；覆盖率总行 74.64%、Services/Commands 84.32%；Headless UI 测试通过；1M 行 JSONL、1M 行质量操作与 1M 行编辑保存基线通过；10M 行链路与 CSV/Parquet 大规模基线入口已提供；win-x64 单文件发布与 Debug 启动冒烟通过。
 >
 > 图例：`[x]` 已完成并有测试/验证；`[部分]` 可用但有明确缺口；`[ ]` 未实现。
 >
@@ -40,7 +40,7 @@
 - CSV/Parquet 大规模基线：20 万行 @256B，JSONL→CSV 14.3s、JSONL→Parquet 13.1s、最慢 100 行分页 18.2ms、托管内存增量 17MB。
 - 10 种节点类型全部接入 Block Sheet、画布、默认配置与 Recipe JSON。
 - Query Source → Simulation → Cleaner → SFT Export 端到端 SFT 轨迹生成可用（脚本/真实 provider、模拟/真实工具均可切换）。
-- 真实 provider tool-calling（OpenAI Chat/Responses、Anthropic）与真实沙箱工具（python/PowerShell/bash/web_fetch）。
+- 真实 provider tool-calling（OpenAI Chat/Responses、Anthropic）与真实沙箱工具（python/PowerShell/bash/web_fetch）；设置中的 API Key 使用 Windows DPAPI 加密落盘，旧明文自动迁移。
 - 画布交互：网格/吸附（Alt 关闭）、鼠标中心缩放、Fit、拓扑自动布局、Mini-map 视口与点击导航、双击添加、复制携带连线、内联重命名、真实端口坐标、边 hover、增量拖拽、可拖动分栏。
 - 工作流预设：6 个基础流水线可从 File → New from Preset 或节点库一键加载，加载遵守脏文档确认。
 - 自定义预设：当前 Recipe 可保存为预设；支持导入外部预设（分配新本地 ID）与删除；单文件存于 `%APPDATA%\LMTrainingDataStudio\presets`，坏文件跳过并告警。
@@ -60,7 +60,7 @@
 - 发布：MSIX 清单/打包脚本、Inno Setup 安装脚本；`examples/` 6 个示例 Recipe；README Dark/Light 截图。
 - 工程质量：`.editorconfig`、.NET 分析器 `latest-recommended`、警告即错误；构建 0 警告。
 - 工程化：滚动日志与全局异常、GitHub Actions CI、win-x64 单文件发布脚本、Headless UI 测试、MIT LICENSE、应用图标。
-- 626 个自动化测试：618 个常规通过 + 7 个 gated（2 个真实 provider 冒烟 + 5 个性能 gated）+ 1 个 Explicit 示例生成。
+- 632 个自动化测试：624 个常规通过 + 7 个 gated（2 个真实 provider 冒烟 + 5 个性能 gated）+ 1 个 Explicit 示例生成。
 
 ### 1.2 当前最大缺口（按优先级）
 
@@ -105,7 +105,7 @@
 - Seed 多文件/目录、过滤/列映射、编码选项、HuggingFace/HTTP 数据源。
 - 10M 行实测与 CSV/Parquet 大规模基线按需运行（入口已提供）。
 - 单实例、命令行打开、文件关联、MSIX/Inno 脚本与诊断导出已完成；安装包未做本机安装验证。
-- API Key 加密存储、设置变更通知、运行日志/执行状态本地化、Tool Profile MCP。
+- 设置变更通知、运行日志/执行状态本地化、Tool Profile MCP。
 
 ---
 
@@ -155,7 +155,7 @@
 | 模型、Endpoint、温度、Max tokens | [x] | 专属面板 |
 | Prompt 模板 | [x] | 与 Expression 相同的 Fluid 引擎；空 Prompt 时发送整行 JSON |
 | 节点级超时 / 指数退避重试 | [x] | `TimeoutSeconds` / `MaxRetries` |
-| 密钥设置 | [x] | settings.json 本机保存，环境变量兜底 |
+| 密钥设置 | [x] | settings.json 中 DPAPI 加密保存（旧明文自动迁移）；环境变量兜底 |
 | 输出格式 | [x] | 默认每行输出 `messages[{role:assistant,content}]`；工具回填时输出完整 assistant/tool 轨迹 |
 | Tool Profile 引用 | [x] | 工具定义写入请求 tools，同时保留在输出行 |
 | Prompt 预览 / 语法校验 | [部分] | 执行期校验模板；编辑期无预览 |
@@ -348,7 +348,7 @@
 - [x] 撤销/重做基础能力：添加、删除、移动、连线、删除边、粘贴（块）、重命名。
 - [x] 画布基础交互：Block Sheet 拖放、可搜索添加菜单（`~` / 右键）、节点拖动、多选拖动、框选、端口连线、边选择/删除、中键平移、滚轮缩放、右键菜单、Mini-map 渲染、缩放百分比、可拖动分栏。
 - [x] 画布增强：网格背景与吸附（Alt 关闭）、鼠标中心缩放、Fit、拓扑自动布局、Mini-map 视口/点击、双击添加、复制携带连线、内联重命名、真实端口坐标、边 hover、增量拖拽。
-- [x] Settings 持久化：缓存目录/上限、网格设置、执行并行/重试/输出目录、主题选择、API Key 本机保存。
+- [x] Settings 持久化：缓存目录/上限、网格设置、执行并行/重试/输出目录、主题选择、API Key DPAPI 加密保存。
 - [x] 工程化：滚动日志与全局异常、CI、win-x64 单文件发布、Headless UI 测试、MIT LICENSE、应用图标、主题变体。
 - [x] 最近文件路径与 `CurrentFilePath` 状态栏接线；`TotalLines` 随执行进度更新；缩放百分比实时显示。
 
@@ -411,7 +411,8 @@
 - [部分] MSIX/Inno 脚本、文件关联、单实例、命令行打开已完成；安装包未在干净机器实际安装验证。
 - [部分] README 截图与 6 个示例 Recipe 已完成；发布说明由 [CHANGELOG.md](CHANGELOG.md) 承担。
 - [ ] 崩溃报告导出；日志级别/来源筛选。
-- [ ] API Key 加密存储、设置变更通知。
+- [x] API Key 使用 Windows DPAPI 加密保存，旧明文加载时自动迁移；非 Windows 只使用环境变量。
+- [ ] 设置变更通知。
 - [部分] 运行日志/执行状态/统计摘要本地化（静态 UI、节点说明与预设已支持 zh-CN / en-US）。
 - [x] `.editorconfig`、分析器、警告即错误。
 
@@ -454,6 +455,7 @@
 | 21 | LLM 工具回填与 Anthropic 结构化输出 | tool_calls 回填循环、三家 provider 工具消息、Anthropic 强制结构化输出、编辑器与校验 | 604 用例（596 通过 + 7 gated + 1 Explicit） |
 | 22 | 数据工作台消息编辑 | `messages` 角色/内容/tool_calls 结构化表单、增删与上下移、字段/消息合并应用 | 620 用例（612 通过 + 7 gated + 1 Explicit） |
 | 23 | Tool Profile 与输出冲突 | Enum/默认值编辑、跨节点输出目标冲突校验（含 Sampler 分片展开） | 626 用例（618 通过 + 7 gated + 1 Explicit） |
+| 24 | API Key 加密与迁移 | Windows DPAPI（CurrentUser）加密落盘、旧明文自动迁移、非 Windows 环境变量回退 | 632 用例（624 通过 + 7 gated + 1 Explicit） |
 
 ---
 

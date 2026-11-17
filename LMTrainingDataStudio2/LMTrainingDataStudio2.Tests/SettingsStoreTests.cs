@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using LMTrainingDataStudio2.Models;
 using LMTrainingDataStudio2.Services;
@@ -103,8 +104,17 @@ public sealed class SettingsStoreTests
         Assert.That(result.Settings.EnableGridSnap, Is.False);
         Assert.That(result.Settings.GridSnapSize, Is.EqualTo(32));
         Assert.That(result.Settings.IsDarkTheme, Is.False);
-        Assert.That(result.Settings.OpenAiApiKey, Is.EqualTo("sk-openai-test"));
-        Assert.That(result.Settings.AnthropicApiKey, Is.EqualTo("sk-ant-test"));
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.That(result.Settings.OpenAiApiKey, Is.EqualTo("sk-openai-test"));
+            Assert.That(result.Settings.AnthropicApiKey, Is.EqualTo("sk-ant-test"));
+        }
+        else
+        {
+            Assert.That(result.Settings.OpenAiApiKey, Is.Null);
+            Assert.That(result.Settings.AnthropicApiKey, Is.Null);
+        }
+
         Assert.That(result.Warnings, Is.Empty);
     }
 
@@ -148,6 +158,123 @@ public sealed class SettingsStoreTests
     }
 
     [Test]
+    public async Task SaveAsync_UsesDpapiForApiKeysOnWindows()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Ignore("DPAPI is Windows-only.");
+        }
+
+        await _store.SaveAsync(new AppSettings { OpenAiApiKey = "sk-windows-secret" });
+
+        var json = await File.ReadAllTextAsync(_path);
+        Assert.That(json, Does.Not.Contain("sk-windows-secret"));
+
+        using var document = JsonDocument.Parse(json);
+        var storedKey = document.RootElement.GetProperty("openAiApiKey").GetString();
+        Assert.That(storedKey, Does.StartWith(DpapiApiKeyProtector.Prefix));
+
+        var result = _store.Load();
+        Assert.That(result.Settings.OpenAiApiKey, Is.EqualTo("sk-windows-secret"));
+        Assert.That(result.Warnings, Is.Empty);
+    }
+
+    [Test]
+    public async Task SaveAsync_EncryptsBothApiKeysBeforeWriting()
+    {
+        var store = new SettingsStore(_path, new FakeApiKeyProtector());
+
+        await store.SaveAsync(new AppSettings
+        {
+            OpenAiApiKey = "sk-openai-test",
+            AnthropicApiKey = "sk-ant-test"
+        });
+
+        var json = await File.ReadAllTextAsync(_path);
+        Assert.That(json, Does.Not.Contain("sk-openai-test"));
+        Assert.That(json, Does.Not.Contain("sk-ant-test"));
+
+        using var document = JsonDocument.Parse(json);
+        Assert.That(
+            document.RootElement.GetProperty("openAiApiKey").GetString(),
+            Does.StartWith(FakeApiKeyProtector.Marker));
+        Assert.That(
+            document.RootElement.GetProperty("anthropicApiKey").GetString(),
+            Does.StartWith(FakeApiKeyProtector.Marker));
+
+        var result = store.Load();
+        Assert.That(result.Settings.OpenAiApiKey, Is.EqualTo("sk-openai-test"));
+        Assert.That(result.Settings.AnthropicApiKey, Is.EqualTo("sk-ant-test"));
+        Assert.That(result.Warnings, Is.Empty);
+    }
+
+    [Test]
+    public async Task Load_LegacyPlaintextApiKeys_MigratesFileToEncryptedValues()
+    {
+        await File.WriteAllTextAsync(_path, """
+            {"openAiApiKey":"sk-legacy","anthropicApiKey":"sk-ant-legacy"}
+            """);
+
+        var store = new SettingsStore(_path, new FakeApiKeyProtector());
+        var result = store.Load();
+
+        Assert.That(result.Settings.OpenAiApiKey, Is.EqualTo("sk-legacy"));
+        Assert.That(result.Settings.AnthropicApiKey, Is.EqualTo("sk-ant-legacy"));
+        Assert.That(result.Warnings.Any(w => w.Contains("migrated")), Is.True);
+
+        var json = await File.ReadAllTextAsync(_path);
+        Assert.That(json, Does.Not.Contain("sk-legacy"));
+        Assert.That(json, Does.Not.Contain("sk-ant-legacy"));
+
+        using var document = JsonDocument.Parse(json);
+        Assert.That(
+            document.RootElement.GetProperty("openAiApiKey").GetString(),
+            Does.StartWith(FakeApiKeyProtector.Marker));
+    }
+
+    [Test]
+    public async Task Load_CorruptProtectedApiKey_WarnsAndIgnoresKey()
+    {
+        await File.WriteAllTextAsync(
+            _path,
+            "{\"openAiApiKey\":\"" + FakeApiKeyProtector.Marker + "not-base64!\"}");
+
+        var store = new SettingsStore(_path, new FakeApiKeyProtector());
+        var result = store.Load();
+
+        Assert.That(result.Settings.OpenAiApiKey, Is.Null);
+        Assert.That(result.Warnings.Any(w => w.Contains("could not be decrypted")), Is.True);
+    }
+
+    [Test]
+    public async Task SaveAsync_WithoutProtectorSupport_DropsKeysInsteadOfWritingPlaintext()
+    {
+        var store = new SettingsStore(_path, new FakeApiKeyProtector { IsAvailable = false });
+
+        await store.SaveAsync(new AppSettings { OpenAiApiKey = "sk-openai-test" });
+
+        var json = await File.ReadAllTextAsync(_path);
+        Assert.That(json, Does.Not.Contain("sk-openai-test"));
+        Assert.That(store.Load().Settings.OpenAiApiKey, Is.Null);
+    }
+
+    [Test]
+    public async Task Load_ProtectedKeyWithoutProtectorSupport_WarnsAndIgnoresKey()
+    {
+        await File.WriteAllTextAsync(
+            _path,
+            "{\"openAiApiKey\":\"" + FakeApiKeyProtector.Marker + "c2stc2VjcmV0\"}");
+
+        var store = new SettingsStore(_path, new FakeApiKeyProtector { IsAvailable = false });
+        var result = store.Load();
+
+        Assert.That(result.Settings.OpenAiApiKey, Is.Null);
+        Assert.That(
+            result.Warnings.Any(w => w.Contains("cannot be read on this platform")),
+            Is.True);
+    }
+
+    [Test]
     public async Task SaveAsync_WritesCamelCaseJson()
     {
         await _store.SaveAsync(new AppSettings
@@ -168,7 +295,16 @@ public sealed class SettingsStoreTests
         Assert.That(root.GetProperty("enableGridSnap").GetBoolean(), Is.True);
         Assert.That(root.GetProperty("gridSnapSize").GetInt32(), Is.EqualTo(8));
         Assert.That(root.GetProperty("isDarkTheme").GetBoolean(), Is.False);
-        Assert.That(root.GetProperty("openAiApiKey").GetString(), Is.EqualTo("sk-test"));
+        if (OperatingSystem.IsWindows())
+        {
+            var storedKey = root.GetProperty("openAiApiKey").GetString();
+            Assert.That(storedKey, Does.StartWith(DpapiApiKeyProtector.Prefix));
+            Assert.That(storedKey, Does.Not.Contain("sk-test"));
+        }
+        else
+        {
+            Assert.That(root.TryGetProperty("openAiApiKey", out _), Is.False);
+        }
     }
 
     [Test]
@@ -265,5 +401,32 @@ public sealed class SettingsStoreTests
         Assert.ThrowsAsync<OperationCanceledException>(async () => await _store.SaveAsync(new AppSettings(), cts.Token));
         Assert.That(File.Exists(_path), Is.False);
         Assert.That(File.Exists(_path + ".tmp"), Is.False);
+    }
+
+    private sealed class FakeApiKeyProtector : IApiKeyProtector
+    {
+        public const string Marker = "fake:v1:";
+
+        public bool IsAvailable { get; init; } = true;
+
+        public bool IsProtected(string value) => value.StartsWith(Marker, StringComparison.Ordinal);
+
+        public string Protect(string plaintext) =>
+            Marker + Convert.ToBase64String(Encoding.UTF8.GetBytes(plaintext));
+
+        public bool TryUnprotect(string storedValue, out string? plaintext)
+        {
+            try
+            {
+                plaintext = Encoding.UTF8.GetString(
+                    Convert.FromBase64String(storedValue[Marker.Length..]));
+                return true;
+            }
+            catch (FormatException)
+            {
+                plaintext = null;
+                return false;
+            }
+        }
     }
 }

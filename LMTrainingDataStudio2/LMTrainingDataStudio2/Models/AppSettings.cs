@@ -42,10 +42,16 @@ public sealed class AppSettings
     public string RunTempDirectory { get; set; } =
         Path.Combine(Path.GetTempPath(), "LMTrainingDataStudio", "run-temp");
 
-    /// <summary>OpenAI API key; falls back to OPENAI_API_KEY when empty.</summary>
+    /// <summary>
+    /// OpenAI API key; falls back to OPENAI_API_KEY when empty.
+    /// Plaintext in memory only: SettingsStore encrypts it with DPAPI on disk.
+    /// </summary>
     public string? OpenAiApiKey { get; set; }
 
-    /// <summary>Anthropic API key; falls back to ANTHROPIC_API_KEY when empty.</summary>
+    /// <summary>
+    /// Anthropic API key; falls back to ANTHROPIC_API_KEY when empty.
+    /// Plaintext in memory only: SettingsStore encrypts it with DPAPI on disk.
+    /// </summary>
     public string? AnthropicApiKey { get; set; }
 
     /// <summary>Most recently opened recipe files, newest first.</summary>
@@ -53,4 +59,6 @@ public sealed class AppSettings
 
     /// <summary>Recipe file restored on the next launch; empty starts a blank document.</summary>
     public string? LastRecipePath { get; set; }
+
+    internal AppSettings Clone() => (AppSettings)MemberwiseClone();
 }

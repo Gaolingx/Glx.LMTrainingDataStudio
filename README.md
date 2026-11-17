@@ -41,7 +41,7 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - 1M 行质量操作基线通过（去重+混洗+切分 124.2s、统计 63.6s、托管内存增量 2MB）
 - OpenAI / ShareGPT / Alpaca 数据格式转换服务
 - 真实 RecipeRunner：Seed / Expression / Validator / Sampler / LLM 执行器，执行记录与 Executions UI
-- OpenAI Chat Completions / Responses、Anthropic Messages 客户端；密钥从设置或环境变量读取，支持节点级超时与指数退避重试
+- OpenAI Chat Completions / Responses、Anthropic Messages 客户端；密钥从设置或环境变量读取（设置中的 Key 以 Windows DPAPI 加密落盘），支持节点级超时与指数退避重试
 - LLM 请求侧 tools（Tool Profile）、多轮行内 messages、`response_format` JSON Schema、并发与输出保序、token/成本日志、失败样本 JSONL
 - LLM 节点工具回填：`MaxToolRounds` 内执行 tool_calls（模拟或真实沙箱），把结果作为 tool 消息回灌模型并输出完整轨迹；Anthropic 结构化输出通过强制 `structured_output` 工具实现
 - Simulation Tools / Harness Rules / Script 回合可视化编辑器；OpenAI Chat SSE 流式 delta、requests-per-minute 限速与价格预设
@@ -148,7 +148,7 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
   - `MaxConcurrency` 控制 query 并发（输出保持输入顺序）。
   - `FailureOutputPath` / `MaxFailureSamples` 将未完成轨迹单独原子写入 JSONL。
   - `InputCostPerMillionTokens` / `OutputCostPerMillionTokens` 用于估算成本，只写入运行日志。
-- `ProviderChatCompletionClient`：OpenAI Chat Completions、OpenAI Responses、Anthropic Messages 的请求构造与 tool call 解析；密钥从应用设置或环境变量读取。
+- `ProviderChatCompletionClient`：OpenAI Chat Completions、OpenAI Responses、Anthropic Messages 的请求构造与 tool call 解析；密钥从应用设置或环境变量读取，设置中的 Key 使用 Windows DPAPI（当前用户）加密保存，旧明文配置在加载时自动迁移。
 - `RealToolRuntime` + `SandboxProcessRunner`：python（`-I`）、PowerShell（`-NoProfile -NonInteractive -ExecutionPolicy Bypass -File`）、bash（`--noprofile --norc -c`）、web_fetch（默认关闭，阻止私网/回环，禁跟随重定向）。
 - `DatasetCleanupRules`：正则替换、空白/换行规范化、ANSI 清理、移除 reasoning、丢弃空消息；Cleaner 节点与 Validator 均可使用。
 - `SftExportBlockExecutor`：流式写临时文件，成功后原子替换目标 JSONL；按行透传并做 JSON 规范化（不主动裁剪字段，上游 Simulation 输出 `messages` 与 `tools`）。

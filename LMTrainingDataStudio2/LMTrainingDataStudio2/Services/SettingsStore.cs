@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using LMTrainingDataStudio2.Localization;
@@ -28,9 +29,12 @@ public sealed class SettingsStore : ISettingsStore
         Converters = { new JsonStringEnumConverter() }
     };
 
-    public SettingsStore(string? filePath = null)
+    private readonly IApiKeyProtector _apiKeyProtector;
+
+    public SettingsStore(string? filePath = null, IApiKeyProtector? apiKeyProtector = null)
     {
         FilePath = Path.GetFullPath(filePath ?? GetDefaultFilePath());
+        _apiKeyProtector = apiKeyProtector ?? new DpapiApiKeyProtector();
     }
 
     public string FilePath { get; }
@@ -165,6 +169,17 @@ public sealed class SettingsStore : ISettingsStore
             ? null
             : settings.LastRecipePath.Trim();
 
+        var keysMigrated = false;
+        settings.OpenAiApiKey = ReadApiKey(
+            settings.OpenAiApiKey, "openAiApiKey", warnings, ref keysMigrated);
+        settings.AnthropicApiKey = ReadApiKey(
+            settings.AnthropicApiKey, "anthropicApiKey", warnings, ref keysMigrated);
+
+        if (keysMigrated)
+        {
+            TryMigrateApiKeys(settings, warnings);
+        }
+
         return new SettingsLoadResult(settings, warnings);
     }
 
@@ -175,13 +190,14 @@ public sealed class SettingsStore : ISettingsStore
 
         Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
 
+        var persisted = PrepareForStorage(settings);
         var tempPath = FilePath + ".tmp";
         try
         {
             await using (var stream = new FileStream(
                 tempPath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 4096, useAsync: true))
             {
-                await JsonSerializer.SerializeAsync(stream, settings, SerializerOptions, cancellationToken);
+                await JsonSerializer.SerializeAsync(stream, persisted, SerializerOptions, cancellationToken);
             }
 
             File.Move(tempPath, FilePath, overwrite: true);
@@ -190,6 +206,118 @@ public sealed class SettingsStore : ISettingsStore
         {
             TryDelete(tempPath);
             throw;
+        }
+    }
+
+    private AppSettings PrepareForStorage(AppSettings settings)
+    {
+        var persisted = settings.Clone();
+        persisted.OpenAiApiKey = ProtectApiKey(settings.OpenAiApiKey, "openAiApiKey");
+        persisted.AnthropicApiKey = ProtectApiKey(settings.AnthropicApiKey, "anthropicApiKey");
+        return persisted;
+    }
+
+    private string? ProtectApiKey(string? plaintext, string name)
+    {
+        if (string.IsNullOrWhiteSpace(plaintext))
+        {
+            return null;
+        }
+
+        var value = plaintext.Trim();
+        if (_apiKeyProtector.IsProtected(value))
+        {
+            return value;
+        }
+
+        if (!_apiKeyProtector.IsAvailable)
+        {
+            AppLog.Warning(
+                $"{name} was not saved because API keys are only protected on Windows; " +
+                "set the matching environment variable instead.");
+            return null;
+        }
+
+        try
+        {
+            return _apiKeyProtector.Protect(value);
+        }
+        catch (Exception ex) when (ex is CryptographicException or PlatformNotSupportedException)
+        {
+            throw new IOException($"Failed to encrypt {name} for storage: {ex.Message}", ex);
+        }
+    }
+
+    private string? ReadApiKey(
+        string? storedValue,
+        string name,
+        List<string> warnings,
+        ref bool migrated)
+    {
+        if (string.IsNullOrWhiteSpace(storedValue))
+        {
+            return null;
+        }
+
+        var value = storedValue.Trim();
+        if (!_apiKeyProtector.IsProtected(value))
+        {
+            if (_apiKeyProtector.IsAvailable)
+            {
+                migrated = true;
+            }
+            else
+            {
+                warnings.Add(
+                    $"{name} is stored in plaintext and cannot be encrypted on this platform; " +
+                    "prefer the matching environment variable.");
+            }
+
+            return value;
+        }
+
+        if (!_apiKeyProtector.IsAvailable)
+        {
+            warnings.Add(
+                $"{name} is encrypted with Windows DPAPI and cannot be read on this platform; " +
+                "set the matching environment variable instead.");
+            return null;
+        }
+
+        if (!_apiKeyProtector.TryUnprotect(value, out var plaintext) ||
+            string.IsNullOrWhiteSpace(plaintext))
+        {
+            warnings.Add(
+                $"{name} could not be decrypted and was ignored; re-enter the key in Settings.");
+            return null;
+        }
+
+        return plaintext;
+    }
+
+    private void TryMigrateApiKeys(AppSettings settings, List<string> warnings)
+    {
+        var tempPath = FilePath + ".tmp";
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
+            var persisted = PrepareForStorage(settings);
+            using (var stream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                JsonSerializer.Serialize(stream, persisted, SerializerOptions);
+            }
+
+            File.Move(tempPath, FilePath, overwrite: true);
+            warnings.Add(
+                $"API keys in '{FilePath}' were migrated to Windows DPAPI encryption.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or
+                                       CryptographicException or PlatformNotSupportedException)
+        {
+            TryDelete(tempPath);
+            warnings.Add(
+                $"Failed to write encrypted API keys to '{FilePath}': {ex.Message}. " +
+                "The plaintext keys remain until settings are saved again.");
         }
     }
 

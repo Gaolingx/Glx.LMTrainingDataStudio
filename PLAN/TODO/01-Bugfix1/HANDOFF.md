@@ -1,6 +1,6 @@
 # HANDOFF — 01-Bugfix1（全仓缺陷修复与门禁补齐）
 
-> 状态：进行中（Round 23）
+> 状态：进行中（Round 24）
 > 创建：2026-11-17
 > 基线：`895c08e feat(release): Round 16 发布与体验`
 > 上一阶段归档：[PLAN/Done/01-BuildALL/HANDOFF.md](../../Done/01-BuildALL/HANDOFF.md)
@@ -445,6 +445,7 @@
 | 2026-11-18 | Batch 11：LLM 工具回填与 Anthropic 结构化输出 | `dotnet build -c Release`；`dotnet test -c Release`；`dotnet format --verify-no-changes`；示例再生成 | 见第 13.3 节 | `LlmToolLoopTests`、`LlmApiClientTests`、`LlmConfigEditorTests`、校验与 Headless 测试 |
 | 2026-11-18 | Batch 12：数据工作台 `messages` 结构化编辑 | `dotnet build -c Release`；`dotnet test -c Release`；`dotnet format --verify-no-changes` | 见第 14.3 节 | `DatasetMessageEditorTests`、`DataWorkbenchEditTests`、Headless 面板测试 |
 | 2026-11-18 | Batch 13：Tool Profile Enum/Default 与输出冲突校验 | `dotnet build -c Release`；`dotnet test -c Release`；`dotnet format --verify-no-changes` | 见第 15.3 节 | `ToolProfileReuseTests`、`RecipeValidationServiceTests`、Headless 面板测试 |
+| 2026-11-18 | Batch 14：API Key DPAPI 加密 | `dotnet build -c Release`；`dotnet test -c Release`；`dotnet format --verify-no-changes` | 见第 16.3 节 | `SettingsStoreTests`（6 项新增）、DPAPI 落盘与迁移断言 |
 
 ---
 
@@ -642,7 +643,7 @@
 
 ### 7.10 安全与沙箱
 
-- [ ] **[安全/P1] API Key 明文落盘**：`settings.json` 未加密；诊断包已脱敏，但本机文件仍需保护。
+- [x] **[安全/P1] API Key 明文落盘**：`settings.json` 未加密；诊断包已脱敏，但本机文件仍需保护。—Round 24 已用 Windows DPAPI（CurrentUser）加密，旧明文在加载时自动迁移；非 Windows 不持久化 Key。
 - [ ] **[安全/P2] web_fetch 存在 DNS 重绑定窗口**：先 `Dns.GetHostAddressesAsync` 校验，再由 `HttpClient` 重新解析（`Services/Sandbox/RealToolRuntime.cs:252-280`）；需固定解析结果或使用自定义 `SocketsHttpHandler.ConnectCallback`。
 - [ ] **[安全/P2] 诊断包只脱敏设置**：日志/运行摘要原样打包，可能包含 prompt、模型响应或工具输出。
 - [ ] **[安全/P2] 沙箱是协作式隔离**：同用户运行，无容器/命名空间；非 Windows 无内存/进程数限制。
@@ -1085,3 +1086,38 @@
 - SFT 按比例拆片、输出路径存在性提示（206）。
 - LLM 流式输出与模型列表。
 - 数据工作台列排序/筛选/列宽持久化（191）。
+
+---
+
+## 16. Round 24 执行记录（2026-11-18）
+
+### 16.1 已完成项
+
+| 项 | 范围 | 提交 |
+| --- | --- | --- |
+| Batch 14 | API Key 加密存储、旧明文迁移、跨平台回退 | 本次提交 |
+
+### 16.2 具体改动
+
+- 新增 `IApiKeyProtector` 与 `DpapiApiKeyProtector`：使用 Windows DPAPI（`DataProtectionScope.CurrentUser` + 应用固定熵）加密 Key，密文格式为 `dpapi:v1:<base64>`。
+- `SettingsStore` 在序列化边界加密：写入前复制 `AppSettings` 并替换 Key 为密文，内存中的对象保持明文供 `ILlmCredentials` 使用。
+- `Load` 识别三种状态：密文解密、旧明文迁移、无法解密；旧明文加载后立即以原子替换加密回写，并记录迁移警告。
+- 无法解密（换用户、损坏、跨平台）时忽略该 Key 并给出警告，回退到 `OPENAI_API_KEY` / `ANTHROPIC_API_KEY`。
+- 非 Windows：`Protect` 不可用，`SaveAsync` 不写入 Key（只使用环境变量），避免回退到明文。
+- 诊断包脱敏逻辑不变；加密值同样会在导出前被清空。
+- 未修改设置界面；Key 输入框行为保持原样。
+
+### 16.3 当前验证
+
+- `dotnet build -c Release`：0 警告，0 错误。
+- `dotnet test -c Release`：624 通过，0 失败，7 跳过（5 性能 gated + 2 provider gated）；`--list-tests` 632 个用例（含 1 个 `[Explicit]`）。
+- `dotnet format --verify-no-changes`：通过。
+- 新增测试：`SettingsStoreTests` 6 项（DPAPI 落盘不含明文、双 Key 加密往返、旧明文迁移后文件加密、损坏密文告警、无保护能力时丢弃 Key、跨平台读取密文告警），并调整原有 camelCase 与往返断言按平台分支。
+- 真实 DPAPI 往返在 Windows 本机执行通过；未做干净用户/换机场景的手工验证。
+
+### 16.4 本轮未做（保留在 7.x / 8.3）
+
+- 设置变更通知（7.4）、Settings/Index Cache schema 版本与迁移。
+- web_fetch DNS 重绑定加固、诊断日志内容脱敏、目录 ACL 收紧（7.10 P2/P3）。
+- LLM 流式输出与模型列表。
+- 数据工作台列排序/筛选/列宽持久化（191）、CSV 类型推断。
