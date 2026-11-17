@@ -478,6 +478,45 @@ public sealed class RecipeValidationServiceTests
     }
 
     [Test]
+    public void Validate_SftExportWithUnsupportedTargetFormat_ReportsWarning()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("export", BlockType.SftExport, "export",
+            new SftExportBlockConfig("out/sft.jsonl", TargetFormat: DatasetFormat.Pretrain)));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Severity == ValidationSeverity.Warning && i.Message.Contains("cannot produce Pretrain")), Is.True);
+    }
+
+    [Test]
+    public void Validate_SftExportWithAppendAndSplit_ReportsWarning()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("export", BlockType.SftExport, "export",
+            new SftExportBlockConfig("out/sft.jsonl", Append: true, SplitMaxRows: 100)));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Severity == ValidationSeverity.Warning && i.Message.Contains("cannot combine append")), Is.True);
+    }
+
+    [Test]
+    public void Validate_SftExportWithNegativeSplit_ReportsWarning()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("export", BlockType.SftExport, "export",
+            new SftExportBlockConfig("out/sft.jsonl", SplitMaxRows: -5)));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Severity == ValidationSeverity.Warning && i.Message.Contains("split size cannot be negative")), Is.True);
+    }
+
+    [Test]
     public void Validate_SeedWithInputPort_ReportsError()
     {
         var seed = CreateBlock("seed", BlockType.Seed, "seed_data");

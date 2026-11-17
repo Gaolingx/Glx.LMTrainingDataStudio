@@ -309,8 +309,15 @@
 
                 <StackPanel Spacing="4">
                     <TextBlock Text="{loc:Loc property.failure_output_path}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
-                    <TextBox Text="{Binding SelectedBlock.LlmEditor.FailureOutputPath, Mode=TwoWay}"
-                             FontSize="11" Padding="8,6" Watermark="out/llm-failures.jsonl" />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                        <TextBox Text="{Binding SelectedBlock.LlmEditor.FailureOutputPath, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="out/llm-failures.jsonl" />
+                        <Button x:Name="BrowseLlmFailureButton" Grid.Column="1"
+                                Content="{loc:Loc property.browse}"
+                                Click="OnBrowseLlmFailureOutputClick"
+                                FontSize="11" Padding="10,6"
+                                Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
+                    </Grid>
                 </StackPanel>
 
                 <CheckBox Content="{loc:Loc property.continue_on_error}"
@@ -481,8 +488,15 @@
 
                 <StackPanel Spacing="4">
                     <TextBlock Text="{loc:Loc property.reject_output_path_optional}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
-                    <TextBox Text="{Binding SelectedBlock.ValidatorEditor.RejectOutputPath, Mode=TwoWay}"
-                             FontSize="11" Padding="8,6" Watermark="out/rejected.jsonl" />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                        <TextBox Text="{Binding SelectedBlock.ValidatorEditor.RejectOutputPath, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="out/rejected.jsonl" />
+                        <Button x:Name="BrowseValidatorRejectButton" Grid.Column="1"
+                                Content="{loc:Loc property.browse}"
+                                Click="OnBrowseValidatorRejectOutputClick"
+                                FontSize="11" Padding="10,6"
+                                Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
+                    </Grid>
                     <TextBlock Text="{loc:Loc property.rejected_rows_are_written_as_linenumber_reason_d}"
                                FontSize="10" Foreground="{DynamicResource TextFaintBrush}" TextWrapping="Wrap" />
                     <Button Content="{loc:Loc property.preview_reject}"
@@ -531,8 +545,15 @@
 
                 <StackPanel Spacing="4">
                     <TextBlock Text="{loc:Loc property.split_output_directory}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
-                    <TextBox Text="{Binding SelectedBlock.SamplerEditor.OutputDirectory, Mode=TwoWay}"
-                             FontSize="11" Padding="8,6" Watermark="out/splits" />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                        <TextBox Text="{Binding SelectedBlock.SamplerEditor.OutputDirectory, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="out/splits" />
+                        <Button x:Name="BrowseSamplerOutputButton" Grid.Column="1"
+                                Content="{loc:Loc property.browse}"
+                                Click="OnBrowseSamplerOutputDirectoryClick"
+                                FontSize="11" Padding="10,6"
+                                Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
+                    </Grid>
                 </StackPanel>
 
                 <StackPanel Spacing="4">
@@ -751,8 +772,15 @@
 
                 <StackPanel Spacing="4">
                     <TextBlock Text="{loc:Loc property.failure_jsonl_path_optional}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
-                    <TextBox Text="{Binding SelectedBlock.SimulationEditor.FailureOutputPath, Mode=TwoWay}"
-                             FontSize="11" Padding="8,6" Watermark="out/failed.jsonl" />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                        <TextBox Text="{Binding SelectedBlock.SimulationEditor.FailureOutputPath, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="out/failed.jsonl" />
+                        <Button x:Name="BrowseSimulationFailureButton" Grid.Column="1"
+                                Content="{loc:Loc property.browse}"
+                                Click="OnBrowseSimulationFailureOutputClick"
+                                FontSize="11" Padding="10,6"
+                                Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
+                    </Grid>
                     <Button Content="{loc:Loc property.preview_failures}"
                             Click="OnPreviewFailuresClick"
                             HorizontalAlignment="Left" Padding="10,5" FontSize="10"
@@ -1012,6 +1040,36 @@
                                 Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
                     </Grid>
                 </StackPanel>
+
+                <CheckBox Content="{loc:Loc property.sft_export_append}"
+                          FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}"
+                          IsChecked="{Binding SelectedBlock.SftExportEditor.Append, Mode=TwoWay}" />
+                <TextBlock Text="{loc:Loc property.sft_export_append_hint}"
+                           FontSize="10" Foreground="{DynamicResource TextFaintBrush}" TextWrapping="Wrap" />
+
+                <Grid ColumnDefinitions="*,8,*">
+                    <StackPanel Grid.Column="0" Spacing="4">
+                        <TextBlock Text="{loc:Loc property.sft_export_target_format}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
+                        <ComboBox ItemsSource="{Binding SelectedBlock.SftExportEditor.TargetFormats}"
+                                  SelectedItem="{Binding SelectedBlock.SftExportEditor.SelectedTargetFormat, Mode=TwoWay}"
+                                  FontSize="11" HorizontalAlignment="Stretch">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:SftTargetFormatOption">
+                                    <TextBlock Text="{Binding DisplayName}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Spacing="4">
+                        <TextBlock Text="{loc:Loc property.sft_export_split_rows}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
+                        <NumericUpDown Value="{Binding SelectedBlock.SftExportEditor.SplitMaxRows, Mode=TwoWay}"
+                                       Minimum="0" Maximum="10000000" Increment="1000"
+                                       FormatString="0" />
+                    </StackPanel>
+                </Grid>
+                <TextBlock Text="{loc:Loc property.sft_export_split_hint}"
+                           FontSize="10" Foreground="{DynamicResource TextFaintBrush}" TextWrapping="Wrap" />
+
                 <StackPanel Spacing="4">
                     <TextBlock Text="{loc:Loc property.sft_export_fields}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.SftExportEditor.FieldsText, Mode=TwoWay}"
@@ -1021,6 +1079,42 @@
                     <TextBlock Text="{Binding SelectedBlock.SftExportEditor.FieldsError}"
                                FontSize="10" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap"
                                IsVisible="{Binding SelectedBlock.SftExportEditor.FieldsError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Button x:Name="BrowseSftSampleFieldsButton"
+                                Content="{loc:Loc property.sft_export_load_fields}"
+                                Click="OnBrowseSftSampleFieldsClick"
+                                Padding="10,5" FontSize="10"
+                                Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
+                        <Button Content="{loc:Loc property.sft_export_select_all_fields}"
+                                Command="{Binding SelectedBlock.SftExportEditor.SelectAllFieldsCommand}"
+                                Padding="10,5" FontSize="10"
+                                Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
+                        <Button Content="{loc:Loc property.sft_export_clear_fields}"
+                                Command="{Binding SelectedBlock.SftExportEditor.ClearFieldsCommand}"
+                                Padding="10,5" FontSize="10"
+                                Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
+                    </StackPanel>
+                    <ItemsControl ItemsSource="{Binding SelectedBlock.SftExportEditor.AvailableFields}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:SftFieldOptionViewModel">
+                                <CheckBox Content="{Binding Name}"
+                                          IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                          FontSize="10" Margin="0,0,10,2"
+                                          Foreground="{DynamicResource TextPrimaryBrush}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="{Binding SelectedBlock.SftExportEditor.FieldsSourceInfo}"
+                               FontSize="10" Foreground="{DynamicResource TextFaintBrush}" TextWrapping="Wrap"
+                               IsVisible="{Binding SelectedBlock.SftExportEditor.FieldsSourceInfo, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <TextBlock Text="{Binding SelectedBlock.SftExportEditor.FieldsSourceError}"
+                               FontSize="10" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap"
+                               IsVisible="{Binding SelectedBlock.SftExportEditor.FieldsSourceError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                     <Button Content="{loc:Loc property.preview_output}"
                             Click="OnPreviewSftOutputClick"
                             HorizontalAlignment="Left" Padding="10,5" FontSize="10"

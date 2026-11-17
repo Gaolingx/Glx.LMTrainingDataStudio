@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -18,6 +17,8 @@ public sealed class SftExportBlockExecutor : IBlockExecutor
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
 
+    private static readonly DatasetFormatConverter FormatConverter = new();
+
     public BlockType Type => BlockType.SftExport;
 
     public Task<BlockExecutionResult> ExecuteAsync(
@@ -30,11 +31,7 @@ public sealed class SftExportBlockExecutor : IBlockExecutor
                 $"SFT export block '{context.Block.Name}' has an invalid configuration.");
         }
 
-        if (string.IsNullOrWhiteSpace(config.OutputPath))
-        {
-            throw new InvalidOperationException(
-                $"SFT export block '{context.Block.Name}' has no output path configured.");
-        }
+        ValidateConfig(config, context.Block.Name);
 
         if (context.Input is null)
         {
@@ -46,50 +43,66 @@ public sealed class SftExportBlockExecutor : IBlockExecutor
             ExportAsync(context, config, cancellationToken)));
     }
 
+    private static void ValidateConfig(SftExportBlockConfig config, string blockName)
+    {
+        if (string.IsNullOrWhiteSpace(config.OutputPath))
+        {
+            throw new InvalidOperationException(
+                $"SFT export block '{blockName}' has no output path configured.");
+        }
+
+        if (config.SplitMaxRows < 0)
+        {
+            throw new InvalidOperationException(
+                $"SFT export block '{blockName}' split size cannot be negative.");
+        }
+
+        if (config.Append && config.SplitMaxRows > 0)
+        {
+            throw new InvalidOperationException(
+                $"SFT export block '{blockName}' cannot combine append mode with file splitting.");
+        }
+
+        if (config.TargetFormat is DatasetFormat.Dpo or DatasetFormat.Pretrain)
+        {
+            throw new InvalidOperationException(
+                $"SFT export block '{blockName}' cannot produce {config.TargetFormat} rows from chat messages.");
+        }
+    }
+
     private static async IAsyncEnumerable<DatasetRow> ExportAsync(
         BlockExecutionContext context,
         SftExportBlockConfig config,
         [EnumeratorCancellation] CancellationToken ct)
     {
-        var fullPath = Path.GetFullPath(config.OutputPath);
-        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
-        var tempPath = fullPath + ".tmp";
+        await using var writer = SftExportWriter.Create(
+            config.OutputPath, config.Append, config.SplitMaxRows);
 
         var index = 0L;
-        var completed = false;
         string? preview = null;
-        try
+        await foreach (var row in context.Input!.WithCancellation(ct))
         {
-            await using (var stream = new FileStream(
-                tempPath, FileMode.Create, FileAccess.Write, FileShare.None,
-                bufferSize: 64 * 1024, useAsync: true))
-            await using (var writer = new StreamWriter(stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false)))
-            {
-                await foreach (var row in context.Input!.WithCancellation(ct))
-                {
-                    var line = NormalizeRow(row, config, context.Block.Name);
-                    await writer.WriteLineAsync(line.AsMemory(), ct);
-                    preview ??= Preview(line);
-                    yield return new DatasetRow(index++, line);
-                    context.RowsProcessed?.Report(index);
-                }
-            }
-
-            File.Move(tempPath, fullPath, overwrite: true);
-            completed = true;
-        }
-        finally
-        {
-            if (!completed)
-            {
-                TryDelete(tempPath);
-            }
+            var line = NormalizeRow(row, config, context.Block.Name);
+            await writer.WriteAsync(line, ct);
+            preview ??= Preview(line);
+            yield return new DatasetRow(index++, line);
+            context.RowsProcessed?.Report(index);
         }
 
+        await writer.CommitAsync(ct);
+
+        var parts = writer.PartPaths;
+        var destination = parts.Count == 1
+            ? $"'{parts[0]}'"
+            : $"{parts.Count} part file(s) starting at '{parts[0]}'";
         var fieldNote = config.Fields is { Length: > 0 }
             ? $" (fields: {string.Join(", ", config.Fields.Where(field => !string.IsNullOrWhiteSpace(field)))})"
             : string.Empty;
-        context.Log($"Exported {index} row(s) to '{fullPath}'{fieldNote}.");
+        var formatNote = config.TargetFormat == DatasetFormat.Auto
+            ? string.Empty
+            : $" (format: {config.TargetFormat})";
+        var appendNote = config.Append ? " [append]" : string.Empty;
+        context.Log($"Exported {index} row(s) to {destination}{fieldNote}{formatNote}{appendNote}.");
         context.Log(preview is null ? "Preview: no rows exported." : $"Preview: {preview}");
     }
 
@@ -112,6 +125,28 @@ public sealed class SftExportBlockExecutor : IBlockExecutor
                 $"SFT export block '{blockName}' row {row.LineNumber} is empty JSON.");
         }
 
+        if (config.TargetFormat != DatasetFormat.Auto)
+        {
+            if (node is not JsonObject sourceObject)
+            {
+                throw new InvalidDataException(
+                    $"SFT export block '{blockName}' row {row.LineNumber} is not a JSON object; " +
+                    "format conversion requires object rows.");
+            }
+
+            try
+            {
+                var sample = FormatConverter.Convert(sourceObject, DatasetFormat.Auto);
+                node = FormatConverter.ConvertTo(sample, config.TargetFormat);
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                throw new InvalidDataException(
+                    $"SFT export block '{blockName}' could not convert row {row.LineNumber} " +
+                    $"to {config.TargetFormat}: {ex.Message}", ex);
+            }
+        }
+
         var fields = config.Fields?
             .Where(field => !string.IsNullOrWhiteSpace(field))
             .Select(field => field.Trim())
@@ -122,7 +157,7 @@ public sealed class SftExportBlockExecutor : IBlockExecutor
             return node.ToJsonString(RowJsonOptions);
         }
 
-        if (node is not JsonObject source)
+        if (node is not JsonObject target)
         {
             throw new InvalidDataException(
                 $"SFT export block '{blockName}' row {row.LineNumber} is not a JSON object; " +
@@ -132,7 +167,7 @@ public sealed class SftExportBlockExecutor : IBlockExecutor
         var filtered = new JsonObject();
         foreach (var field in fields)
         {
-            if (source.TryGetPropertyValue(field, out var value))
+            if (target.TryGetPropertyValue(field, out var value))
             {
                 filtered[field] = value?.DeepClone();
             }
@@ -142,18 +177,4 @@ public sealed class SftExportBlockExecutor : IBlockExecutor
     }
 
     private static string Preview(string line) => line.Length <= 200 ? line : line[..200] + "…";
-
-    private static void TryDelete(string path)
-    {
-        try
-        {
-            File.Delete(path);
-        }
-        catch (IOException)
-        {
-        }
-        catch (UnauthorizedAccessException)
-        {
-        }
-    }
 }

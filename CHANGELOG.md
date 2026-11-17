@@ -2,6 +2,27 @@
 
 本文件记录用户可见变更与工程化修复。完整未完成清单见 [PLAN/TODO/01-Bugfix1/HANDOFF.md](PLAN/TODO/01-Bugfix1/HANDOFF.md)。
 
+## [Unreleased] — 2026-11-18（Round 20 / SFT 导出能力与路径选择）
+
+### Added
+
+- SFT Export 支持安全追加：先复制现有文件到临时副本，成功后再原子替换，失败不破坏原文件。
+- SFT Export 支持目标格式 Auto / OpenAI / ShareGPT / Alpaca，转换后再应用字段白名单。
+- SFT Export 支持按行数分片：`name.part001.jsonl`、`name.part002.jsonl`…，失败时清理所有临时分片。
+- SFT 字段选择器：从 JSONL/CSV/Parquet 样本读取顶层字段，复选、全选/清空，并与字段文本框双向同步。
+- LLM/Simulation 失败样本、Validator reject 输出、Sampler 输出目录新增 Browse。
+- Recipe 校验新增不支持的目标格式、负分片、追加 + 分片组合的警告。
+
+### Changed
+
+- `SftExportBlockConfig` 新增 `append`、`targetFormat`、`splitMaxRows`；旧 Recipe 按默认值（透传/单文件/覆盖）加载。
+- 重新生成 `examples/*.recipe.json` 以包含新增默认字段。
+
+### Tests
+
+- `--list-tests`：590 个用例；`dotnet test`：582 通过 / 0 失败 / 7 跳过（另 1 个 `[Explicit]`）。
+- 新增 `SftExportExecutorTests`、`SftExportFieldSelectorTests`、校验与序列化回归，以及 SFT 面板 Headless 控件检查。
+
 ## [Unreleased] — 2026-11-18（Round 19 / 数据工作台与入口打磨）
 
 ### Added

@@ -800,6 +800,34 @@ public sealed class RecipeValidationService
                         BlockId = block.Id
                     });
                     break;
+
+                case SftExportBlockConfig export when export.TargetFormat is DatasetFormat.Dpo or DatasetFormat.Pretrain:
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"SFT export block '{block.Name}' cannot produce {export.TargetFormat} rows; " +
+                                  "choose Auto, OpenAI, ShareGPT or Alpaca.",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case SftExportBlockConfig export when export.SplitMaxRows < 0:
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"SFT export block '{block.Name}' split size cannot be negative.",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case SftExportBlockConfig export when export.Append && export.SplitMaxRows > 0:
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"SFT export block '{block.Name}' cannot combine append mode with file splitting.",
+                        BlockId = block.Id
+                    });
+                    break;
             }
         }
     }

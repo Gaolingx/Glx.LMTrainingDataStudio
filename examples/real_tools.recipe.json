@@ -158,7 +158,10 @@
       "outputPorts": [],
       "config": {
         "kind": "sft_export",
-        "outputPath": "out/real-tools-sft.jsonl"
+        "outputPath": "out/real-tools-sft.jsonl",
+        "append": false,
+        "targetFormat": "Auto",
+        "splitMaxRows": 0
       }
     }
   ],

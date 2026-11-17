@@ -149,8 +149,15 @@ public sealed record CleanerBlockConfig(DatasetCleanupRules Rules) : BlockConfig
 /// <summary>
 /// Writes rows to a JSONL file in OpenAI messages format while passing them downstream.
 /// When <see cref="Fields"/> is non-empty, only those top-level fields are written.
+/// <see cref="Append"/> keeps existing rows; <see cref="TargetFormat"/> converts rows before
+/// writing; <see cref="SplitMaxRows"/> rotates to numbered part files.
 /// </summary>
-public sealed record SftExportBlockConfig(string OutputPath, string[]? Fields = null) : BlockConfig;
+public sealed record SftExportBlockConfig(
+    string OutputPath,
+    string[]? Fields = null,
+    bool Append = false,
+    DatasetFormat TargetFormat = DatasetFormat.Auto,
+    int SplitMaxRows = 0) : BlockConfig;
 
 /// <summary>
 /// Token pricing presets used by the simulation and LLM editors.

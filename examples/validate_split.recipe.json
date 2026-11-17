@@ -138,7 +138,10 @@
       "outputPorts": [],
       "config": {
         "kind": "sft_export",
-        "outputPath": "out/sampled-sft.jsonl"
+        "outputPath": "out/sampled-sft.jsonl",
+        "append": false,
+        "targetFormat": "Auto",
+        "splitMaxRows": 0
       }
     }
   ],

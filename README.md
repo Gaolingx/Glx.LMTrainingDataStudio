@@ -32,7 +32,7 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - 属性修改可撤销：名称/显示名与所有节点配置编辑进入同一撤销历史，连续编辑自动合并
 - 执行：层内受控并行、暂停/恢复、节点重试、运行输出目录与 `run-summary.json`
 - 执行韧性：节点间溢写磁盘（阈值与临时目录可配置）、节点级检查点与中断恢复、取消 1s 内停止与临时目录清理
-- SFT Export：文件选择器、运行前覆盖确认、可选字段白名单、写出行数与首行预览日志
+- SFT Export：文件选择器、运行前覆盖确认、安全追加、目标格式（OpenAI/ShareGPT/Alpaca）、按行数分片、可选字段白名单与样本字段选择器、写出行数与首行预览日志
 - 工程化：滚动日志与全局异常、完整 Dark/Light 主题（全部视图使用主题资源）、GitHub Actions CI、win-x64 单文件发布、Headless UI 测试、MIT LICENSE、应用图标
 - 发布：MSIX 清单与打包脚本、Inno Setup 安装脚本（`.recipe` 文件关联）
 - 工程质量：`.editorconfig`、.NET 分析器（`latest-recommended`）与警告即错误；构建 0 警告
@@ -230,7 +230,7 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 | Query Source | 单组/多组 + 模板变量 + 外部 JSONL/CSV/Parquet | 有 | 随机/模型生成 query、去重/权重 |
 | Simulation | 脚本/真实 provider + 模拟/真实工具 + 可视化 Tools/Rules/Script | 有 | 非 OpenAI 流式、严格限速、容器隔离 |
 | Cleaner | 正则/格式/ANSI/reasoning/空消息 + 正则规则 UI + 预览 | 有 | 坏行报告、自定义 JSONPath |
-| SFT Export | 流式 + 原子替换 + 行透传 + 文件选择器 + 字段白名单 + 预览 | 有 | 追加模式、拆分、DPO/Pretrain 直出 |
+| SFT Export | 流式 + 原子替换 + 行透传 + 文件选择器 + 字段白名单 + 预览 + 安全追加 + 目标格式 + 按行数分片 | 有 | 按比例拆片、DPO/Pretrain 直出、并发写检测 |
 
 完整矩阵与逐项缺口见 [PLAN/STATUS.md](PLAN/STATUS.md)。
 
@@ -318,7 +318,8 @@ UI 采用 Recipe Graph / DAG 的设计：
 - 画布交互：网格背景与吸附（Alt 临时关闭）、鼠标中心缩放、Fit、拓扑自动布局、Mini-map 视口/点击导航、双击空白添加、双击节点内联重命名、复制携带内部连线、边 hover
 - 执行控制：Pause / Resume、节点重试设置、运行输出目录（`run-summary.json`）、节点间溢写阈值与运行临时目录
 - 执行恢复：Executions 视图对失败/取消的运行提供“恢复执行”，复用已完成节点输出；成功运行后自动清理检查点
-- SFT Export 面板：输出文件选择器、字段白名单（逗号分隔顶层字段）、运行前覆盖确认
+- SFT Export 面板：输出文件选择器、字段白名单（逗号分隔或从样本读取复选）、追加/目标格式/按行数分片、运行前覆盖确认
+- 失败样本与 reject 路径：LLM/Simulation 失败样本、Validator reject 输出、Sampler 输出目录均提供 Browse
 - 右侧属性编辑面板（含校验问题列表，可点击定位节点）
 - 悬浮 Run / Validate 控件
 - Mini-map 渲染

@@ -90,7 +90,10 @@
       "outputPorts": [],
       "config": {
         "kind": "sft_export",
-        "outputPath": "out/llm-batch.jsonl"
+        "outputPath": "out/llm-batch.jsonl",
+        "append": false,
+        "targetFormat": "Auto",
+        "splitMaxRows": 0
       }
     }
   ],

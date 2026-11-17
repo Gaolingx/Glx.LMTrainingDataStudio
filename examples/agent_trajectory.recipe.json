@@ -182,7 +182,10 @@
       "outputPorts": [],
       "config": {
         "kind": "sft_export",
-        "outputPath": "out/agent-sft.jsonl"
+        "outputPath": "out/agent-sft.jsonl",
+        "append": false,
+        "targetFormat": "Auto",
+        "splitMaxRows": 0
       }
     }
   ],

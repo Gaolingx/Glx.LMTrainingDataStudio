@@ -135,6 +135,136 @@ public partial class PropertyPanelView : UserControl
         vm.StatusText = $"SFT export target selected: {path}";
     }
 
+    private async void OnBrowseSftSampleFieldsClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm ||
+            vm.SelectedBlock?.SftExportEditor is not { } editor)
+        {
+            return;
+        }
+
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel is null) return;
+
+        var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = LocalizationService.L("property.sft_export_load_fields"),
+            AllowMultiple = false,
+            FileTypeFilter = new[]
+            {
+                new FilePickerFileType("Datasets")
+                {
+                    Patterns = new[] { "*.jsonl", "*.json", "*.csv", "*.parquet" }
+                },
+                FilePickerFileTypes.All
+            }
+        });
+
+        var path = files.Count > 0 ? files[0].TryGetLocalPath() : null;
+        if (!string.IsNullOrWhiteSpace(path))
+        {
+            await editor.LoadFieldsFromFileAsync(path);
+        }
+    }
+
+    private async void OnBrowseLlmFailureOutputClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm ||
+            vm.SelectedBlock?.LlmEditor is not { } editor)
+        {
+            return;
+        }
+
+        var path = await PickSavePathAsync(
+            "Select LLM failure sample file", editor.FailureOutputPath, "jsonl");
+        if (!string.IsNullOrWhiteSpace(path))
+        {
+            editor.FailureOutputPath = path;
+            vm.StatusText = $"LLM failure samples will be written to: {path}";
+        }
+    }
+
+    private async void OnBrowseValidatorRejectOutputClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm ||
+            vm.SelectedBlock?.ValidatorEditor is not { } editor)
+        {
+            return;
+        }
+
+        var path = await PickSavePathAsync(
+            "Select rejected rows file", editor.RejectOutputPath, "jsonl");
+        if (!string.IsNullOrWhiteSpace(path))
+        {
+            editor.RejectOutputPath = path;
+            vm.StatusText = $"Rejected rows will be written to: {path}";
+        }
+    }
+
+    private async void OnBrowseSimulationFailureOutputClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm ||
+            vm.SelectedBlock?.SimulationEditor is not { } editor)
+        {
+            return;
+        }
+
+        var path = await PickSavePathAsync(
+            "Select simulation failure sample file", editor.FailureOutputPath, "jsonl");
+        if (!string.IsNullOrWhiteSpace(path))
+        {
+            editor.FailureOutputPath = path;
+            vm.StatusText = $"Simulation failure samples will be written to: {path}";
+        }
+    }
+
+    private async void OnBrowseSamplerOutputDirectoryClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm ||
+            vm.SelectedBlock?.SamplerEditor is not { } editor)
+        {
+            return;
+        }
+
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel is null) return;
+
+        var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = "Select split output directory",
+            AllowMultiple = false
+        });
+
+        var path = folders.Count > 0 ? folders[0].TryGetLocalPath() : null;
+        if (!string.IsNullOrWhiteSpace(path))
+        {
+            editor.OutputDirectory = path;
+            vm.StatusText = $"Sampler split output directory: {path}";
+        }
+    }
+
+    private async Task<string?> PickSavePathAsync(string title, string? currentPath, string extension)
+    {
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel is null) return null;
+
+        var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = title,
+            SuggestedFileName = string.IsNullOrWhiteSpace(currentPath)
+                ? null
+                : Path.GetFileName(currentPath),
+            DefaultExtension = extension,
+            FileTypeChoices = new[]
+            {
+                new FilePickerFileType("JSONL") { Patterns = new[] { "*.jsonl", "*.json" } },
+                FilePickerFileTypes.All
+            }
+        });
+
+        return file?.TryGetLocalPath();
+    }
+
     private async void OnPreviewSftOutputClick(object? sender, RoutedEventArgs e)
     {
         if (DataContext is not MainWindowViewModel vm ||

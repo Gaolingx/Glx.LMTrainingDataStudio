@@ -323,6 +323,26 @@ public sealed class BlockConfigSerializationTests
     }
 
     [Test]
+    public void RoundTrip_SftExportConfig_PreservesAppendFormatAndSplit()
+    {
+        var config = new SftExportBlockConfig(
+            "data/sft.jsonl",
+            Fields: new[] { "messages", "tools" },
+            Append: true,
+            TargetFormat: DatasetFormat.ShareGPT,
+            SplitMaxRows: 250);
+
+        var loaded = (SftExportBlockConfig)RoundTrip(config);
+
+        Assert.That(loaded.OutputPath, Is.EqualTo(config.OutputPath));
+        Assert.That(loaded.Fields, Is.EqualTo(config.Fields));
+        Assert.That(loaded.Fields, Is.Not.SameAs(config.Fields));
+        Assert.That(loaded.Append, Is.True);
+        Assert.That(loaded.TargetFormat, Is.EqualTo(DatasetFormat.ShareGPT));
+        Assert.That(loaded.SplitMaxRows, Is.EqualTo(250));
+    }
+
+    [Test]
     public void DeepClone_SimulationConfig_DoesNotShareArrays()
     {
         var config = new SimulationBlockConfig(

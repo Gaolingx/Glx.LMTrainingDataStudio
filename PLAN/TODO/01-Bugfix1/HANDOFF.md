@@ -1,6 +1,6 @@
 # HANDOFF — 01-Bugfix1（全仓缺陷修复与门禁补齐）
 
-> 状态：进行中（Round 18）
+> 状态：进行中（Round 20）
 > 创建：2026-11-17
 > 基线：`895c08e feat(release): Round 16 发布与体验`
 > 上一阶段归档：[PLAN/Done/01-BuildALL/HANDOFF.md](../../Done/01-BuildALL/HANDOFF.md)
@@ -441,6 +441,7 @@
 | 2026-11-17 | Batch 5：数据与恢复 | `dotnet build -c Release`；`dotnet test -c Release --no-build` | 0 警告；531 通过 / 0 失败 / 7 跳过 | 分页取消、跨格式保存、恢复哈希/指纹测试 |
 | 2026-11-18 | Batch 7：启动/打包/设置 | `dotnet build -c Release`；`dotnet test -c Release`；`dotnet format --verify-no-changes` | 0 警告；550 通过 / 0 失败 / 7 跳过；格式通过 | `StartupLaunchTests`、`PackagingConsistencyTests`、`LocalizationConsistencyTests`、`SettingsPanelTests` |
 | 2026-11-18 | Batch 8：CI 门禁 | 本地 `check-coverage.ps1`；发布脚本 `-Version 0.0.0`；示例再生成 + `git diff` | 总行 74.64%、Services/Commands 84.32%；FileVersion 0.0.0.0；示例无漂移 | `.github/workflows/ci.yml`、`scripts/check-coverage.ps1` |
+| 2026-11-18 | Batch 10：SFT 导出与路径选择 | `dotnet build -c Release`；`dotnet test -c Release`；`dotnet format --verify-no-changes`；示例再生成 | 见第 12.3 节 | `SftExportExecutorTests`、`SftExportFieldSelectorTests`、`HeadlessUiTests` |
 
 ---
 
@@ -573,9 +574,9 @@
 
 #### SFT Export
 
-- [ ] **[节点/P2] 无追加模式**：只有运行前覆盖确认。
-- [ ] **[节点/P2] 无目标格式选择**：不能直接输出 DPO/Pretrain（需数据工作台转换）。
-- [ ] **[节点/P2] 无按数量/比例拆分多文件**：只能前置 Sampler。
+- [x] **[节点/P2] 无追加模式**：已支持安全追加（复制临时副本 → 追加 → 成功原子替换，失败保留原文件）。
+- [x] **[节点/P2] 无目标格式选择**：已支持 Auto/OpenAI/ShareGPT/Alpaca 转换；DPO/Pretrain 直出仍走数据工作台。
+- [部分] **[节点/P2] 无按数量/比例拆分多文件**：已支持按行数分片 `name.part001.jsonl`；比例拆分仍用前置 Sampler。
 - [ ] **[节点/P2] 无并发写同一目标文件的检测/提示**。
 
 ### 7.6 数据工作台与数据治理
@@ -749,12 +750,13 @@
 - [ ] **185 [P3] 新节点默认配置不可改**：`BlockConfig.CreateDefault` 写死默认值（`Models/BlockConfig.cs:21-37`），设置页不能改默认 Seed 路径、默认并发、默认导出字段等。
 - [ ] **186 [P3] 无 API Key 测试连接**：Key 错误只能在首次运行时发现；可在设置页加“测试连接”（只读请求）并区分认证失败/网络失败。
 
-#### 8.3.5 节点模块（187–190）
+#### 8.3.5 节点模块（187–190、206）
 
-- [ ] **187 [P2] SFT 字段白名单是逗号文本框（校验已补，字段选择器未做）**：`SftExportConfigEditorViewModel.FieldsText` 直接按逗号拆分（`ViewModels/SftExportConfigEditorViewModel.cs:39-44`），面板只有 TextBox（`Views/PropertyPanelView.axaml:943-947`）；无字段选择器、无样本字段提示、拼写错误会静默输出缺字段。建议从输入样本读取顶层字段做多选。
+- [x] **187 [P2] SFT 字段白名单是逗号文本框（校验已补，字段选择器未做）**：`SftExportConfigEditorViewModel.FieldsText` 直接按逗号拆分（`ViewModels/SftExportConfigEditorViewModel.cs:39-44`），面板只有 TextBox（`Views/PropertyPanelView.axaml:943-947`）；无字段选择器、无样本字段提示、拼写错误会静默输出缺字段。建议从输入样本读取顶层字段做多选。—Round 20 已加“从样本读取字段”、复选列表、全选/清空与文本框双向同步；读取失败在面板内提示。
 - [x] **188 [P3] LLM `response_schema` 无编辑期校验/格式化**：面板是纯 TextBox（`Views/PropertyPanelView.axaml:221`），没有 JSON 语法校验、格式化或从 Schema 生成示例；错误只在运行时暴露。
 - [ ] **189 [P3] Sampler splits 是纯多行文本**：`SplitsText` 只有整体解析/错误提示（`ViewModels/SamplerConfigEditorViewModel.cs:110-130`），没有逐行增删、排序、重命名和单行预览。
-- [ ] **190 [P3] 路径输入体验不统一**：Seed 与 SFT 有 Browse/可写性检查；Validator reject 路径（`Views/PropertyPanelView.axaml:401`）、LLM failure 路径（`:229`）、Simulation failure 路径（`:671`）、Sampler 输出目录（`:451`）仍是纯文本，且没有目录/文件存在性提示。
+- [ ] **190 [P3] 路径输入体验不统一**：Seed 与 SFT 有 Browse/可写性检查；Validator reject 路径（`Views/PropertyPanelView.axaml:401`）、LLM failure 路径（`:229`）、Simulation failure 路径（`:671`）、Sampler 输出目录（`:451`）仍是纯文本，且没有目录/文件存在性提示。—Round 20 已为以上四处接入 Browse；存在性提示拆分到 206。
+- [ ] **206 [P3] 输出路径存在性/可写性提示**：相对路径在运行时按进程工作目录解析，编辑期尚未提示父目录是否存在或可写；需要先统一“相对路径基准”再给出准确提示。
 
 #### 8.3.6 数据工作台（191）
 
@@ -935,4 +937,43 @@
 
 - 预览全文搜索（当前为分页 + 数据工作台搜索高亮）。
 - 7.5 节点能力（LLM tool_calls 回填、Anthropic 结构化输出、SFT 追加/目标格式/拆分）。
+- 7.7 执行清理/配额、7.10 安全加固、7.1 Recipe 校验错误码。
+
+---
+
+## 12. Round 20 执行记录（2026-11-18）
+
+### 12.1 已完成项
+
+| 项 | 范围 | 提交 |
+| --- | --- | --- |
+| Batch 10 | SFT 追加/目标格式/按行数分片、字段选择器、失败与 reject 路径 Browse | 本次提交 |
+
+### 12.2 具体改动
+
+- `SftExportBlockConfig` 新增 `Append`、`TargetFormat`、`SplitMaxRows`；旧 Recipe（只含 `outputPath`/`fields`）按默认值加载。
+- 新增 `SftExportWriter`：单文件/分片统一走临时文件，成功后再原子替换；追加模式先复制原文件再追加，输入失败时保留原文件；分片命名 `name.part001.jsonl`、`name.part002.jsonl`…。
+- 目标格式：`Auto` 透传；`OpenAI`/`ShareGPT`/`Alpaca` 复用 `DatasetFormatConverter` 转换；`Dpo`/`Pretrain` 在校验与执行期明确拒绝。
+- 字段白名单在格式转换后应用，可只保留目标格式的字段。
+- 校验服务新增：不支持的目标格式、负分片、追加 + 分片组合。
+- 新增 `DatasetFieldDiscovery`：通过 `DatasetIO` 读取 JSONL/CSV/Parquet 首行，返回顶层字段。
+- SFT 面板：追加开关、目标格式下拉、每片行数 `NumericUpDown`、从样本读取字段、复选列表、全选/清空；字段框与复选双向同步，手动输入的未知字段会保留。
+- LLM/Simulation 失败样本、Validator reject 输出、Sampler 输出目录新增 Browse（文件/文件夹选择器）。
+- 新增本地化键（zh-CN/en-US）：追加、目标格式、分片、字段加载与状态提示。
+- 示例 Recipe 重新生成（`WriteExamples`），补入新增默认字段。
+
+### 12.3 当前验证
+
+- `dotnet build -c Release`：0 警告，0 错误。
+- `dotnet test -c Release`：582 通过，0 失败，7 跳过（5 性能 gated + 2 provider gated）；`--list-tests` 590 个用例（含 1 个 `[Explicit]`）。
+- `dotnet format --verify-no-changes`：通过。
+- 示例再生成后 `git diff -- examples/`：仅包含 SFT 新增默认字段（已提交）。
+- 新增测试：`SftExportExecutorTests`（透传、无尾换行追加、失败保留原文件、Alpaca/ShareGPT 转换、字段过滤、分片、分片失败清理、非法组合）、`SftExportFieldSelectorTests`（配置推送、样本字段发现、复选同步、全选/清空、错误提示）、校验服务 3 项、序列化往返、Headless 面板控件检查。
+
+### 12.4 本轮未做（保留在 7.x / 8.3）
+
+- SFT 按比例拆片与 DPO/Pretrain 直出（仍由数据工作台承担）。
+- SFT 并发写同一目标文件检测；输出路径存在性提示（206）。
+- LLM `tool_calls` 回填、Anthropic 结构化输出。
+- 数据工作台 `messages` 结构化表单、列排序/筛选/列宽持久化（191）。
 - 7.7 执行清理/配额、7.10 安全加固、7.1 Recipe 校验错误码。

@@ -285,13 +285,13 @@
 | JSONL 流式写出 | [x] | 临时文件 + 原子替换；取消/异常删除临时文件 |
 | JSON 规范化 | [x] | 每行解析后重写，保留原有字段 |
 | 按行透传给下游 | [x] | 节点有输出端口，下游可继续处理 |
-| 专属属性面板 | [x] | 输出路径、Browse 文件选择器、字段白名单 |
+| 专属属性面板 | [x] | 输出路径、Browse 文件选择器、字段白名单、追加/目标格式/分片 |
 | “只输出 messages + tools” | [x] | 字段白名单可只保留指定顶层字段；留空则整行透传 |
 | 文件选择器 | [x] | SaveFilePicker，默认 `.jsonl` |
-| 覆盖确认 / 追加模式 | [部分] | 运行前确认覆盖；无追加模式 |
+| 覆盖确认 / 追加模式 | [x] | 运行前确认覆盖；追加模式先复制临时副本，成功后原子替换 |
 | 输出预览 / 样本查看 | [x] | 统一样本预览弹窗与运行日志摘要 |
-| 字段白名单 / 目标格式选择 | [部分] | 顶层字段白名单已接入并校验；无目标格式选择 |
-| 按数量/比例拆分多文件 | [ ] | 可用 Sampler 前置切分 |
+| 字段白名单 / 目标格式选择 | [x] | 白名单校验 + 从样本读取顶层字段复选；目标格式 Auto/OpenAI/ShareGPT/Alpaca |
+| 按数量/比例拆分多文件 | [部分] | 支持按行数分片 `name.part001.jsonl`；比例拆分仍用前置 Sampler |
 | DPO / Pretrain 直出 | [ ] | 数据工作台批量转换支持，节点本身只写 JSONL |
 
 ### 2.11 工作流预设与界面本地化
@@ -371,7 +371,8 @@
 - [ ] CSV 类型推断与列类型展示；CSV/Parquet 1M 行质量基线；10M 行实测。
 - [ ] Seed 节点内过滤/列映射/多文件/目录/HuggingFace/HTTP 源。
 - [x] 字段白名单与输入校验。
-- [ ] 输出文件追加模式、目标格式选择。
+- [x] 输出文件安全追加、目标格式选择（OpenAI/ShareGPT/Alpaca）、按行数分片。
+- [ ] SFT Export 按比例拆片与 DPO/Pretrain 直出。
 
 **执行与性能**
 
@@ -391,7 +392,7 @@
 - [部分] Simulation Tools/Rules/Script 可视化编辑器、流式 delta、速率限制/价格预设已完成；容器级隔离未做。
 - [部分] Query Source 模板与外部数据源已完成；随机/模型生成 query 未做。
 - [ ] Tool Profile MCP（stdio/HTTP）、共享工具库、鉴权。
-- [部分] Validator/LLM/SFT Export 的文件选择器与路径校验统一：SFT Export 已接入，其余仍手输路径。
+- [部分] Validator/LLM/SFT Export 的文件选择器与路径校验统一：四类失败/reject/输出路径均已接入 Browse；相对路径的存在性提示未做。
 
 **画布与 UI**
 
@@ -426,7 +427,7 @@
 | Query Source | 是 | Queries、Mode、Repeat、System Prompt | 无 |
 | Simulation | 是 | Provider、模式、模型、轮数、并发、温度、tokens、超时、重试、Endpoint、System/Final、失败样本、成本、沙箱、Tool Profile、Tools/Rules/Script | 无（容器隔离未做） |
 | Cleaner | 是 | 5 个布尔规则 + 正则规则 | 无（高级 JSONPath 未做） |
-| SFT Export | 是 | 输出路径、Browse、字段白名单与校验 | 目标格式选择、追加模式 |
+| SFT Export | 是 | 输出路径、Browse、字段白名单与样本字段选择器、追加、目标格式、按行数分片 | 比例拆片、DPO/Pretrain 直出 |
 
 ---
 
@@ -446,6 +447,7 @@
 | 17 | Bugfix1 一致性 | `.recipe` 全链路、版本单一来源与图标、打包参数、Seed/Cleaner/Validator/LLM/SFT 编辑缺口、跨格式保存、恢复哈希/指纹、文档同步 | 531 测试 + 7 gated |
 | 18 | 测试与 CI 门禁 | 单实例/命令行/打包一致性/本地化键测试、设置面板有界输入与目录选择、格式门禁、Debug/Release 矩阵、覆盖率门禁、示例漂移与发布冒烟 | 550 测试 + 7 gated |
 | 19 | 数据工作台与入口打磨 | 搜索匹配上一处/下一处、样本预览分页、最近文件清理与失效路径移除、执行输出目录打开 | 556 测试 + 7 gated |
+| 20 | SFT 导出与路径选择 | 安全追加、目标格式转换、按行数分片、样本字段选择器、失败/reject 路径 Browse | 590 用例（582 通过 + 7 gated + 1 Explicit） |
 
 ---
 

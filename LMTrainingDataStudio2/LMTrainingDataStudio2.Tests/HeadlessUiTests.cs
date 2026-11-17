@@ -152,6 +152,47 @@ public sealed class HeadlessUiTests
     }
 
     [AvaloniaTest]
+    public void SftExportPanel_RendersFormatSplitFieldSelectorAndPathPickButtons()
+    {
+        var vm = new MainWindowViewModel(new SettingsStore(Path.Combine(_directory, "settings.json")));
+        var window = new MainWindow { DataContext = vm };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        try
+        {
+            vm.AddBlockCommand.Execute(BlockType.SftExport);
+            Dispatcher.UIThread.RunJobs();
+
+            var editor = vm.SelectedBlock!.SftExportEditor!;
+            editor.LoadFields(new[] { "messages", "tools" });
+            Dispatcher.UIThread.RunJobs();
+
+            var buttonNames = window.GetVisualDescendants()
+                .OfType<Button>()
+                .Select(button => button.Name)
+                .Where(name => !string.IsNullOrEmpty(name))
+                .ToArray();
+            Assert.That(buttonNames, Does.Contain("BrowseSftSampleFieldsButton"));
+            Assert.That(buttonNames, Does.Contain("BrowseLlmFailureButton"));
+            Assert.That(buttonNames, Does.Contain("BrowseValidatorRejectButton"));
+            Assert.That(buttonNames, Does.Contain("BrowseSimulationFailureButton"));
+            Assert.That(buttonNames, Does.Contain("BrowseSamplerOutputButton"));
+
+            var fieldLabels = window.GetVisualDescendants()
+                .OfType<CheckBox>()
+                .Select(box => box.Content as string)
+                .ToArray();
+            Assert.That(fieldLabels, Does.Contain("messages"));
+            Assert.That(fieldLabels, Does.Contain("tools"));
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaTest]
     public void HighlightBehavior_RendersMatchedRuns()
     {
         var block = new TextBlock();
