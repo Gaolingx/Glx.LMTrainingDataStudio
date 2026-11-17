@@ -82,14 +82,24 @@ public sealed class DatasetEditServiceTests
     }
 
     [Test]
-    public void Save_TargetFormatDiffers_Throws()
+    public async Task Save_TargetFormatDiffers_WritesConvertedRows()
     {
         var source = CreateJsonl(2);
         var target = Path.Combine(_directory, "edited.csv");
         var session = new DatasetEditSession(2);
+        session.SetRowJson(0, """{"id":1,"text":"changed"}""");
 
-        Assert.ThrowsAsync<DatasetFormatException>(() =>
-            _service.SaveAsync(session.Snapshot(), source, DataFileType.Jsonl, target));
+        var result = await _service.SaveAsync(session.Snapshot(), source, DataFileType.Jsonl, target);
+
+        Assert.That(result.WrittenRows, Is.EqualTo(2));
+        Assert.That(File.Exists(target), Is.True);
+
+        await using var reader = new CsvDatasetReader();
+        await reader.OpenAsync(target);
+        var page = await reader.ReadPageAsync(0, 10);
+        Assert.That(page, Has.Count.EqualTo(2));
+        Assert.That(page[0].Json, Does.Contain("\"changed\""));
+        Assert.That(Directory.GetFiles(_directory, "*.tmp-*"), Is.Empty);
     }
 
     [Test]

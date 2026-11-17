@@ -237,7 +237,7 @@ public async Task RunAsync_WritesOutputDirectorySummary()
         Assert.That(Node(firstRun, expression).Status, Is.EqualTo(ExecutionStatus.Failed));
         var checkpointDirectory = Path.Combine(firstRun.OutputDirectory!, "nodes");
         Assert.That(Directory.Exists(checkpointDirectory), Is.True);
-        Assert.That(GetFiles(checkpointDirectory), Has.Length.EqualTo(1));
+        Assert.That(GetFiles(checkpointDirectory), Has.Length.EqualTo(2));
 
         expressionExecutor.Fail = false;
         var resumeRunner = new RecipeRunner(
@@ -264,6 +264,75 @@ public async Task RunAsync_WritesOutputDirectorySummary()
 
         Assert.ThrowsAsync<ArgumentException>(
             () => CreateRunner().RunAsync(recipe, resumeFrom: run));
+    }
+
+    [Test]
+    public async Task RunAsync_ResumeAfterRecipeChange_Throws()
+    {
+        var (recipe, seed, expression) = CreateTwoBlockRecipe();
+        var options = new RecipeRunOptions(
+            SpillThresholdRows: 1,
+            SpillDirectory: Path.Combine(_directory, "spill"),
+            OutputDirectory: Path.Combine(_directory, "runs"));
+        var firstRunner = new RecipeRunner(
+            new RecipeValidationService(),
+            new IBlockExecutor[]
+            {
+                new CountingRowSourceExecutor(BlockType.Seed, rows: 4),
+                new FailThenSucceedExecutor(BlockType.Expression) { Fail = true }
+            },
+            options: options);
+        var firstRun = await firstRunner.RunAsync(recipe);
+        Assert.That(firstRun.Status, Is.EqualTo(RunStatus.Failed));
+        Assert.That(Node(firstRun, seed).Status, Is.EqualTo(ExecutionStatus.Succeeded));
+        Assert.That(Node(firstRun, expression).Status, Is.EqualTo(ExecutionStatus.Failed));
+
+        recipe.Name = "changed recipe";
+        var resumeRunner = new RecipeRunner(
+            new RecipeValidationService(),
+            new IBlockExecutor[]
+            {
+                new CountingRowSourceExecutor(BlockType.Seed, rows: 4),
+                new FailThenSucceedExecutor(BlockType.Expression)
+            },
+            options: options);
+
+        Assert.ThrowsAsync<InvalidOperationException>(
+            () => resumeRunner.RunAsync(recipe, resumeFrom: firstRun));
+    }
+
+    [Test]
+    public async Task RunAsync_ResumeWithTamperedCheckpoint_RerunsBlock()
+    {
+        var (recipe, seed, _) = CreateTwoBlockRecipe();
+        var seedExecutor = new CountingRowSourceExecutor(BlockType.Seed, rows: 4);
+        var expressionExecutor = new FailThenSucceedExecutor(BlockType.Expression) { Fail = true };
+        var options = new RecipeRunOptions(
+            SpillThresholdRows: 1,
+            SpillDirectory: Path.Combine(_directory, "spill"),
+            OutputDirectory: Path.Combine(_directory, "runs"));
+        var firstRunner = new RecipeRunner(
+            new RecipeValidationService(),
+            new IBlockExecutor[] { seedExecutor, expressionExecutor },
+            options: options);
+        var firstRun = await firstRunner.RunAsync(recipe);
+
+        var checkpointDirectory = Path.Combine(firstRun.OutputDirectory!, "nodes");
+        var checkpoint = GetFiles(checkpointDirectory)
+            .Single(path => path.EndsWith(".rows", StringComparison.Ordinal));
+        await File.AppendAllTextAsync(checkpoint, "999\t{}\n");
+
+        expressionExecutor.Fail = false;
+        var resumeRunner = new RecipeRunner(
+            new RecipeValidationService(),
+            new IBlockExecutor[] { seedExecutor, expressionExecutor },
+            options: options);
+        var resumed = await resumeRunner.RunAsync(recipe, resumeFrom: firstRun);
+
+        Assert.That(resumed.Status, Is.EqualTo(RunStatus.Succeeded), string.Join('\n', resumed.Logs));
+        Assert.That(seedExecutor.Attempts, Is.EqualTo(2));
+        Assert.That(resumed.Logs.Any(log => log.Contains("failed hash verification")), Is.True);
+        Assert.That(Node(resumed, seed).Status, Is.EqualTo(ExecutionStatus.Succeeded));
     }
 
     [Test]

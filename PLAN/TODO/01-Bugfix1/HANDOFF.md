@@ -438,6 +438,7 @@
 | 2026-11-17 | Batch 1：`.recipe` 一致性 | `dotnet build -c Release`；`dotnet test -c Release --no-build` | 0 警告；522 通过 / 0 失败 / 7 跳过 | `RecipeFileExtensionsTests` |
 | 2026-11-17 | Batch 2：版本、图标、打包 | `dotnet build -c Release`；检查 Release deps.json 与 exe VersionInfo；PowerShell Parser 校验脚本 | 0 警告；FileVersion 1.0.0.0；Release 不含 Avalonia.Diagnostics；脚本语法通过 | 本文件 7.1/8.3.1 勾选 |
 | 2026-11-17 | Batch 4：节点编辑器 | `dotnet build -c Release`；`dotnet test -c Release --no-build` | 0 警告；528 通过 / 0 失败 / 7 跳过 | `NodeEditorTests`、Cleanup 共享模板 Headless 测试 |
+| 2026-11-17 | Batch 5：数据与恢复 | `dotnet build -c Release`；`dotnet test -c Release --no-build` | 0 警告；531 通过 / 0 失败 / 7 跳过 | 分页取消、跨格式保存、恢复哈希/指纹测试 |
 
 ---
 
@@ -457,7 +458,7 @@
 - [x] **[缺陷][P2] 发布包包含无用依赖**：`Avalonia.Diagnostics` 无条件引用（`LMTrainingDataStudio2.csproj:23`），代码未调用 `AttachDevTools`；建议改为 Debug 条件引用，减小发布体积。
 - [ ] **[缺陷][P2] 设置页路径输入无选择器/可写性检查**：CacheDirectory、RunOutputDirectory、RunTempDirectory 只能手输（`Views/MainWindow.axaml:398,442,448`），无 Browse 与可写性检查。
 - [ ] **[缺陷][P2] 数值设置无即时校验**：MaxCacheSizeMb、MaxParallelism、NodeRetryCount、SpillThresholdRows、GridSnapSize 均为 TextBox 直绑数值，非法输入无提示，只在 Apply 时 clamp（`ViewModels/MainWindowViewModel.cs:1345-1365`）。
-- [ ] **[缺陷][P2] 数据工作台在途分页不可取消**：`OpenDatasetAsync`/`LoadPageAsync` 使用 `CancellationToken.None`（`ViewModels/DataWorkbenchViewModel.cs:234,325`），切换/关闭文件无法取消旧分页请求。
+- [x] **[缺陷][P2] 数据工作台在途分页不可取消**：`OpenDatasetAsync`/`LoadPageAsync` 使用 `CancellationToken.None`（`ViewModels/DataWorkbenchViewModel.cs:234,325`），切换/关闭文件无法取消旧分页请求。
 - [ ] **[缺陷][P2] Recipe 校验问题无错误码**：`RecipeValidationService` 创建的 `ValidationIssue` 只有 Message/BlockId，未填 Code/Path（数据集校验已有错误码），问题列表无法稳定筛选/分组。
 
 ### 7.2 测试缺口
@@ -577,14 +578,14 @@
 
 ### 7.6 数据工作台与数据治理
 
-- [ ] **[数据/P1] 跨格式保存未支持**：编辑保存只允许源格式，`DatasetEditService.SaveAsync` 对不同目标格式直接抛 `DatasetFormatException`。
+- [x] **[数据/P1] 跨格式保存未支持**：编辑保存只允许源格式，`DatasetEditService.SaveAsync` 对不同目标格式直接抛 `DatasetFormatException`。
 - [ ] **[数据/P2] 嵌套消息/角色级表单未做**：`messages` 等结构仍以整段 JSON 文本编辑。
 - [ ] **[数据/P2] 搜索匹配项导航未做**：只有命中高亮，没有上一处/下一处。
 - [ ] **[数据/P2] 预览窗口固定 50 行**：`SamplePreviewService.DefaultMaxRows = 50`，无分页/全文搜索。
 - [ ] **[数据/P2] CSV 类型推断与列类型展示未做**。
 - [ ] **[数据/P2] 多文件/目录数据源、HuggingFace/HTTP 未做**。
 - [ ] **[数据/P2] 字节级一致仅保证 LF JSONL**：CSV/Parquet 保存会重写整表。
-- [ ] **[数据/P2] 数据工作台在途分页不可取消**：见 7.1。
+- [x] **[数据/P2] 数据工作台在途分页不可取消**：见 7.1。
 - [ ] **[数据/P2] CSV/Parquet 1M 行质量操作基线未做**：现有质量基线为 JSONL。
 - [ ] **[数据/P2] 10M 行质量/转换基线未实测**：仅提供入口。
 - [ ] **[数据/P3] Alpaca 多轮转换不丢轮次/不丢 tools**：待补齐与测试。
@@ -595,7 +596,7 @@
 
 ### 7.7 执行与恢复
 
-- [ ] **[执行/P2] 恢复未做逐字节/哈希比对**：只验证行数与内容；Round 13 验收目标中的“哈希一致”未落地。
+- [x] **[执行/P2] 恢复未做逐字节/哈希比对**：只验证行数与内容；Round 13 验收目标中的“哈希一致”未落地。
 - [ ] **[执行/P2] 溢写阈值只按行数**：无按字节阈值。
 - [ ] **[执行/P2] 检查点无磁盘配额**：失败/取消运行会保留节点输出。
 - [ ] **[执行/P2] 无并发写同一目标文件的检测**：两个节点/两次运行写同一路径时无提示。
@@ -726,8 +727,8 @@
 
 #### 8.3.2 测试缺口（174–179）
 
-- [ ] **174 [P2] 数据工作台分页取消/过期结果无测试**：`OpenDatasetAsync` / `LoadPageAsync` 使用 `CancellationToken.None`（`ViewModels/DataWorkbenchViewModel.cs:234,325`），且没有请求代际标识；切换文件时旧页可能回写新文件。需要“取消旧请求 + 忽略过期结果”的测试。
-- [ ] **175 [P2] 中断恢复未校验 Recipe/节点配置指纹**：`RehydrateCompletedNodes` 只按 block ID、输出文件存在和行数复用（`Services/RecipeRunner.cs:353-398`）；修改 Recipe 后恢复可能复用旧配置的输出。需要 recipe/config 哈希或版本指纹。
+- [x] **174 [P2] 数据工作台分页取消/过期结果无测试**：`OpenDatasetAsync` / `LoadPageAsync` 使用 `CancellationToken.None`（`ViewModels/DataWorkbenchViewModel.cs:234,325`），且没有请求代际标识；切换文件时旧页可能回写新文件。需要“取消旧请求 + 忽略过期结果”的测试。
+- [x] **175 [P2] 中断恢复未校验 Recipe/节点配置指纹**：`RehydrateCompletedNodes` 只按 block ID、输出文件存在和行数复用（`Services/RecipeRunner.cs:353-398`）；修改 Recipe 后恢复可能复用旧配置的输出。需要 recipe/config 哈希或版本指纹。
 - [ ] **176 [P2] 本地化测试不扫描硬编码英文**：现有 `LocalizationTests` 只测服务、节点目录和预设，不检查 VM/代码后置里的用户可见英文字符串（见 197）。建议增加静态/反射扫描测试。
 - [ ] **177 [P2] 设置 UI 校验无测试**：只测 `SettingsStore.Load` 的非法值回退；TextBox 非法数值、不可写目录的即时提示没有测试。
 - [ ] **178 [P3] 示例文件漂移无检查**：`ExampleRecipeTests.WriteExamples` 为 `[Explicit]`（`Tests/ExampleRecipeTests.cs:36`）；CI 不验证 `examples/` 与 `RecipePresetCatalog`/默认配置一致。

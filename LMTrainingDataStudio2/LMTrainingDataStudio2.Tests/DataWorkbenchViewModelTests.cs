@@ -282,6 +282,25 @@ public sealed class DataWorkbenchViewModelTests
         Assert.That(vm.Statistics.Summary, Does.Contain("profiled"));
     }
 
+    [Test]
+    public async Task OpeningAnotherDataset_CancelsInFlightPageLoad()
+    {
+        var slow = new SlowDatasetReader(TimeSpan.FromSeconds(5));
+        var fast = new SlowDatasetReader(TimeSpan.Zero);
+        var readers = new Queue<IDatasetReader>(new IDatasetReader[] { slow, fast });
+        var vm = new DataWorkbenchViewModel(_settings, _ => readers.Dequeue());
+
+        var first = vm.OpenDatasetAsync(Path.Combine(_directory, "slow.jsonl"));
+        await Task.Delay(50);
+        var second = vm.OpenDatasetAsync(Path.Combine(_directory, "fast.jsonl"));
+
+        await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.That(Path.GetFileName(vm.SourcePath), Is.EqualTo("fast.jsonl"));
+        Assert.That(vm.Rows, Has.Count.EqualTo(1));
+        Assert.That(vm.IsBusy, Is.False);
+    }
+
     private static async Task WaitForAsync(Func<bool> condition)
     {
         for (var attempt = 0; attempt < 200; attempt++)
@@ -305,5 +324,38 @@ public sealed class DataWorkbenchViewModelTests
             : $$"""{"id":{{id}},"text":"row-{{id}}"}""");
         File.WriteAllLines(path, lines);
         return path;
+    }
+
+    private sealed class SlowDatasetReader : IDatasetReader
+    {
+        private readonly TimeSpan _delay;
+
+        public SlowDatasetReader(TimeSpan delay)
+        {
+            _delay = delay;
+        }
+
+        public string SourcePath { get; private set; } = string.Empty;
+
+        public DataFileType FileType => DataFileType.Jsonl;
+
+        public long TotalRows => 1;
+
+        public Task OpenAsync(string path, CancellationToken cancellationToken = default)
+        {
+            SourcePath = path;
+            return Task.CompletedTask;
+        }
+
+        public async Task<IReadOnlyList<DatasetRow>> ReadPageAsync(
+            long startRow,
+            int count,
+            CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(_delay, cancellationToken);
+            return new[] { new DatasetRow(0, """{"id":1}""") };
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }

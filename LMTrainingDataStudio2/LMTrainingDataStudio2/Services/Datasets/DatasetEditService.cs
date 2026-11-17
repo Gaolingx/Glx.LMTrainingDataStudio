@@ -127,11 +127,6 @@ public sealed class DatasetEditService
         ArgumentOutOfRangeException.ThrowIfLessThan(chunkRows, 1);
 
         var targetType = DatasetIO.DetectFileType(targetPath);
-        if (targetType != sourceType)
-        {
-            throw new DatasetFormatException(
-                $"Edited saves keep the source format ({sourceType}); convert the dataset first to write {targetType}.");
-        }
 
         ValidateSnapshot(snapshot, long.MaxValue);
 

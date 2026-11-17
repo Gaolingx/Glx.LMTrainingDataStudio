@@ -20,6 +20,8 @@ public sealed class RecipeRunner
 {
     private const string NodeOutputDirectoryName = "nodes";
     private const string NodeOutputExtension = ".rows";
+    private const string CheckpointHashExtension = ".sha256";
+    private const string RecipeFingerprintFileName = "recipe.fingerprint";
     private const char PortKeySeparator = '\u001f';
 
     private readonly RecipeValidationService _validation;
@@ -66,11 +68,13 @@ public sealed class RecipeRunner
             run.Status = RunStatus.Running;
             run.FinishedAt = null;
             EnsureOutputDirectory(run);
+            VerifyRecipeFingerprint(run, recipe);
             Log(run, $"Resuming run {run.RunId} for recipe '{recipe.Name}'.");
         }
         else
         {
             PrepareOutputDirectory(run);
+            WriteRecipeFingerprint(run, recipe);
             Log(run, $"Run {run.RunId} started for recipe '{recipe.Name}'.");
         }
 
@@ -364,11 +368,12 @@ public sealed class RecipeRunner
                     port => port,
                     port => GetNodeOutputPath(run.OutputDirectory, block, port));
 
-            if (result.Status == ExecutionStatus.Succeeded &&
-                paths is not null &&
-                (paths.Count == 0 || paths.Values.All(File.Exists)))
+            var checkpointValid = paths is not null &&
+                                  (paths.Count == 0 || paths.Values.All(HasValidCheckpoint));
+
+            if (result.Status == ExecutionStatus.Succeeded && paths is not null && checkpointValid)
             {
-                foreach (var (port, path) in paths!)
+                foreach (var (port, path) in paths)
                 {
                     outputs[GetOutputKey(block.Id, port)] =
                         RowSpillBuffer.FromFile(path, CountLines(path));
@@ -379,6 +384,13 @@ public sealed class RecipeRunner
                 state.ProcessedRows += result.OutputRows;
                 checkpointCount++;
                 continue;
+            }
+
+            if (result.Status == ExecutionStatus.Succeeded && paths is not null && !checkpointValid)
+            {
+                Log(run,
+                    $"[Warning] Checkpoint for block '{block.Name}' is missing or failed hash verification; " +
+                    "the block will run again.");
             }
 
             result.Status = ExecutionStatus.Pending;
@@ -430,6 +442,7 @@ public sealed class RecipeRunner
                 }
 
                 File.Move(tempPath, path, overwrite: true);
+                await WriteCheckpointHashAsync(path, cancellationToken);
                 completed = true;
             }
             catch (OperationCanceledException)
@@ -593,6 +606,99 @@ public sealed class RecipeRunner
         }
 
         return count;
+    }
+
+    private static async Task WriteCheckpointHashAsync(string path, CancellationToken cancellationToken)
+    {
+        await using var stream = new FileStream(
+            path, FileMode.Open, FileAccess.Read, FileShare.Read, 64 * 1024,
+            FileOptions.Asynchronous | FileOptions.SequentialScan);
+        var hash = await SHA256.HashDataAsync(stream, cancellationToken);
+
+        var hashPath = path + CheckpointHashExtension;
+        var tempHashPath = hashPath + ".tmp";
+        try
+        {
+            await File.WriteAllTextAsync(tempHashPath, Convert.ToHexString(hash), cancellationToken);
+            File.Move(tempHashPath, hashPath, overwrite: true);
+        }
+        catch
+        {
+            TryDeleteFile(tempHashPath);
+            throw;
+        }
+    }
+
+    private static bool HasValidCheckpoint(string path)
+    {
+        var hashPath = path + CheckpointHashExtension;
+        if (!File.Exists(path) || !File.Exists(hashPath))
+        {
+            return false;
+        }
+
+        try
+        {
+            var expected = File.ReadAllText(hashPath).Trim();
+            using var stream = File.OpenRead(path);
+            var actual = Convert.ToHexString(SHA256.HashData(stream));
+            return expected.Length > 0 &&
+                   string.Equals(expected, actual, StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    private static string ComputeRecipeFingerprint(Recipe recipe) =>
+        Convert.ToHexString(SHA256.HashData(
+            JsonSerializer.SerializeToUtf8Bytes(recipe, RecipeStore.SerializerOptions)));
+
+    private void WriteRecipeFingerprint(ExecutionRun run, Recipe recipe)
+    {
+        if (run.OutputDirectory is null) return;
+
+        var path = Path.Combine(run.OutputDirectory, RecipeFingerprintFileName);
+        var tempPath = path + ".tmp";
+        try
+        {
+            File.WriteAllText(tempPath, ComputeRecipeFingerprint(recipe));
+            File.Move(tempPath, path, overwrite: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            TryDeleteFile(tempPath);
+            Log(run, $"[Warning] Could not persist the recipe fingerprint: {ex.Message}");
+        }
+    }
+
+    private static void VerifyRecipeFingerprint(ExecutionRun run, Recipe recipe)
+    {
+        if (run.OutputDirectory is null) return;
+
+        var path = Path.Combine(run.OutputDirectory, RecipeFingerprintFileName);
+        if (!File.Exists(path))
+        {
+            throw new InvalidOperationException(
+                "The run has no recipe fingerprint; start a new run instead of resuming.");
+        }
+
+        string expected;
+        try
+        {
+            expected = File.ReadAllText(path).Trim();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new InvalidOperationException($"Could not read the recipe fingerprint: {ex.Message}", ex);
+        }
+
+        if (!string.Equals(expected, ComputeRecipeFingerprint(recipe), StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "The recipe changed since this run was checkpointed; start a new run instead of resuming.");
+        }
     }
 
     private void CleanupPersistedNodeOutputs(ExecutionRun run)

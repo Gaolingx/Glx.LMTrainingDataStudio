@@ -26,12 +26,15 @@ public partial class DataWorkbenchViewModel : ObservableObject
     };
 
     private readonly DatasetBatchConverter _converter;
+    private readonly Func<DataFileType, IDatasetReader> _readerFactory;
     private DatasetEditService _editService;
     private AppSettings _settings;
     private IDatasetReader? _reader;
     private DataFileType _sourceFileType;
     private CancellationTokenSource? _conversionCancellation;
+    private CancellationTokenSource? _loadCancellation;
     private int _pageLoadVersion;
+    private int _openVersion;
     private bool _targetPathIsSuggested = true;
     private bool _updatingTargetPath;
     private DatasetEditSession? _editSession;
@@ -169,8 +172,16 @@ public partial class DataWorkbenchViewModel : ObservableObject
     }
 
     public DataWorkbenchViewModel(AppSettings settings)
+        : this(settings, fileType => DatasetIO.CreateReader(fileType, settings))
+    {
+    }
+
+    internal DataWorkbenchViewModel(
+        AppSettings settings,
+        Func<DataFileType, IDatasetReader> readerFactory)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+        _readerFactory = readerFactory ?? throw new ArgumentNullException(nameof(readerFactory));
         _converter = new DatasetBatchConverter(settings);
         _editService = new DatasetEditService(settings);
 
@@ -216,27 +227,39 @@ public partial class DataWorkbenchViewModel : ObservableObject
     /// </summary>
     public async Task OpenDatasetAsync(string path)
     {
-        if (IsBusy) return;
-
         if (IsConverting)
         {
             StatusText = "Cancel the running conversion before opening another dataset.";
             return;
         }
 
+        var openVersion = ++_openVersion;
+        var cancellation = BeginLoad();
         IsBusy = true;
         StatusText = "Opening dataset...";
         IDatasetReader? reader = null;
         try
         {
             var fileType = DatasetIO.DetectFileType(path);
-            reader = DatasetIO.CreateReader(fileType, _settings);
-            await reader.OpenAsync(path, CancellationToken.None);
+            reader = _readerFactory(fileType);
+            await reader.OpenAsync(path, cancellation.Token);
+
+            if (openVersion != _openVersion || cancellation.IsCancellationRequested)
+            {
+                await reader.DisposeAsync();
+                return;
+            }
 
             var openedPath = reader.SourcePath;
             var openedRows = reader.TotalRows;
 
-            await CloseReaderAsync();
+            await CloseReaderAsync(cancelLoad: false);
+            if (openVersion != _openVersion || cancellation.IsCancellationRequested)
+            {
+                await reader.DisposeAsync();
+                return;
+            }
+
             _reader = reader;
             reader = null;
             _sourceFileType = fileType;
@@ -259,8 +282,18 @@ public partial class DataWorkbenchViewModel : ObservableObject
             Transform.SetSource(openedPath, fileType);
             Statistics.SetSource(openedPath, fileType);
 
-            await LoadPageAsync(1);
-            StatusText = $"Opened '{openedPath}' ({openedRows:N0} rows).";
+            await LoadPageCoreAsync(1, _pageLoadVersion, cancellation.Token);
+            if (openVersion == _openVersion)
+            {
+                StatusText = $"Opened '{openedPath}' ({openedRows:N0} rows).";
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            if (reader is not null)
+            {
+                await reader.DisposeAsync();
+            }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -269,11 +302,18 @@ public partial class DataWorkbenchViewModel : ObservableObject
                 await reader.DisposeAsync();
             }
 
-            StatusText = $"Open failed: {ex.Message}";
+            if (openVersion == _openVersion)
+            {
+                StatusText = $"Open failed: {ex.Message}";
+            }
         }
         finally
         {
-            IsBusy = false;
+            EndLoad(cancellation);
+            if (openVersion == _openVersion)
+            {
+                IsBusy = false;
+            }
         }
     }
 
@@ -314,7 +354,21 @@ public partial class DataWorkbenchViewModel : ObservableObject
     {
         if (_reader is null) return;
 
-        var version = ++_pageLoadVersion;
+        var cancellation = BeginLoad();
+        try
+        {
+            await LoadPageCoreAsync(page, _pageLoadVersion, cancellation.Token);
+        }
+        finally
+        {
+            EndLoad(cancellation);
+        }
+    }
+
+    private async Task LoadPageCoreAsync(long page, int version, CancellationToken cancellationToken)
+    {
+        if (_reader is null) return;
+
         var previousAnchor = SelectedRow?.OriginalIndex;
         var previousInsertId = SelectedRow?.InsertId;
         try
@@ -322,7 +376,7 @@ public partial class DataWorkbenchViewModel : ObservableObject
             var totalPages = TotalPages;
             page = Math.Clamp(page, 1, totalPages);
             var startRow = (page - 1) * PageSize;
-            var pageRows = await _reader.ReadPageAsync(startRow, PageSize, CancellationToken.None);
+            var pageRows = await _reader.ReadPageAsync(startRow, PageSize, cancellationToken);
 
             if (version != _pageLoadVersion)
             {
@@ -365,6 +419,13 @@ public partial class DataWorkbenchViewModel : ObservableObject
             StatusText = TotalRows == 0
                 ? "The dataset is empty."
                 : $"Rows {startRow + 1:N0}-{lastRow:N0} of {TotalRows:N0}.";
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (ObjectDisposedException)
+        {
+            // The reader was replaced while this page request was in flight.
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -993,12 +1054,44 @@ public partial class DataWorkbenchViewModel : ObservableObject
         }
     }
 
-    private async Task CloseReaderAsync()
+    private async Task CloseReaderAsync(bool cancelLoad = true)
     {
+        if (cancelLoad)
+        {
+            CancelLoad();
+        }
+
         if (_reader is null) return;
 
         await _reader.DisposeAsync();
         _reader = null;
+    }
+
+    private CancellationTokenSource BeginLoad()
+    {
+        _loadCancellation?.Cancel();
+        _loadCancellation?.Dispose();
+        _pageLoadVersion++;
+
+        var cancellation = new CancellationTokenSource();
+        _loadCancellation = cancellation;
+        return cancellation;
+    }
+
+    private void EndLoad(CancellationTokenSource cancellation)
+    {
+        if (!ReferenceEquals(_loadCancellation, cancellation)) return;
+
+        _loadCancellation = null;
+        cancellation.Dispose();
+    }
+
+    private void CancelLoad()
+    {
+        _loadCancellation?.Cancel();
+        _loadCancellation?.Dispose();
+        _loadCancellation = null;
+        _pageLoadVersion++;
     }
 
     partial void OnPageSizeChanged(int value)
