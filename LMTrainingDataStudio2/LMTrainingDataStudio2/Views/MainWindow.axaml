@@ -392,10 +392,22 @@
 
                                 <Grid ColumnDefinitions="180,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="12">
                                     <TextBlock Grid.Row="0" Grid.Column="0" Text="{loc:Loc main.max_cache_size_mb}" VerticalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}" />
-                                    <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding MaxCacheSizeMb, Mode=TwoWay}" Watermark="512" />
+                                    <NumericUpDown Grid.Row="0" Grid.Column="1"
+                                                   x:Name="MaxCacheSizeInput"
+                                                   Value="{Binding MaxCacheSizeMb, Mode=TwoWay}"
+                                                   Minimum="16" Maximum="1000000" Increment="16"
+                                                   FormatString="0" />
 
                                     <TextBlock Grid.Row="1" Grid.Column="0" Text="{loc:Loc main.cache_directory}" VerticalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}" />
-                                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding CacheDirectory, Mode=TwoWay}" Watermark="tmp/index-cache" />
+                                    <Grid Grid.Row="1" Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                        <TextBox Grid.Column="0" Text="{Binding CacheDirectory, Mode=TwoWay}" Watermark="tmp/index-cache" />
+                                        <Button Grid.Column="1" x:Name="BrowseCacheDirectoryButton"
+                                                Content="{loc:Loc property.browse}"
+                                                Click="OnBrowseCacheDirectoryClick"
+                                                Padding="10,5"
+                                                Background="{DynamicResource ButtonSurfaceBrush}"
+                                                Foreground="{DynamicResource TextBrightBrush}" />
+                                    </Grid>
 
                                     <TextBlock Grid.Row="2" Grid.Column="0" Text="{loc:Loc main.current_cache_size}" VerticalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}" />
                                     <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="10">
@@ -433,19 +445,47 @@
                                 <TextBlock Text="{loc:Loc main.execution}" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextBrightBrush}" />
                                 <Grid ColumnDefinitions="180,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="12">
                                     <TextBlock Grid.Row="0" Grid.Column="0" Text="{loc:Loc main.layer_parallelism}" VerticalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}" />
-                                    <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding MaxParallelism, Mode=TwoWay}" Watermark="4" />
+                                    <NumericUpDown Grid.Row="0" Grid.Column="1"
+                                                   x:Name="MaxParallelismInput"
+                                                   Value="{Binding MaxParallelism, Mode=TwoWay}"
+                                                   Minimum="1" Maximum="64" Increment="1"
+                                                   FormatString="0" />
 
                                     <TextBlock Grid.Row="1" Grid.Column="0" Text="{loc:Loc main.node_retries}" VerticalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}" />
-                                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding NodeRetryCount, Mode=TwoWay}" Watermark="0" />
+                                    <NumericUpDown Grid.Row="1" Grid.Column="1"
+                                                   x:Name="NodeRetryCountInput"
+                                                   Value="{Binding NodeRetryCount, Mode=TwoWay}"
+                                                   Minimum="0" Maximum="10" Increment="1"
+                                                   FormatString="0" />
 
                                     <TextBlock Grid.Row="2" Grid.Column="0" Text="{loc:Loc main.run_summary_directory}" VerticalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}" />
-                                    <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding RunOutputDirectory, Mode=TwoWay}" Watermark="%TEMP%\LMTrainingDataStudio\runs" />
+                                    <Grid Grid.Row="2" Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                        <TextBox Grid.Column="0" Text="{Binding RunOutputDirectory, Mode=TwoWay}" Watermark="%TEMP%\LMTrainingDataStudio\runs" />
+                                        <Button Grid.Column="1" x:Name="BrowseRunOutputDirectoryButton"
+                                                Content="{loc:Loc property.browse}"
+                                                Click="OnBrowseRunOutputDirectoryClick"
+                                                Padding="10,5"
+                                                Background="{DynamicResource ButtonSurfaceBrush}"
+                                                Foreground="{DynamicResource TextBrightBrush}" />
+                                    </Grid>
 
                                     <TextBlock Grid.Row="3" Grid.Column="0" Text="{loc:Loc main.spill_threshold_rows}" VerticalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}" />
-                                    <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding SpillThresholdRows, Mode=TwoWay}" Watermark="10000" />
+                                    <NumericUpDown Grid.Row="3" Grid.Column="1"
+                                                   x:Name="SpillThresholdInput"
+                                                   Value="{Binding SpillThresholdRows, Mode=TwoWay}"
+                                                   Minimum="0" Maximum="10000000" Increment="1000"
+                                                   FormatString="0" />
 
                                     <TextBlock Grid.Row="4" Grid.Column="0" Text="{loc:Loc main.run_temp_directory}" VerticalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}" />
-                                    <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding RunTempDirectory, Mode=TwoWay}" Watermark="%TEMP%\LMTrainingDataStudio\run-temp" />
+                                    <Grid Grid.Row="4" Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                        <TextBox Grid.Column="0" Text="{Binding RunTempDirectory, Mode=TwoWay}" Watermark="%TEMP%\LMTrainingDataStudio\run-temp" />
+                                        <Button Grid.Column="1" x:Name="BrowseRunTempDirectoryButton"
+                                                Content="{loc:Loc property.browse}"
+                                                Click="OnBrowseRunTempDirectoryClick"
+                                                Padding="10,5"
+                                                Background="{DynamicResource ButtonSurfaceBrush}"
+                                                Foreground="{DynamicResource TextBrightBrush}" />
+                                    </Grid>
                                 </Grid>
                             </StackPanel>
                         </Border>
@@ -458,7 +498,11 @@
                                     <CheckBox Grid.Row="0" Grid.Column="1" IsChecked="{Binding EnableGridSnap, Mode=TwoWay}" />
 
                                     <TextBlock Grid.Row="1" Grid.Column="0" Text="{loc:Loc main.grid_snap_size_px}" VerticalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}" />
-                                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding GridSnapSize, Mode=TwoWay}" Watermark="16" />
+                                    <NumericUpDown Grid.Row="1" Grid.Column="1"
+                                                   x:Name="GridSnapSizeInput"
+                                                   Value="{Binding GridSnapSize, Mode=TwoWay}"
+                                                   Minimum="1" Maximum="256" Increment="1"
+                                                   FormatString="0" />
                                 </Grid>
                             </StackPanel>
                         </Border>
@@ -486,6 +530,13 @@
                                 <CheckBox Grid.Column="1" IsChecked="{Binding IsDarkTheme, Mode=TwoWay}" />
                             </Grid>
                         </Border>
+
+                        <TextBlock Text="{Binding SettingsValidationMessage}"
+                                   IsVisible="{Binding HasSettingsValidationMessage}"
+                                   Foreground="{DynamicResource DangerBrush}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   HorizontalAlignment="Right" />
 
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
                             <Button Content="{loc:Loc common.cancel}"

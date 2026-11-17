@@ -269,11 +269,11 @@ public sealed class ExecutorTests
         RecipeBlock block,
         IEnumerable<DatasetRow>? input = null,
         List<string>? logs = null) => new()
-    {
-        Block = block,
-        Input = input is null ? null : ToAsync(input),
-        Log = message => logs?.Add(message)
-    };
+        {
+            Block = block,
+            Input = input is null ? null : ToAsync(input),
+            Log = message => logs?.Add(message)
+        };
 
     private static async IAsyncEnumerable<DatasetRow> ToAsync(IEnumerable<DatasetRow> rows)
     {

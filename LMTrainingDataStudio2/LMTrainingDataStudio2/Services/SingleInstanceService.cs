@@ -9,10 +9,10 @@ namespace LMTrainingDataStudio2.Services;
 /// </summary>
 public sealed class SingleInstanceService : IDisposable
 {
-    private const string MutexName = @"Local\LMTrainingDataStudio2.SingleInstance";
+    public const string DefaultInstanceName = "LMTrainingDataStudio2";
 
-    private static readonly string PipeName =
-        "LMTrainingDataStudio2.Open." + Sanitize(Environment.UserName);
+    private static readonly string DefaultPipeName =
+        BuildPipeName(DefaultInstanceName);
 
     private readonly Mutex _mutex;
     private readonly CancellationTokenSource _cancellation = new();
@@ -20,8 +20,15 @@ public sealed class SingleInstanceService : IDisposable
     private Task? _serverTask;
 
     public SingleInstanceService()
+        : this(null)
     {
-        _mutex = new Mutex(initiallyOwned: false, MutexName, out var createdNew);
+    }
+
+    internal SingleInstanceService(string? instanceName)
+    {
+        var mutexName = $@"Local\{Sanitize(instanceName ?? DefaultInstanceName)}.SingleInstance";
+        PipeName = instanceName is null ? DefaultPipeName : BuildPipeName(instanceName);
+        _mutex = new Mutex(initiallyOwned: false, mutexName, out var createdNew);
         if (createdNew)
         {
             _ownsMutex = _mutex.WaitOne(TimeSpan.Zero);
@@ -44,6 +51,8 @@ public sealed class SingleInstanceService : IDisposable
 
     public bool IsFirstInstance { get; }
 
+    internal string PipeName { get; }
+
     /// <summary>
     /// Starts listening for recipe paths from later launches.
     /// </summary>
@@ -51,18 +60,21 @@ public sealed class SingleInstanceService : IDisposable
     {
         if (!IsFirstInstance || _serverTask is not null) return;
 
-        _serverTask = Task.Run(() => RunServerAsync(onRecipeRequested, _cancellation.Token));
+        _serverTask = Task.Run(() => RunServerAsync(PipeName, onRecipeRequested, _cancellation.Token));
     }
 
     /// <summary>
     /// Sends a recipe path to the primary instance. Returns false when it is not reachable.
     /// </summary>
-    public static bool TrySendToPrimary(string recipePath)
+    public static bool TrySendToPrimary(string recipePath) =>
+        TrySendToPrimary(recipePath, DefaultPipeName, TimeSpan.FromMilliseconds(2000));
+
+    internal static bool TrySendToPrimary(string recipePath, string pipeName, TimeSpan timeout)
     {
         try
         {
-            using var client = new NamedPipeClientStream(".", PipeName, PipeDirection.Out);
-            client.Connect(2000);
+            using var client = new NamedPipeClientStream(".", pipeName, PipeDirection.Out);
+            client.Connect((int)timeout.TotalMilliseconds);
             using var writer = new StreamWriter(client, new UTF8Encoding(false));
             writer.WriteLine(recipePath);
             writer.Flush();
@@ -74,14 +86,20 @@ public sealed class SingleInstanceService : IDisposable
         }
     }
 
-    private static async Task RunServerAsync(Action<string> onRecipeRequested, CancellationToken cancellationToken)
+    private static string BuildPipeName(string instanceName) =>
+        Sanitize(instanceName) + ".Open." + Sanitize(Environment.UserName);
+
+    private static async Task RunServerAsync(
+        string pipeName,
+        Action<string> onRecipeRequested,
+        CancellationToken cancellationToken)
     {
         while (!cancellationToken.IsCancellationRequested)
         {
             try
             {
                 await using var server = new NamedPipeServerStream(
-                    PipeName,
+                    pipeName,
                     PipeDirection.In,
                     1,
                     PipeTransmissionMode.Byte,

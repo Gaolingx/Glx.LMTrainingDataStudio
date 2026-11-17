@@ -256,38 +256,38 @@ public sealed class ValidatorBlockExecutor : IBlockExecutor
                 return (schemaFailure is null, schemaFailure);
 
             case RuleKind.Regex:
-            {
-                try
                 {
-                    var matched = rule.Regex!.IsMatch(row.Json);
-                    return (matched, matched ? null : $"Row did not match /{rule.Source.Rule}/.");
+                    try
+                    {
+                        var matched = rule.Regex!.IsMatch(row.Json);
+                        return (matched, matched ? null : $"Row did not match /{rule.Source.Rule}/.");
+                    }
+                    catch (RegexMatchTimeoutException)
+                    {
+                        return (false, "Regular expression rule timed out.");
+                    }
                 }
-                catch (RegexMatchTimeoutException)
-                {
-                    return (false, "Regular expression rule timed out.");
-                }
-            }
 
             case RuleKind.Expression:
-            {
-                var matched = PredicateRuleEvaluator.Evaluate(rule.Source.Rule, root!.Value);
-                return (matched, matched ? null : "Expression rule did not match.");
-            }
+                {
+                    var matched = PredicateRuleEvaluator.Evaluate(rule.Source.Rule, root!.Value);
+                    return (matched, matched ? null : "Expression rule did not match.");
+                }
 
             case RuleKind.Script:
-            {
-                try
                 {
-                    var matched = _scriptEvaluator is not null
-                        ? await _scriptEvaluator(rule.Source.Rule, root!.Value, ct)
-                        : await RenderScriptAsync(rule.Source.Rule, root!.Value);
-                    return (matched, matched ? null : "Script rule rendered false.");
+                    try
+                    {
+                        var matched = _scriptEvaluator is not null
+                            ? await _scriptEvaluator(rule.Source.Rule, root!.Value, ct)
+                            : await RenderScriptAsync(rule.Source.Rule, root!.Value);
+                        return (matched, matched ? null : "Script rule rendered false.");
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        return (false, $"Script rule failed: {ex.Message}");
+                    }
                 }
-                catch (InvalidOperationException ex)
-                {
-                    return (false, $"Script rule failed: {ex.Message}");
-                }
-            }
 
             default:
                 return (false, $"Unsupported validator rule kind '{rule.Source.Kind}'.");

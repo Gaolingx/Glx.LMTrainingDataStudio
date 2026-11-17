@@ -23,6 +23,7 @@
   "dialog.action.open_recent_recipe": "Open Recent Recipe",
   "dialog.picker.open_recipe": "Open Recipe",
   "dialog.picker.save_recipe": "Save Recipe",
+  "dialog.picker.choose_directory": "Choose folder",
   "dialog.file_type.recipe_json": "Recipe files",
   "dialog.no_recent_files": "No recent files",
   "data.position_format": "Page {0:N0} / {1:N0}",

@@ -1,7 +1,7 @@
+using System.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LMTrainingDataStudio2.Localization;
 using LMTrainingDataStudio2.Models;
-using System.ComponentModel;
 
 namespace LMTrainingDataStudio2.ViewModels;
 

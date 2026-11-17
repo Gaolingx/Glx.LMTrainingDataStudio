@@ -1,5 +1,5 @@
-using Avalonia;
 using System;
+using Avalonia;
 using LMTrainingDataStudio2.Services;
 
 namespace LMTrainingDataStudio2;
@@ -27,7 +27,7 @@ internal sealed class Program
             e.SetObserved();
         };
 
-        var recipePaths = Array.FindAll(args, RecipeFileExtensions.IsRecipePath);
+        var recipePaths = RecipeFileExtensions.FilterRecipePaths(args);
         var recipePath = recipePaths.Length > 0 ? recipePaths[0] : null;
 
         using var singleInstance = new SingleInstanceService();

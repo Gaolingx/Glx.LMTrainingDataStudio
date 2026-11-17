@@ -151,11 +151,11 @@ public sealed class ValidatorSchemaAndRejectTests
         RecipeBlock block,
         IEnumerable<DatasetRow> input,
         List<string>? logs = null) => new()
-    {
-        Block = block,
-        Input = ToAsync(input),
-        Log = message => logs?.Add(message)
-    };
+        {
+            Block = block,
+            Input = ToAsync(input),
+            Log = message => logs?.Add(message)
+        };
 
     private static async IAsyncEnumerable<DatasetRow> ToAsync(IEnumerable<DatasetRow> rows)
     {

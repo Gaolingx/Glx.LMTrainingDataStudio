@@ -237,12 +237,12 @@ public sealed class ToolProfileReuseTests
         IEnumerable<DatasetRow> input,
         ToolProfile? profile,
         List<string>? logs = null) => new()
-    {
-        Block = block,
-        Input = ToAsync(input),
-        Log = message => logs?.Add(message),
-        ToolProfile = profile
-    };
+        {
+            Block = block,
+            Input = ToAsync(input),
+            Log = message => logs?.Add(message),
+            ToolProfile = profile
+        };
 
     private static async IAsyncEnumerable<DatasetRow> ToAsync(IEnumerable<DatasetRow> rows)
     {

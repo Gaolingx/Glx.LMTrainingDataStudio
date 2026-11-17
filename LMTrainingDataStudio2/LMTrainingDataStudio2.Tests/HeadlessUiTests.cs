@@ -239,4 +239,49 @@ public sealed class HeadlessUiTests
             window.Close();
         }
     }
+
+    [AvaloniaTest]
+    public void SettingsPanel_UsesBoundedInputsAndDirectoryBrowsers()
+    {
+        var vm = new MainWindowViewModel(new SettingsStore(Path.Combine(_directory, "settings.json")));
+        vm.OpenSettingsCommand.Execute(null);
+        var window = new MainWindow { DataContext = vm };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        try
+        {
+            var parallelism = window.FindControl<NumericUpDown>("MaxParallelismInput");
+            var retries = window.FindControl<NumericUpDown>("NodeRetryCountInput");
+            var spill = window.FindControl<NumericUpDown>("SpillThresholdInput");
+            var snap = window.FindControl<NumericUpDown>("GridSnapSizeInput");
+            var cacheSize = window.FindControl<NumericUpDown>("MaxCacheSizeInput");
+
+            Assert.That(parallelism, Is.Not.Null);
+            Assert.That(parallelism!.Minimum, Is.EqualTo(SettingsStore.MinParallelism));
+            Assert.That(parallelism.Maximum, Is.EqualTo(SettingsStore.MaxParallelism));
+
+            Assert.That(retries, Is.Not.Null);
+            Assert.That(retries!.Minimum, Is.EqualTo(0));
+            Assert.That(retries.Maximum, Is.EqualTo(SettingsStore.MaxNodeRetries));
+
+            Assert.That(spill, Is.Not.Null);
+            Assert.That(spill!.Maximum, Is.EqualTo(SettingsStore.MaxSpillThresholdRows));
+
+            Assert.That(snap, Is.Not.Null);
+            Assert.That(snap!.Minimum, Is.EqualTo(SettingsStore.MinGridSnapSize));
+            Assert.That(snap.Maximum, Is.EqualTo(SettingsStore.MaxGridSnapSize));
+
+            Assert.That(cacheSize, Is.Not.Null);
+            Assert.That(cacheSize!.Minimum, Is.EqualTo(SettingsStore.MinCacheSizeMb));
+
+            Assert.That(window.FindControl<Button>("BrowseCacheDirectoryButton"), Is.Not.Null);
+            Assert.That(window.FindControl<Button>("BrowseRunOutputDirectoryButton"), Is.Not.Null);
+            Assert.That(window.FindControl<Button>("BrowseRunTempDirectoryButton"), Is.Not.Null);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
 }

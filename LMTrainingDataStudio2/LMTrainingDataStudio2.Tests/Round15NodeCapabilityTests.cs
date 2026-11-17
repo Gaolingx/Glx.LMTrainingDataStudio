@@ -577,27 +577,27 @@ public sealed class Round15NodeCapabilityTests
 
     private static RecipeBlock CreateRecipeBlock(
         string id, BlockType type, string name, BlockConfig config) => new()
-    {
-        Id = id,
-        Type = type,
-        Name = name,
-        DisplayName = name,
-        Config = config,
-        InputPorts = BlockPortSchema.CreateInputPorts(type),
-        OutputPorts = BlockPortSchema.CreateOutputPorts(type, config)
-    };
+        {
+            Id = id,
+            Type = type,
+            Name = name,
+            DisplayName = name,
+            Config = config,
+            InputPorts = BlockPortSchema.CreateInputPorts(type),
+            OutputPorts = BlockPortSchema.CreateOutputPorts(type, config)
+        };
 
     private static BlockExecutionContext CreateContext(
         RecipeBlock block,
         IEnumerable<DatasetRow> input,
         List<string>? logs = null,
         IReadOnlySet<string>? connectedPorts = null) => new()
-    {
-        Block = block,
-        Input = ToAsync(input),
-        Log = message => logs?.Add(message),
-        ConnectedOutputPorts = connectedPorts
-    };
+        {
+            Block = block,
+            Input = ToAsync(input),
+            Log = message => logs?.Add(message),
+            ConnectedOutputPorts = connectedPorts
+        };
 
     private static async IAsyncEnumerable<DatasetRow> ToAsync(IEnumerable<DatasetRow> rows)
     {

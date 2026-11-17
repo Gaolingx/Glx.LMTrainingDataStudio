@@ -148,12 +148,12 @@ public sealed class PipelinePerformanceTests
 
     private static RecipeEdge Edge(
         string sourcePort, string targetPort, RecipeBlock source, RecipeBlock target) => new()
-    {
-        SourceBlockId = source.Id,
-        SourcePortId = sourcePort,
-        TargetBlockId = target.Id,
-        TargetPortId = targetPort
-    };
+        {
+            SourceBlockId = source.Id,
+            SourcePortId = sourcePort,
+            TargetBlockId = target.Id,
+            TargetPortId = targetPort
+        };
 
     private static async Task GenerateAsync(string path, int rows)
     {

@@ -141,11 +141,11 @@ public sealed class ConnectionRulesTests
         BlockPort sourcePort,
         RecipeBlock target,
         BlockPort targetPort) => new()
-    {
-        Id = id,
-        SourceBlockId = source.Id,
-        SourcePortId = sourcePort.Id,
-        TargetBlockId = target.Id,
-        TargetPortId = targetPort.Id
-    };
+        {
+            Id = id,
+            SourceBlockId = source.Id,
+            SourcePortId = sourcePort.Id,
+            TargetBlockId = target.Id,
+            TargetPortId = targetPort.Id
+        };
 }

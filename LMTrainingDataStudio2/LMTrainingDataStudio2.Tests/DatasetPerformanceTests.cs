@@ -281,112 +281,112 @@ public sealed class DatasetPerformanceTests
     }
 
     [Test]
-public async Task QualityOperations_LargeInput_StayBoundedAndConserveRows()
-{
-    if (Environment.GetEnvironmentVariable("LMTDS_PERF_TESTS") != "1")
+    public async Task QualityOperations_LargeInput_StayBoundedAndConserveRows()
     {
-        Assert.Ignore("Set LMTDS_PERF_TESTS=1 to run the quality-operation baseline.");
-        return;
-    }
-
-    var rows = int.TryParse(Environment.GetEnvironmentVariable("LMTDS_PERF_ROWS"), out var configured)
-        ? Math.Clamp(configured, 10_000, 20_000_000)
-        : 1_000_000;
-    const int rowBytes = 256;
-
-    var directory = Path.Combine(Path.GetTempPath(), "lmtds-perf-quality", Guid.NewGuid().ToString("N"));
-    Directory.CreateDirectory(directory);
-
-    try
-    {
-        var sourcePath = Path.Combine(directory, "quality.jsonl");
-        var splitDirectory = Path.Combine(directory, "splits");
-
-        var generate = Stopwatch.StartNew();
-        GenerateDuplicates(sourcePath, rows, rowBytes);
-        generate.Stop();
-
-        var settings = new AppSettings
+        if (Environment.GetEnvironmentVariable("LMTDS_PERF_TESTS") != "1")
         {
-            CacheDirectory = Path.Combine(directory, "cache"),
-            MaxCacheSizeMb = 512
-        };
+            Assert.Ignore("Set LMTDS_PERF_TESTS=1 to run the quality-operation baseline.");
+            return;
+        }
 
-        var memoryBefore = GC.GetTotalMemory(forceFullCollection: true);
+        var rows = int.TryParse(Environment.GetEnvironmentVariable("LMTDS_PERF_ROWS"), out var configured)
+            ? Math.Clamp(configured, 10_000, 20_000_000)
+            : 1_000_000;
+        const int rowBytes = 256;
 
-        var transform = Stopwatch.StartNew();
-        var transformService = new DatasetTransformService(settings);
-        var transformResult = await transformService.TransformAsync(
-            sourcePath, DataFileType.Jsonl,
-            new DatasetTransformOptions(
-                Deduplicate: true,
-                Shuffle: true,
-                Seed: 42,
-                Splits: new[] { "train:0.8", "valid:0.2" },
-                OutputDirectory: splitDirectory));
-        transform.Stop();
+        var directory = Path.Combine(Path.GetTempPath(), "lmtds-perf-quality", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
 
-        var memoryAfterTransform = GC.GetTotalMemory(forceFullCollection: false);
+        try
+        {
+            var sourcePath = Path.Combine(directory, "quality.jsonl");
+            var splitDirectory = Path.Combine(directory, "splits");
 
-        var uniqueRows = rows - rows / 2;
-        Assert.That(transformResult.TotalRows, Is.EqualTo(rows));
-        Assert.That(transformResult.OutputRows, Is.EqualTo(uniqueRows));
-        Assert.That(transformResult.DuplicateRows, Is.EqualTo(rows - uniqueRows));
-        Assert.That(transformResult.OutputRows + transformResult.DuplicateRows,
-            Is.EqualTo(transformResult.TotalRows));
-        Assert.That(transformResult.Splits.Sum(split => split.Rows), Is.EqualTo(uniqueRows));
-        Assert.That(memoryAfterTransform - memoryBefore, Is.LessThan(MemoryLimitBytes),
-            $"Managed memory delta after transform: {(memoryAfterTransform - memoryBefore) / 1024.0 / 1024.0:F0} MB.");
+            var generate = Stopwatch.StartNew();
+            GenerateDuplicates(sourcePath, rows, rowBytes);
+            generate.Stop();
 
-        var statistics = Stopwatch.StartNew();
-        var statisticsService = new DatasetStatisticsService(settings);
-        var stats = await statisticsService.ComputeAsync(sourcePath, DataFileType.Jsonl);
-        statistics.Stop();
+            var settings = new AppSettings
+            {
+                CacheDirectory = Path.Combine(directory, "cache"),
+                MaxCacheSizeMb = 512
+            };
 
-        var memoryAfterStats = GC.GetTotalMemory(forceFullCollection: false);
+            var memoryBefore = GC.GetTotalMemory(forceFullCollection: true);
 
-        Assert.That(stats.TotalRows, Is.EqualTo(rows));
-        Assert.That(stats.DuplicateRows, Is.EqualTo(rows - uniqueRows));
-        Assert.That(stats.LengthBuckets.Sum(bucket => bucket.Count), Is.EqualTo(rows));
-        Assert.That(memoryAfterStats - memoryBefore, Is.LessThan(MemoryLimitBytes),
-            $"Managed memory delta after statistics: {(memoryAfterStats - memoryBefore) / 1024.0 / 1024.0:F0} MB.");
+            var transform = Stopwatch.StartNew();
+            var transformService = new DatasetTransformService(settings);
+            var transformResult = await transformService.TransformAsync(
+                sourcePath, DataFileType.Jsonl,
+                new DatasetTransformOptions(
+                    Deduplicate: true,
+                    Shuffle: true,
+                    Seed: 42,
+                    Splits: new[] { "train:0.8", "valid:0.2" },
+                    OutputDirectory: splitDirectory));
+            transform.Stop();
 
-        TestContext.Progress.WriteLine(
-            $"{rows:N0} quality rows @ {rowBytes}B: generate {generate.Elapsed.TotalSeconds:F1}s, " +
-            $"dedup+shuffle+split {transform.Elapsed.TotalSeconds:F1}s " +
-            $"({transformResult.OutputRows:N0} kept, {transformResult.DuplicateRows:N0} duplicates), " +
-            $"statistics {statistics.Elapsed.TotalSeconds:F1}s, " +
-            $"managed memory delta {(memoryAfterStats - memoryBefore) / 1024.0 / 1024.0:F0} MB.");
+            var memoryAfterTransform = GC.GetTotalMemory(forceFullCollection: false);
+
+            var uniqueRows = rows - rows / 2;
+            Assert.That(transformResult.TotalRows, Is.EqualTo(rows));
+            Assert.That(transformResult.OutputRows, Is.EqualTo(uniqueRows));
+            Assert.That(transformResult.DuplicateRows, Is.EqualTo(rows - uniqueRows));
+            Assert.That(transformResult.OutputRows + transformResult.DuplicateRows,
+                Is.EqualTo(transformResult.TotalRows));
+            Assert.That(transformResult.Splits.Sum(split => split.Rows), Is.EqualTo(uniqueRows));
+            Assert.That(memoryAfterTransform - memoryBefore, Is.LessThan(MemoryLimitBytes),
+                $"Managed memory delta after transform: {(memoryAfterTransform - memoryBefore) / 1024.0 / 1024.0:F0} MB.");
+
+            var statistics = Stopwatch.StartNew();
+            var statisticsService = new DatasetStatisticsService(settings);
+            var stats = await statisticsService.ComputeAsync(sourcePath, DataFileType.Jsonl);
+            statistics.Stop();
+
+            var memoryAfterStats = GC.GetTotalMemory(forceFullCollection: false);
+
+            Assert.That(stats.TotalRows, Is.EqualTo(rows));
+            Assert.That(stats.DuplicateRows, Is.EqualTo(rows - uniqueRows));
+            Assert.That(stats.LengthBuckets.Sum(bucket => bucket.Count), Is.EqualTo(rows));
+            Assert.That(memoryAfterStats - memoryBefore, Is.LessThan(MemoryLimitBytes),
+                $"Managed memory delta after statistics: {(memoryAfterStats - memoryBefore) / 1024.0 / 1024.0:F0} MB.");
+
+            TestContext.Progress.WriteLine(
+                $"{rows:N0} quality rows @ {rowBytes}B: generate {generate.Elapsed.TotalSeconds:F1}s, " +
+                $"dedup+shuffle+split {transform.Elapsed.TotalSeconds:F1}s " +
+                $"({transformResult.OutputRows:N0} kept, {transformResult.DuplicateRows:N0} duplicates), " +
+                $"statistics {statistics.Elapsed.TotalSeconds:F1}s, " +
+                $"managed memory delta {(memoryAfterStats - memoryBefore) / 1024.0 / 1024.0:F0} MB.");
+        }
+        finally
+        {
+            try { Directory.Delete(directory, true); } catch { /* best effort */ }
+        }
     }
-    finally
+
+    private static void GenerateDuplicates(string path, int rows, int rowBytes)
     {
-        try { Directory.Delete(directory, true); } catch { /* best effort */ }
+        var padding = new string('x', Math.Max(0, rowBytes - 80));
+        var half = Math.Max(1, rows / 2);
+        using var writer = new StreamWriter(
+            new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 20),
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+            1 << 20);
+
+        for (var i = 0; i < rows; i++)
+        {
+            var key = i % half;
+            writer.Write("{\"messages\":[{\"role\":\"user\",\"content\":\"row ");
+            writer.Write(key.ToString(CultureInfo.InvariantCulture));
+            writer.Write("\"}],\"id\":");
+            writer.Write(key.ToString(CultureInfo.InvariantCulture));
+            writer.Write(",\"padding\":\"");
+            writer.Write(padding);
+            writer.WriteLine("\"}");
+        }
     }
-}
 
-private static void GenerateDuplicates(string path, int rows, int rowBytes)
-{
-    var padding = new string('x', Math.Max(0, rowBytes - 80));
-    var half = Math.Max(1, rows / 2);
-    using var writer = new StreamWriter(
-        new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 20),
-        new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
-        1 << 20);
-
-    for (var i = 0; i < rows; i++)
-    {
-        var key = i % half;
-        writer.Write("{\"messages\":[{\"role\":\"user\",\"content\":\"row ");
-        writer.Write(key.ToString(CultureInfo.InvariantCulture));
-        writer.Write("\"}],\"id\":");
-        writer.Write(key.ToString(CultureInfo.InvariantCulture));
-        writer.Write(",\"padding\":\"");
-        writer.Write(padding);
-        writer.WriteLine("\"}");
-    }
-}
-
-private static void Generate(string path, int rows, int rowBytes)
+    private static void Generate(string path, int rows, int rowBytes)
     {
         var padding = new string('x', Math.Max(0, rowBytes - 60));
         using var writer = new StreamWriter(

@@ -19,6 +19,12 @@ public static class RecipeFileExtensions
         !string.IsNullOrWhiteSpace(path) && HasRecipeExtension(path.Trim());
 
     /// <summary>
+    /// Selects recipe paths from command-line arguments, preserving their order.
+    /// </summary>
+    public static string[] FilterRecipePaths(IEnumerable<string> arguments) =>
+        arguments.Where(IsRecipePath).ToArray();
+
+    /// <summary>
     /// Preserves a recognized recipe extension; otherwise appends <c>.json</c>.
     /// </summary>
     public static string EnsureRecipeExtension(string path)

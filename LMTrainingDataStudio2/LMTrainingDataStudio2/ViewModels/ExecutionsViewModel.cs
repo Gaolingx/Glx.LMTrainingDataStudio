@@ -1,8 +1,8 @@
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LMTrainingDataStudio2.Models;
 using LMTrainingDataStudio2.Services;
-using System.Collections.ObjectModel;
 
 namespace LMTrainingDataStudio2.ViewModels;
 

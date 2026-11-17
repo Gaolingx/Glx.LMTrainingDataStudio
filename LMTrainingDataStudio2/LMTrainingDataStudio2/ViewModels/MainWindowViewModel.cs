@@ -1,3 +1,6 @@
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LMTrainingDataStudio2.Commands;
@@ -5,9 +8,6 @@ using LMTrainingDataStudio2.Localization;
 using LMTrainingDataStudio2.Models;
 using LMTrainingDataStudio2.Services;
 using LMTrainingDataStudio2.Services.Executors;
-using System.Collections.ObjectModel;
-using System.Collections.Specialized;
-using System.ComponentModel;
 
 namespace LMTrainingDataStudio2.ViewModels;
 
@@ -144,6 +144,14 @@ public partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private LanguageOption _selectedLanguageOption = LanguageCatalog.All[0];
+
+    [ObservableProperty]
+    private string _settingsValidationMessage = string.Empty;
+
+    public bool HasSettingsValidationMessage => !string.IsNullOrEmpty(SettingsValidationMessage);
+
+    partial void OnSettingsValidationMessageChanged(string value) =>
+        OnPropertyChanged(nameof(HasSettingsValidationMessage));
 
     public ObservableCollection<BlockNodeViewModel> Blocks { get; } = new();
     public ObservableCollection<EdgeViewModel> Edges { get; } = new();
@@ -665,17 +673,17 @@ public partial class MainWindowViewModel : ObservableObject
         double x,
         double y,
         BlockConfig config) => new()
-    {
-        Id = id,
-        Type = type,
-        Name = name,
-        DisplayName = displayName,
-        X = x,
-        Y = y,
-        Config = config,
-        InputPorts = BlockPortSchema.CreateInputPorts(type),
-        OutputPorts = BlockPortSchema.CreateOutputPorts(type, config)
-    };
+        {
+            Id = id,
+            Type = type,
+            Name = name,
+            DisplayName = displayName,
+            X = x,
+            Y = y,
+            Config = config,
+            InputPorts = BlockPortSchema.CreateInputPorts(type),
+            OutputPorts = BlockPortSchema.CreateOutputPorts(type, config)
+        };
 
     private static void AddSampleEdge(Recipe recipe, string id, RecipeBlock source, RecipeBlock target)
     {
@@ -1325,6 +1333,7 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void OpenSettings()
     {
+        SettingsValidationMessage = string.Empty;
         LoadSettingsSnapshot();
         IsSettingsVisible = true;
     }
@@ -1332,6 +1341,7 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void CloseSettings()
     {
+        SettingsValidationMessage = string.Empty;
         IsSettingsVisible = false;
     }
 
@@ -1339,6 +1349,20 @@ public partial class MainWindowViewModel : ObservableObject
     private async Task ApplySettingsAsync()
     {
         var defaults = new AppSettings();
+        var errors = ValidateSettingsInputs();
+        if (errors.Count > 0)
+        {
+            SettingsValidationMessage = string.Join(Environment.NewLine, errors);
+            StatusText = "Fix the settings errors before applying";
+            foreach (var error in errors)
+            {
+                LogMessages.Add($"[Error] {error}");
+            }
+
+            return;
+        }
+
+        SettingsValidationMessage = string.Empty;
         var settings = new AppSettings
         {
             MaxCacheSizeMb = Math.Max(SettingsStore.MinCacheSizeMb, MaxCacheSizeMb),
@@ -1381,6 +1405,79 @@ public partial class MainWindowViewModel : ObservableObject
         {
             StatusText = "Failed to save settings";
             LogMessages.Add($"[Error] Failed to save settings to '{_settingsStore.FilePath}': {ex.Message}");
+        }
+    }
+
+    private List<string> ValidateSettingsInputs()
+    {
+        var errors = new List<string>();
+
+        if (MaxCacheSizeMb < SettingsStore.MinCacheSizeMb)
+        {
+            errors.Add(
+                $"Max cache size must be at least {SettingsStore.MinCacheSizeMb} MB; found {MaxCacheSizeMb}.");
+        }
+
+        if (GridSnapSize < SettingsStore.MinGridSnapSize || GridSnapSize > SettingsStore.MaxGridSnapSize)
+        {
+            errors.Add(
+                $"Grid snap size must be between {SettingsStore.MinGridSnapSize} and " +
+                $"{SettingsStore.MaxGridSnapSize} px; found {GridSnapSize}.");
+        }
+
+        if (MaxParallelism < SettingsStore.MinParallelism || MaxParallelism > SettingsStore.MaxParallelism)
+        {
+            errors.Add(
+                $"Parallelism must be between {SettingsStore.MinParallelism} and " +
+                $"{SettingsStore.MaxParallelism}; found {MaxParallelism}.");
+        }
+
+        if (NodeRetryCount < 0 || NodeRetryCount > SettingsStore.MaxNodeRetries)
+        {
+            errors.Add($"Node retries must be between 0 and {SettingsStore.MaxNodeRetries}; found {NodeRetryCount}.");
+        }
+
+        if (SpillThresholdRows < 0 || SpillThresholdRows > SettingsStore.MaxSpillThresholdRows)
+        {
+            errors.Add(
+                $"Spill threshold must be between 0 and {SettingsStore.MaxSpillThresholdRows} rows; " +
+                $"found {SpillThresholdRows}.");
+        }
+
+        AddPathError(errors, "Cache directory", CacheDirectory, allowDefault: true);
+        AddPathError(errors, "Run summary directory", RunOutputDirectory, allowDefault: true);
+        AddPathError(errors, "Run temp directory", RunTempDirectory, allowDefault: true);
+
+        return errors;
+    }
+
+    private static void AddPathError(List<string> errors, string label, string path, bool allowDefault)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            if (!allowDefault)
+            {
+                errors.Add($"{label} is required.");
+            }
+
+            return;
+        }
+
+        var expanded = Environment.ExpandEnvironmentVariables(path.Trim());
+        try
+        {
+            var full = Path.GetFullPath(expanded);
+            Directory.CreateDirectory(full);
+            var probe = Path.Combine(full, $".lmtds-write-{Guid.NewGuid():N}");
+            using (File.Create(probe))
+            {
+            }
+
+            File.Delete(probe);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            errors.Add($"{label} is not writable: {expanded} ({ex.Message})");
         }
     }
 

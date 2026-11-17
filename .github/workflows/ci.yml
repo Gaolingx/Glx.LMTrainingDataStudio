@@ -5,9 +5,18 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
 jobs:
-  build-test:
+  format:
     runs-on: windows-latest
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v4
@@ -15,17 +24,44 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 9.0.x
+          cache: true
+          cache-dependency-path: '**/*.csproj'
+
+      - name: Restore
+        run: dotnet restore LMTrainingDataStudio2/LMTrainingDataStudio2.slnx
+
+      - name: Verify formatting
+        run: dotnet format LMTrainingDataStudio2/LMTrainingDataStudio2.slnx --verify-no-changes --no-restore
+
+  build-test:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [Debug, Release]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+          cache: true
+          cache-dependency-path: '**/*.csproj'
 
       - name: Restore
         run: dotnet restore LMTrainingDataStudio2/LMTrainingDataStudio2.slnx
 
       - name: Build
-        run: dotnet build LMTrainingDataStudio2/LMTrainingDataStudio2.slnx -c Release --no-restore
+        run: >
+          dotnet build LMTrainingDataStudio2/LMTrainingDataStudio2.slnx
+          -c ${{ matrix.configuration }} --no-restore
 
       - name: Test
         run: >
           dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx
-          -c Release --no-build
+          -c ${{ matrix.configuration }} --no-build
           --logger "trx;LogFileName=test-results.trx"
           --results-directory artifacts/test-results
 
@@ -33,6 +69,113 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
+          name: test-results-${{ matrix.configuration }}
           path: artifacts/test-results
           if-no-files-found: ignore
+
+  coverage:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    needs: build-test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+          cache: true
+          cache-dependency-path: '**/*.csproj'
+
+      - name: Restore
+        run: dotnet restore LMTrainingDataStudio2/LMTrainingDataStudio2.slnx
+
+      - name: Test with coverage
+        run: >
+          dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx
+          -c Release
+          -p:CollectCoverage=true
+          -p:CoverletOutput=artifacts/coverage/
+          -p:CoverletOutputFormat=cobertura
+          -p:Threshold=0
+          -p:Exclude="[LMTrainingDataStudio2.Tests]*"
+
+      - name: Enforce coverage floors
+        shell: powershell
+        run: >
+          powershell -ExecutionPolicy Bypass -File scripts/check-coverage.ps1
+          -ReportPath LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/artifacts/coverage/coverage.cobertura.xml
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/artifacts/coverage
+          if-no-files-found: ignore
+
+  packaging:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    needs: build-test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+          cache: true
+          cache-dependency-path: '**/*.csproj'
+
+      - name: Restore
+        run: dotnet restore LMTrainingDataStudio2/LMTrainingDataStudio2.slnx
+
+      - name: Parse packaging scripts
+        shell: powershell
+        run: |
+          $failed = $false
+          Get-ChildItem scripts/*.ps1 | ForEach-Object {
+              $tokens = $null
+              $parseErrors = $null
+              [System.Management.Automation.Language.Parser]::ParseFile(
+                  $_.FullName, [ref]$tokens, [ref]$parseErrors) | Out-Null
+              foreach ($parseError in $parseErrors) {
+                  Write-Host "::error file=$($_.FullName)::$($parseError.Message)"
+                  $failed = $true
+              }
+          }
+          if ($failed) { exit 1 }
+
+      - name: Build and verify packaging metadata
+        run: >
+          dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx
+          -c Release
+          --filter "FullyQualifiedName~PackagingConsistencyTests|FullyQualifiedName~LocalizationConsistencyTests|FullyQualifiedName~StartupLaunchTests"
+
+      - name: Verify example recipes are up to date
+        shell: powershell
+        run: |
+          dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx -c Release --no-build --filter "FullyQualifiedName~ExampleRecipeTests"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx -c Release --no-build --filter "FullyQualifiedName~WriteExamples"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git diff --exit-code -- examples/
+          if ($LASTEXITCODE -ne 0) { throw "Generated examples differ from the committed files." }
+
+      - name: Publish smoke test
+        shell: powershell
+        run: |
+          powershell -ExecutionPolicy Bypass -File scripts/publish-win-x64.ps1 `
+              -Configuration Release -Version 0.0.0 -Output artifacts/ci-publish
+          if ($LASTEXITCODE -ne 0) { throw "Publish script failed." }
+
+          $exe = "artifacts/ci-publish/LMTrainingDataStudio2.exe"
+          $zip = "artifacts/ci-publish-0.0.0.zip"
+          if (-not (Test-Path $exe)) { throw "Published executable is missing." }
+          if (-not (Test-Path $zip)) { throw "Published archive is missing." }
+
+          $version = (Get-Item $exe).VersionInfo.FileVersion
+          if (-not $version.StartsWith("0.0.0")) {
+              throw "Published executable version '$version' does not match -Version 0.0.0."
+          }

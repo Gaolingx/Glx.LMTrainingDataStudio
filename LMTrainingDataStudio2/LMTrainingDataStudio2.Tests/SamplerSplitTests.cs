@@ -133,11 +133,11 @@ public sealed class SamplerSplitTests
     private static BlockExecutionContext CreateContext(
         RecipeBlock block,
         IEnumerable<DatasetRow> input) => new()
-    {
-        Block = block,
-        Input = ToAsync(input),
-        Log = _ => { }
-    };
+        {
+            Block = block,
+            Input = ToAsync(input),
+            Log = _ => { }
+        };
 
     private static async IAsyncEnumerable<DatasetRow> ToAsync(IEnumerable<DatasetRow> rows)
     {

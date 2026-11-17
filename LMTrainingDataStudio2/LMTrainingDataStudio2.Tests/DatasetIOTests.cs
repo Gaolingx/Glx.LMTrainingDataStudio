@@ -38,7 +38,7 @@ public sealed class DatasetIOTests
             alpha,"{""messages"":[{""role"":""user"",""content"":""hi""}]}","line1
             line2"
             beta,"[1,2,3]",plain
-            """);
+            """.ReplaceLineEndings("\n"));
 
         await using var reader = new CsvDatasetReader();
         await reader.OpenAsync(path);

@@ -318,6 +318,31 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnBrowseCacheDirectoryClick(object? sender, RoutedEventArgs e) =>
+        await BrowseSettingDirectoryAsync((vm, path) => vm.CacheDirectory = path);
+
+    private async void OnBrowseRunOutputDirectoryClick(object? sender, RoutedEventArgs e) =>
+        await BrowseSettingDirectoryAsync((vm, path) => vm.RunOutputDirectory = path);
+
+    private async void OnBrowseRunTempDirectoryClick(object? sender, RoutedEventArgs e) =>
+        await BrowseSettingDirectoryAsync((vm, path) => vm.RunTempDirectory = path);
+
+    private async Task BrowseSettingDirectoryAsync(Action<MainWindowViewModel, string> apply)
+    {
+        if (DataContext is not MainWindowViewModel vm) return;
+
+        var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = LocalizationService.L("dialog.picker.choose_directory"),
+            AllowMultiple = false
+        });
+
+        if (folders.Count > 0 && folders[0].TryGetLocalPath() is { } path)
+        {
+            apply(vm, path);
+        }
+    }
+
     private void OnRecentFilesSubmenuOpened(object? sender, RoutedEventArgs e)
     {
         if (DataContext is not MainWindowViewModel vm || sender is not MenuItem menu) return;

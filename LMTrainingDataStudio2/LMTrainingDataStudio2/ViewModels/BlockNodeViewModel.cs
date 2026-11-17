@@ -1,9 +1,9 @@
+using System.Collections.ObjectModel;
+using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using LMTrainingDataStudio2.Commands;
 using LMTrainingDataStudio2.Models;
 using LMTrainingDataStudio2.Services;
-using System.Collections.ObjectModel;
-using System.Text.Json;
 
 namespace LMTrainingDataStudio2.ViewModels;
 

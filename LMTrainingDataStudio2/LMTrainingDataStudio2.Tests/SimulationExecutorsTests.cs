@@ -651,22 +651,22 @@ public sealed class SimulationExecutorsTests
 
     private static RecipeEdge Edge(
         string sourcePort, string targetPort, RecipeBlock source, RecipeBlock target) => new()
-    {
-        SourceBlockId = source.Id,
-        SourcePortId = sourcePort,
-        TargetBlockId = target.Id,
-        TargetPortId = targetPort
-    };
+        {
+            SourceBlockId = source.Id,
+            SourcePortId = sourcePort,
+            TargetBlockId = target.Id,
+            TargetPortId = targetPort
+        };
 
     private static BlockExecutionContext CreateContext(
         RecipeBlock block,
         IEnumerable<DatasetRow>? input = null,
         List<string>? logs = null) => new()
-    {
-        Block = block,
-        Input = input is null ? null : ToAsync(input),
-        Log = message => logs?.Add(message)
-    };
+        {
+            Block = block,
+            Input = input is null ? null : ToAsync(input),
+            Log = message => logs?.Add(message)
+        };
 
     private static async IAsyncEnumerable<DatasetRow> ToAsync(IEnumerable<DatasetRow> rows)
     {

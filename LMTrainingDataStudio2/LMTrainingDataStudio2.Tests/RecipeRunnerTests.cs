@@ -116,87 +116,87 @@ public sealed class RecipeRunnerTests
     }
 
     [Test]
-public async Task RunAsync_IndependentLayerBlocks_RunInParallel()
-{
-    await WriteRowsAsync(1);
-    var recipe = CreateProbeRecipe();
-    var executor = new ProbeExecutor(BlockType.Seed);
-    var runner = new RecipeRunner(
-        new RecipeValidationService(),
-        new IBlockExecutor[] { executor },
-        options: new RecipeRunOptions(MaxParallelism: 2));
+    public async Task RunAsync_IndependentLayerBlocks_RunInParallel()
+    {
+        await WriteRowsAsync(1);
+        var recipe = CreateProbeRecipe();
+        var executor = new ProbeExecutor(BlockType.Seed);
+        var runner = new RecipeRunner(
+            new RecipeValidationService(),
+            new IBlockExecutor[] { executor },
+            options: new RecipeRunOptions(MaxParallelism: 2));
 
-    var run = await runner.RunAsync(recipe).WaitAsync(TimeSpan.FromSeconds(10));
+        var run = await runner.RunAsync(recipe).WaitAsync(TimeSpan.FromSeconds(10));
 
-    Assert.That(run.Status, Is.EqualTo(RunStatus.Succeeded));
-    Assert.That(run.Nodes, Has.Count.EqualTo(2));
-    Assert.That(run.Nodes.Select(node => node.Status),
-        Is.All.EqualTo(ExecutionStatus.Succeeded));
-    Assert.That(executor.MaxConcurrency, Is.GreaterThanOrEqualTo(2));
-}
+        Assert.That(run.Status, Is.EqualTo(RunStatus.Succeeded));
+        Assert.That(run.Nodes, Has.Count.EqualTo(2));
+        Assert.That(run.Nodes.Select(node => node.Status),
+            Is.All.EqualTo(ExecutionStatus.Succeeded));
+        Assert.That(executor.MaxConcurrency, Is.GreaterThanOrEqualTo(2));
+    }
 
-[Test]
-public async Task RunAsync_PausedBeforeStart_WaitsForResume()
-{
-    await WriteRowsAsync(1);
-    var recipe = CreateSingleSeedRecipe();
-    var runner = new RecipeRunner(
-        new RecipeValidationService(),
-        new IBlockExecutor[] { new EmptyExecutor(BlockType.Seed) });
-    var pause = new ExecutionPauseController();
-    pause.Pause();
+    [Test]
+    public async Task RunAsync_PausedBeforeStart_WaitsForResume()
+    {
+        await WriteRowsAsync(1);
+        var recipe = CreateSingleSeedRecipe();
+        var runner = new RecipeRunner(
+            new RecipeValidationService(),
+            new IBlockExecutor[] { new EmptyExecutor(BlockType.Seed) });
+        var pause = new ExecutionPauseController();
+        pause.Pause();
 
-    var runTask = runner.RunAsync(recipe, pause: pause);
-    await Task.Delay(150);
-    Assert.That(runTask.IsCompleted, Is.False);
+        var runTask = runner.RunAsync(recipe, pause: pause);
+        await Task.Delay(150);
+        Assert.That(runTask.IsCompleted, Is.False);
 
-    pause.Resume();
-    var run = await runTask.WaitAsync(TimeSpan.FromSeconds(5));
+        pause.Resume();
+        var run = await runTask.WaitAsync(TimeSpan.FromSeconds(5));
 
-    Assert.That(run.Status, Is.EqualTo(RunStatus.Succeeded));
-    Assert.That(run.Logs.Any(log => log.Contains("paused", StringComparison.OrdinalIgnoreCase)),
-        Is.True);
-    Assert.That(run.Logs.Any(log => log.Contains("resumed", StringComparison.OrdinalIgnoreCase)),
-        Is.True);
-}
+        Assert.That(run.Status, Is.EqualTo(RunStatus.Succeeded));
+        Assert.That(run.Logs.Any(log => log.Contains("paused", StringComparison.OrdinalIgnoreCase)),
+            Is.True);
+        Assert.That(run.Logs.Any(log => log.Contains("resumed", StringComparison.OrdinalIgnoreCase)),
+            Is.True);
+    }
 
-[Test]
-public async Task RunAsync_NodeRetry_RetriesFailedBlock()
-{
-    await WriteRowsAsync(1);
-    var recipe = CreateSingleSeedRecipe();
-    var executor = new FlakyExecutor(BlockType.Seed, failuresBeforeSuccess: 1);
-    var runner = new RecipeRunner(
-        new RecipeValidationService(),
-        new IBlockExecutor[] { executor },
-        options: new RecipeRunOptions(NodeRetryCount: 1));
+    [Test]
+    public async Task RunAsync_NodeRetry_RetriesFailedBlock()
+    {
+        await WriteRowsAsync(1);
+        var recipe = CreateSingleSeedRecipe();
+        var executor = new FlakyExecutor(BlockType.Seed, failuresBeforeSuccess: 1);
+        var runner = new RecipeRunner(
+            new RecipeValidationService(),
+            new IBlockExecutor[] { executor },
+            options: new RecipeRunOptions(NodeRetryCount: 1));
 
-    var run = await runner.RunAsync(recipe);
+        var run = await runner.RunAsync(recipe);
 
-    Assert.That(run.Status, Is.EqualTo(RunStatus.Succeeded));
-    Assert.That(executor.Attempts, Is.EqualTo(2));
-    Assert.That(run.Logs.Any(log => log.Contains("Retrying", StringComparison.Ordinal)), Is.True);
-}
+        Assert.That(run.Status, Is.EqualTo(RunStatus.Succeeded));
+        Assert.That(executor.Attempts, Is.EqualTo(2));
+        Assert.That(run.Logs.Any(log => log.Contains("Retrying", StringComparison.Ordinal)), Is.True);
+    }
 
-[Test]
-public async Task RunAsync_WritesOutputDirectorySummary()
-{
-    await WriteRowsAsync(1);
-    var recipe = CreateSingleSeedRecipe();
-    var output = Path.Combine(_directory, "runs");
-    var runner = new RecipeRunner(
-        new RecipeValidationService(),
-        new IBlockExecutor[] { new EmptyExecutor(BlockType.Seed) },
-        options: new RecipeRunOptions(OutputDirectory: output));
+    [Test]
+    public async Task RunAsync_WritesOutputDirectorySummary()
+    {
+        await WriteRowsAsync(1);
+        var recipe = CreateSingleSeedRecipe();
+        var output = Path.Combine(_directory, "runs");
+        var runner = new RecipeRunner(
+            new RecipeValidationService(),
+            new IBlockExecutor[] { new EmptyExecutor(BlockType.Seed) },
+            options: new RecipeRunOptions(OutputDirectory: output));
 
-    var run = await runner.RunAsync(recipe);
+        var run = await runner.RunAsync(recipe);
 
-    Assert.That(run.OutputDirectory, Is.Not.Null);
-    Assert.That(Directory.Exists(run.OutputDirectory), Is.True);
-    var summaryPath = Path.Combine(run.OutputDirectory!, "run-summary.json");
-    Assert.That(File.Exists(summaryPath), Is.True);
-    Assert.That(await File.ReadAllTextAsync(summaryPath), Does.Contain("\"Status\": \"Succeeded\""));
-}
+        Assert.That(run.OutputDirectory, Is.Not.Null);
+        Assert.That(Directory.Exists(run.OutputDirectory), Is.True);
+        var summaryPath = Path.Combine(run.OutputDirectory!, "run-summary.json");
+        Assert.That(File.Exists(summaryPath), Is.True);
+        Assert.That(await File.ReadAllTextAsync(summaryPath), Does.Contain("\"Status\": \"Succeeded\""));
+    }
 
     [Test]
     public async Task RunAsync_LowSpillThreshold_SpillsRowsAndCleansTempDirectory()
@@ -384,30 +384,30 @@ public async Task RunAsync_WritesOutputDirectorySummary()
         Assert.That(GetFiles(spillDirectory), Is.Empty);
     }
 
-private Recipe CreateProbeRecipe()
-{
-    var recipe = new Recipe { Name = "parallel" };
-    var first = CreateBlock("seed1", BlockType.Seed, "seed_a",
-        new SeedBlockConfig(_dataPath, DataFileType.Jsonl, Streaming: false, UseIndexCache: true));
-    first.OutputPorts.Add(CreatePort("seed1_out", "rows", PortDirection.Output, "rows"));
-    var second = CreateBlock("seed2", BlockType.Seed, "seed_b",
-        new SeedBlockConfig(_dataPath, DataFileType.Jsonl, Streaming: false, UseIndexCache: true));
-    second.OutputPorts.Add(CreatePort("seed2_out", "rows", PortDirection.Output, "rows"));
-    recipe.Blocks.AddRange(new[] { first, second });
-    return recipe;
-}
+    private Recipe CreateProbeRecipe()
+    {
+        var recipe = new Recipe { Name = "parallel" };
+        var first = CreateBlock("seed1", BlockType.Seed, "seed_a",
+            new SeedBlockConfig(_dataPath, DataFileType.Jsonl, Streaming: false, UseIndexCache: true));
+        first.OutputPorts.Add(CreatePort("seed1_out", "rows", PortDirection.Output, "rows"));
+        var second = CreateBlock("seed2", BlockType.Seed, "seed_b",
+            new SeedBlockConfig(_dataPath, DataFileType.Jsonl, Streaming: false, UseIndexCache: true));
+        second.OutputPorts.Add(CreatePort("seed2_out", "rows", PortDirection.Output, "rows"));
+        recipe.Blocks.AddRange(new[] { first, second });
+        return recipe;
+    }
 
-private Recipe CreateSingleSeedRecipe()
-{
-    var recipe = new Recipe { Name = "single" };
-    var seed = CreateBlock("seed1", BlockType.Seed, "seed_a",
-        new SeedBlockConfig(_dataPath, DataFileType.Jsonl, Streaming: false, UseIndexCache: true));
-    seed.OutputPorts.Add(CreatePort("seed1_out", "rows", PortDirection.Output, "rows"));
-    recipe.Blocks.Add(seed);
-    return recipe;
-}
+    private Recipe CreateSingleSeedRecipe()
+    {
+        var recipe = new Recipe { Name = "single" };
+        var seed = CreateBlock("seed1", BlockType.Seed, "seed_a",
+            new SeedBlockConfig(_dataPath, DataFileType.Jsonl, Streaming: false, UseIndexCache: true));
+        seed.OutputPorts.Add(CreatePort("seed1_out", "rows", PortDirection.Output, "rows"));
+        recipe.Blocks.Add(seed);
+        return recipe;
+    }
 
-private async Task WriteRowsAsync(int count)
+    private async Task WriteRowsAsync(int count)
     {
         var lines = Enumerable.Range(0, count)
             .Select(i => $"{{\"messages\":[{{\"role\":\"user\",\"content\":\"row {i}\"}}]}}");
@@ -469,13 +469,13 @@ private async Task WriteRowsAsync(int count)
 
     private static RecipeEdge CreateEdge(
         string id, RecipeBlock source, BlockPort sourcePort, RecipeBlock target, BlockPort targetPort) => new()
-    {
-        Id = id,
-        SourceBlockId = source.Id,
-        SourcePortId = sourcePort.Id,
-        TargetBlockId = target.Id,
-        TargetPortId = targetPort.Id
-    };
+        {
+            Id = id,
+            SourceBlockId = source.Id,
+            SourcePortId = sourcePort.Id,
+            TargetBlockId = target.Id,
+            TargetPortId = targetPort.Id
+        };
 
     private static NodeExecutionResult Node(ExecutionRun run, RecipeBlock block) =>
         run.Nodes.Single(node => node.BlockId == block.Id);

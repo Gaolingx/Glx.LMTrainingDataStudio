@@ -23,6 +23,7 @@
   "dialog.action.open_recent_recipe": "打开最近的 Recipe",
   "dialog.picker.open_recipe": "打开 Recipe",
   "dialog.picker.save_recipe": "保存 Recipe",
+  "dialog.picker.choose_directory": "选择文件夹",
   "dialog.file_type.recipe_json": "Recipe 文件",
   "dialog.no_recent_files": "没有最近文件",
   "data.position_format": "第 {0:N0} / {1:N0} 页",

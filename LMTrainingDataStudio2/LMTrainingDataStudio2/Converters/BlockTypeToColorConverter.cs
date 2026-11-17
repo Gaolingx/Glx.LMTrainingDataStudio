@@ -1,7 +1,7 @@
+using System.Globalization;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
 using LMTrainingDataStudio2.Models;
-using System.Globalization;
 
 namespace LMTrainingDataStudio2.Converters;
 
