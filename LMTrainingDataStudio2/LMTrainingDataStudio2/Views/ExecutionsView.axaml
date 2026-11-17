@@ -13,17 +13,17 @@
 
         <!-- Run list -->
         <Border Grid.Column="0"
-                Background="{StaticResource PanelBackgroundBrush}"
-                BorderBrush="{StaticResource PanelBorderBrush}"
+                Background="{DynamicResource PanelBackgroundBrush}"
+                BorderBrush="{DynamicResource PanelBorderBrush}"
                 BorderThickness="0,0,1,0">
             <DockPanel>
                 <Border DockPanel.Dock="Top" Height="44"
-                        Background="{StaticResource HeaderBackgroundBrush}"
-                        BorderBrush="{StaticResource PanelBorderBrush}"
+                        Background="{DynamicResource HeaderBackgroundBrush}"
+                        BorderBrush="{DynamicResource PanelBorderBrush}"
                         BorderThickness="0,0,0,1">
                     <Grid ColumnDefinitions="*,Auto,Auto" Margin="12,0">
                         <TextBlock Text="{loc:Loc common.executions}" FontSize="12" FontWeight="SemiBold"
-                                   VerticalAlignment="Center" Foreground="#CCCCCC" />
+                                   VerticalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}" />
                         <ComboBox Grid.Column="1"
                                   ItemsSource="{Binding Executions.StatusFilters}"
                                   SelectedItem="{Binding Executions.StatusFilter, Mode=TwoWay}"
@@ -32,7 +32,7 @@
                         <Button Grid.Column="2" Content="↻"
                                 Command="{Binding Executions.RefreshExecutionsCommand}"
                                 IsEnabled="{Binding !Executions.IsBusy}"
-                                Background="Transparent" Foreground="#AAAAAA"
+                                Background="Transparent" Foreground="{DynamicResource TextMutedBrush}"
                                 FontSize="12" Padding="8,4"
                                 ToolTip.Tip="{loc:Loc executions.refresh_executions}" />
                     </Grid>
@@ -40,7 +40,7 @@
 
                 <TextBlock DockPanel.Dock="Bottom"
                            Text="{Binding Executions.StatusText}"
-                           FontSize="10" Foreground="#777777"
+                           FontSize="10" Foreground="{DynamicResource TextFaintBrush}"
                            Margin="12,8" TextWrapping="Wrap" />
 
                 <ListBox ItemsSource="{Binding Executions.Runs}"
@@ -50,11 +50,11 @@
                         <DataTemplate x:DataType="models:ExecutionRunSummary">
                             <StackPanel Spacing="2" Margin="2,5">
                                 <TextBlock Text="{Binding RunId}" FontSize="12" FontWeight="SemiBold"
-                                           Foreground="#E0E0E0" TextTrimming="CharacterEllipsis" />
+                                           Foreground="{DynamicResource TextBrightBrush}" TextTrimming="CharacterEllipsis" />
                                 <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <TextBlock Text="{Binding Status}" FontSize="10" Foreground="#AAAAAA" />
+                                    <TextBlock Text="{Binding Status}" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" />
                                     <TextBlock Text="{Binding StartedAt, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}"
-                                               FontSize="10" Foreground="#777777" />
+                                               FontSize="10" Foreground="{DynamicResource TextFaintBrush}" />
                                 </StackPanel>
                             </StackPanel>
                         </DataTemplate>
@@ -68,17 +68,17 @@
         <!-- Run details -->
         <DockPanel Grid.Column="2">
             <Border DockPanel.Dock="Top" Height="44"
-                    Background="{StaticResource HeaderBackgroundBrush}"
-                    BorderBrush="{StaticResource PanelBorderBrush}"
+                    Background="{DynamicResource HeaderBackgroundBrush}"
+                    BorderBrush="{DynamicResource PanelBorderBrush}"
                     BorderThickness="0,0,0,1">
                 <Grid ColumnDefinitions="*,Auto,Auto" Margin="12,0">
                     <StackPanel Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
                         <TextBlock Text="{Binding Executions.SelectedRunSummary.RunId, TargetNullValue='No run selected'}"
-                                   FontSize="12" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                   FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextBrightBrush}" />
                         <TextBlock Text="{Binding Executions.SelectedRun.Status}"
-                                   FontSize="11" Foreground="#AAAAAA" />
+                                   FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBlock Text="{Binding Executions.SelectedRunSummary.RecipeId}"
-                                   FontSize="11" Foreground="#777777" />
+                                   FontSize="11" Foreground="{DynamicResource TextFaintBrush}" />
                     </StackPanel>
                     <Button Grid.Column="1"
                             Content="{loc:Loc executions.resume_run}"
@@ -86,13 +86,13 @@
                             CommandParameter="{Binding Executions.SelectedRun}"
                             IsVisible="{Binding Executions.CanResumeSelectedRun}"
                             Padding="12,5" FontSize="11" Margin="0,0,8,0"
-                            Background="#1E3A28" Foreground="#8FE0A8"
+                            Background="{DynamicResource SuccessSurfaceBrush}" Foreground="{DynamicResource SuccessBrush}"
                             VerticalAlignment="Center" />
                     <Button Grid.Column="2" Content="{loc:Loc common.cancel}"
                             Command="{Binding CancelRunCommand}"
                             IsVisible="{Binding IsRunning}"
                             Padding="12,5" FontSize="11"
-                            Background="#3A2020" Foreground="#FF8080"
+                            Background="{DynamicResource DangerSurfaceBrush}" Foreground="{DynamicResource DangerBrush}"
                             VerticalAlignment="Center" />
                 </Grid>
             </Border>
@@ -101,9 +101,9 @@
             <StackPanel IsVisible="{Binding Executions.SelectedRun, Converter={x:Static ObjectConverters.IsNull}}"
                         VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="6">
                 <TextBlock Text="{loc:Loc executions.select_a_run_to_inspect_node_states_and_logs}"
-                           FontSize="12" Foreground="#888888" />
+                           FontSize="12" Foreground="{DynamicResource TextDimBrush}" />
                 <TextBlock Text="{loc:Loc executions.runs_appear_here_after_executing_a_recipe}"
-                           FontSize="10" Foreground="#666666" />
+                           FontSize="10" Foreground="{DynamicResource TextSubtleBrush}" />
             </StackPanel>
 
             <Grid IsVisible="{Binding Executions.SelectedRun, Converter={x:Static ObjectConverters.IsNotNull}}"
@@ -112,19 +112,19 @@
                 <!-- Summary -->
                 <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="24" Margin="0,2,0,10">
                     <StackPanel Orientation="Horizontal" Spacing="4">
-                        <TextBlock Text="{loc:Loc executions.started}" FontSize="10" Foreground="#888888" />
+                        <TextBlock Text="{loc:Loc executions.started}" FontSize="10" Foreground="{DynamicResource TextDimBrush}" />
                         <TextBlock Text="{Binding Executions.SelectedRun.StartedAt, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}"
-                                   FontSize="10" Foreground="#CCCCCC" />
+                                   FontSize="10" Foreground="{DynamicResource TextPrimaryBrush}" />
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="4">
-                        <TextBlock Text="{loc:Loc executions.finished}" FontSize="10" Foreground="#888888" />
+                        <TextBlock Text="{loc:Loc executions.finished}" FontSize="10" Foreground="{DynamicResource TextDimBrush}" />
                         <TextBlock Text="{Binding Executions.SelectedRun.FinishedAt, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}"
-                                   FontSize="10" Foreground="#CCCCCC" />
+                                   FontSize="10" Foreground="{DynamicResource TextPrimaryBrush}" />
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="4">
-                        <TextBlock Text="{loc:Loc executions.output}" FontSize="10" Foreground="#888888" />
+                        <TextBlock Text="{loc:Loc executions.output}" FontSize="10" Foreground="{DynamicResource TextDimBrush}" />
                         <TextBlock Text="{Binding Executions.SelectedRun.OutputDirectory, TargetNullValue='—'}"
-                                   FontSize="10" Foreground="#CCCCCC"
+                                   FontSize="10" Foreground="{DynamicResource TextPrimaryBrush}"
                                    MaxWidth="420" TextTrimming="CharacterEllipsis"
                                    ToolTip.Tip="{Binding Executions.SelectedRun.OutputDirectory}" />
                     </StackPanel>
@@ -132,11 +132,11 @@
 
                 <!-- Node table header -->
                 <Grid Grid.Row="1" ColumnDefinitions="2*,110,80,80,2*" Margin="0,0,0,4">
-                    <TextBlock Text="{loc:Loc executions.block}" FontSize="10" Foreground="#888888" />
-                    <TextBlock Grid.Column="1" Text="{loc:Loc common.status}" FontSize="10" Foreground="#888888" />
-                    <TextBlock Grid.Column="2" Text="{loc:Loc executions.in_rows}" FontSize="10" Foreground="#888888" />
-                    <TextBlock Grid.Column="3" Text="{loc:Loc executions.out_rows}" FontSize="10" Foreground="#888888" />
-                    <TextBlock Grid.Column="4" Text="{loc:Loc common.error}" FontSize="10" Foreground="#888888" />
+                    <TextBlock Text="{loc:Loc executions.block}" FontSize="10" Foreground="{DynamicResource TextDimBrush}" />
+                    <TextBlock Grid.Column="1" Text="{loc:Loc common.status}" FontSize="10" Foreground="{DynamicResource TextDimBrush}" />
+                    <TextBlock Grid.Column="2" Text="{loc:Loc executions.in_rows}" FontSize="10" Foreground="{DynamicResource TextDimBrush}" />
+                    <TextBlock Grid.Column="3" Text="{loc:Loc executions.out_rows}" FontSize="10" Foreground="{DynamicResource TextDimBrush}" />
+                    <TextBlock Grid.Column="4" Text="{loc:Loc common.error}" FontSize="10" Foreground="{DynamicResource TextDimBrush}" />
                 </Grid>
 
                 <!-- Node table -->
@@ -145,12 +145,12 @@
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="models:NodeExecutionResult">
                                 <Grid ColumnDefinitions="2*,110,80,80,2*" Margin="0,3">
-                                    <TextBlock Text="{Binding BlockName}" FontSize="11" Foreground="#E0E0E0"
+                                    <TextBlock Text="{Binding BlockName}" FontSize="11" Foreground="{DynamicResource TextBrightBrush}"
                                                TextTrimming="CharacterEllipsis" />
-                                    <TextBlock Grid.Column="1" Text="{Binding Status}" FontSize="11" Foreground="#CCCCCC" />
-                                    <TextBlock Grid.Column="2" Text="{Binding InputRows}" FontSize="11" Foreground="#AAAAAA" />
-                                    <TextBlock Grid.Column="3" Text="{Binding OutputRows}" FontSize="11" Foreground="#AAAAAA" />
-                                    <TextBlock Grid.Column="4" Text="{Binding Error}" FontSize="10" Foreground="#FF8080"
+                                    <TextBlock Grid.Column="1" Text="{Binding Status}" FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                    <TextBlock Grid.Column="2" Text="{Binding InputRows}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
+                                    <TextBlock Grid.Column="3" Text="{Binding OutputRows}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
+                                    <TextBlock Grid.Column="4" Text="{Binding Error}" FontSize="10" Foreground="{DynamicResource DangerBrush}"
                                                TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
                                 </Grid>
                             </DataTemplate>
@@ -159,14 +159,14 @@
                 </ScrollViewer>
 
                 <TextBlock Grid.Row="3" Text="{loc:Loc common.logs}" FontSize="11" FontWeight="SemiBold"
-                           Foreground="#CCCCCC" Margin="0,10,0,4" />
+                           Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,10,0,4" />
 
-                <Border Grid.Row="4" Background="#1A1A2A" CornerRadius="4" Padding="8">
+                <Border Grid.Row="4" Background="{DynamicResource InputBackgroundBrush}" CornerRadius="4" Padding="8">
                     <ScrollViewer>
                         <ItemsControl ItemsSource="{Binding Executions.SelectedRun.Logs}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding}" FontSize="10" Foreground="#AAAAAA"
+                                    <TextBlock Text="{Binding}" FontSize="10" Foreground="{DynamicResource TextMutedBrush}"
                                                TextWrapping="Wrap" Margin="0,1" />
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>

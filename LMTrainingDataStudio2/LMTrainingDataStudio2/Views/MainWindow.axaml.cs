@@ -2,7 +2,9 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using LMTrainingDataStudio2.Localization;
+using LMTrainingDataStudio2.Services;
 using LMTrainingDataStudio2.ViewModels;
 
 namespace LMTrainingDataStudio2.Views;
@@ -11,12 +13,16 @@ public partial class MainWindow : Window
 {
     private bool _closeConfirmed;
     private bool _closePromptInProgress;
+    private DispatcherTimer? _memoryTimer;
+    private readonly Queue<string> _pendingExternalOpens = new();
+    private bool _opened;
 
     public MainWindow()
     {
         InitializeComponent();
         AddHandler(KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Tunnel);
         Closing += OnWindowClosing;
+        Closed += OnWindowClosed;
     }
 
     protected override async void OnOpened(EventArgs e)
@@ -27,6 +33,113 @@ public partial class MainWindow : Window
         {
             vm.ConfirmOverwriteAsync = ConfirmExportOverwriteAsync;
             await vm.RestoreLastRecipeAsync();
+
+            if (App.TakeStartupRecipe() is { } startupPath)
+            {
+                await OpenExternalRecipeAsync(startupPath);
+            }
+        }
+
+        _memoryTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+        _memoryTimer.Tick += (_, _) => (DataContext as MainWindowViewModel)?.RefreshMemoryUsage();
+        _memoryTimer.Start();
+
+        _opened = true;
+        while (_pendingExternalOpens.Count > 0)
+        {
+            await OpenExternalRecipeAsync(_pendingExternalOpens.Dequeue());
+        }
+    }
+
+    /// <summary>
+    /// Queues a recipe open request; requests received before the window finishes
+    /// restoring settings are drained afterwards.
+    /// </summary>
+    public void QueueExternalOpen(string path)
+    {
+        if (!_opened || !Dispatcher.UIThread.CheckAccess())
+        {
+            _pendingExternalOpens.Enqueue(path);
+            if (_opened)
+            {
+                Dispatcher.UIThread.Post(DrainPendingExternalOpens);
+            }
+
+            return;
+        }
+
+        _ = OpenExternalRecipeAsync(path);
+    }
+
+    private async void DrainPendingExternalOpens()
+    {
+        while (_pendingExternalOpens.Count > 0)
+        {
+            await OpenExternalRecipeAsync(_pendingExternalOpens.Dequeue());
+        }
+    }
+
+    private void OnWindowClosed(object? sender, EventArgs e)
+    {
+        _memoryTimer?.Stop();
+        _memoryTimer = null;
+    }
+
+    /// <summary>
+    /// Opens a recipe requested from the command line or a second instance.
+    /// Prompts to save current changes first, like the Open dialog.
+    /// </summary>
+    public async Task OpenExternalRecipeAsync(string path)
+    {
+        if (DataContext is not MainWindowViewModel vm) return;
+        if (!File.Exists(path))
+        {
+            await MessageDialog.ShowAsync(
+                this,
+                LocalizationService.L("dialog.open_failed.title"),
+                $"The recipe file does not exist: {path}",
+                MessageDialogButtons.Ok);
+            return;
+        }
+
+        if (!await EnsureCanDiscardAsync(vm, "dialog.action.open_recipe")) return;
+        await OpenRecipeAsync(vm, path);
+        Activate();
+    }
+
+    private async void OnExportDiagnosticsClick(object? sender, RoutedEventArgs e)
+    {
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = LocalizationService.L("dialog.picker.export_diagnostics"),
+            SuggestedFileName = $"lmtds-diagnostics-{DateTime.Now:yyyyMMdd-HHmmss}.zip",
+            DefaultExtension = "zip",
+            ShowOverwritePrompt = true,
+            FileTypeChoices = new[]
+            {
+                new FilePickerFileType("ZIP") { Patterns = new[] { "*.zip" } }
+            }
+        });
+
+        var path = file?.TryGetLocalPath();
+        if (string.IsNullOrWhiteSpace(path)) return;
+
+        try
+        {
+            CrashReportService.CreateReport(path);
+            await MessageDialog.ShowAsync(
+                this,
+                LocalizationService.L("dialog.diagnostics_title"),
+                string.Format(LocalizationService.L("dialog.diagnostics_message_format"), path),
+                MessageDialogButtons.Ok);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            await MessageDialog.ShowAsync(
+                this,
+                LocalizationService.L("dialog.diagnostics_failed_title"),
+                ex.Message,
+                MessageDialogButtons.Ok);
         }
     }
 
@@ -236,6 +349,7 @@ public partial class MainWindow : Window
     {
         if (DataContext is not MainWindowViewModel vm) return;
         if (!e.KeyModifiers.HasFlag(KeyModifiers.Control)) return;
+        if (e.Source is TextBox) return;
 
         var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
         switch (e.Key)
@@ -251,6 +365,15 @@ public partial class MainWindow : Window
             case Key.S:
                 e.Handled = true;
                 _ = SaveAsync(vm, forceSaveAs: shift);
+                break;
+            case Key.Z when shift:
+            case Key.Y:
+                e.Handled = true;
+                vm.CommandHistory.Redo();
+                break;
+            case Key.Z:
+                e.Handled = true;
+                vm.CommandHistory.Undo();
                 break;
         }
     }

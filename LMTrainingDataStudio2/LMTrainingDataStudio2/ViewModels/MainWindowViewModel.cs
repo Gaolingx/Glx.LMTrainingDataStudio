@@ -81,6 +81,18 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private string _memoryUsage = "0 MB";
 
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(UndoCommand))]
+    private bool _canUndo;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RedoCommand))]
+    private bool _canRedo;
+
+    public string UndoDescription => CommandHistory.UndoDescription ?? string.Empty;
+
+    public string RedoDescription => CommandHistory.RedoDescription ?? string.Empty;
+
     private double _canvasZoomScale = 1;
 
     public string CanvasZoomText => string.Format(LocalizationService.L("shell.zoom_format"), _canvasZoomScale);
@@ -717,6 +729,7 @@ public partial class MainWindowViewModel : ObservableObject
             foreach (BlockNodeViewModel block in e.OldItems)
             {
                 block.PropertyChanged -= OnBlockPropertyChanged;
+                block.ConfigCommandSink = null;
             }
         }
 
@@ -725,6 +738,8 @@ public partial class MainWindowViewModel : ObservableObject
             foreach (BlockNodeViewModel block in e.NewItems)
             {
                 block.PropertyChanged += OnBlockPropertyChanged;
+                block.ConfigCommandSink = command =>
+                    CommandHistory.ExecuteMerged(command, MergeConfigCommands);
             }
         }
 
@@ -800,12 +815,43 @@ public partial class MainWindowViewModel : ObservableObject
 
     private void OnHistoryChanged(object? sender, EventArgs e)
     {
+        CanUndo = CommandHistory.CanUndo;
+        CanRedo = CommandHistory.CanRedo;
+        OnPropertyChanged(nameof(UndoDescription));
+        OnPropertyChanged(nameof(RedoDescription));
+
         if (_suppressDocumentEvents) return;
 
-        StatusText = CommandHistory.CanUndo || CommandHistory.CanRedo ? "Recipe history updated" : "Ready";
+        StatusText = "Recipe history updated";
         MarkDirty();
         CanvasRenderRequested?.Invoke();
     }
+
+    private static IUndoableCommand? MergeConfigCommands(
+        IUndoableCommand previous,
+        IUndoableCommand current)
+    {
+        if (previous is not SetBlockConfigCommand first ||
+            current is not SetBlockConfigCommand second ||
+            !ReferenceEquals(first.Block, second.Block) ||
+            (second.TimestampUtc - first.TimestampUtc).TotalMilliseconds > 1500)
+        {
+            return null;
+        }
+
+        return first.MergeWith(second);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanUndo))]
+    private void Undo() => CommandHistory.Undo();
+
+    [RelayCommand(CanExecute = nameof(CanRedo))]
+    private void Redo() => CommandHistory.Redo();
+
+    /// <summary>
+    /// Re-samples the process working set for the status bar.
+    /// </summary>
+    public void RefreshMemoryUsage() => UpdateMemoryUsage();
 
     private void MarkDirty()
     {

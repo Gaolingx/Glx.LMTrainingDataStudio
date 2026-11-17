@@ -12,28 +12,28 @@
 
     <UserControl.Styles>
         <Style Selector="TextBlock.issueError">
-            <Setter Property="Foreground" Value="#FF8080" />
+            <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
         </Style>
         <Style Selector="TextBlock.issueWarning">
-            <Setter Property="Foreground" Value="#E0C060" />
+            <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
         </Style>
         <Style Selector="TextBlock.sectionTitle">
             <Setter Property="FontSize" Value="10" />
-            <Setter Property="Foreground" Value="#888888" />
+            <Setter Property="Foreground" Value="{DynamicResource TextDimBrush}" />
         </Style>
         <Style Selector="Border.rowCard">
-            <Setter Property="Background" Value="#1E1E2E" />
-            <Setter Property="BorderBrush" Value="#2E2E42" />
+            <Setter Property="Background" Value="{DynamicResource InputBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="4" />
             <Setter Property="Padding" Value="0" />
         </Style>
         <Style Selector="Border.rowCard.inserted">
-            <Setter Property="Background" Value="#1B2A20" />
-            <Setter Property="BorderBrush" Value="#4E7A5A" />
+            <Setter Property="Background" Value="{DynamicResource DiffInsertedBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource DiffInsertedBorderBrush}" />
         </Style>
         <Style Selector="Border.rowCard.match">
-            <Setter Property="BorderBrush" Value="#B08A2A" />
+            <Setter Property="BorderBrush" Value="{DynamicResource MatchBorderBrush}" />
         </Style>
         <Style Selector="Border.rowCard.deleted">
             <Setter Property="Opacity" Value="0.55" />
@@ -42,7 +42,7 @@
             <Setter Property="FontFamily" Value="Consolas, Menlo, monospace" />
             <Setter Property="FontSize" Value="11" />
             <Setter Property="Padding" Value="8,5" />
-            <Setter Property="Foreground" Value="#D6D6E0" />
+            <Setter Property="Foreground" Value="{DynamicResource RowJsonBrush}" />
             <Setter Property="TextWrapping" Value="NoWrap" />
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
         </Style>
@@ -56,38 +56,38 @@
         </Style>
     </UserControl.Styles>
 
-    <Grid ColumnDefinitions="*,420" RowDefinitions="Auto,*" Background="{StaticResource CanvasBackgroundBrush}">
+    <Grid ColumnDefinitions="*,420" RowDefinitions="Auto,*" Background="{DynamicResource CanvasBackgroundBrush}">
 
         <!-- Header -->
         <Border Grid.Row="0" Grid.ColumnSpan="2" Height="48"
-                Background="{StaticResource HeaderBackgroundBrush}"
-                BorderBrush="{StaticResource PanelBorderBrush}"
+                Background="{DynamicResource HeaderBackgroundBrush}"
+                BorderBrush="{DynamicResource PanelBorderBrush}"
                 BorderThickness="0,0,0,1">
             <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="12,0" ColumnSpacing="12">
                 <Button Grid.Column="0" Content="{loc:Loc data.open_dataset}"
                         Click="OnOpenDatasetClick"
                         IsEnabled="{Binding !IsBusy}"
                         Padding="12,6" FontSize="12"
-                        Background="#4A90D9" Foreground="#FFFFFF"
+                        Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource AccentForegroundBrush}"
                         VerticalAlignment="Center" />
 
                 <TextBlock Grid.Column="1"
                            Text="{Binding SourcePathText}"
-                           FontSize="11" Foreground="#AAAAAA"
+                           FontSize="11" Foreground="{DynamicResource TextMutedBrush}"
                            VerticalAlignment="Center"
                            TextTrimming="CharacterEllipsis" />
 
                 <TextBlock Grid.Column="2" Text="{Binding SourceFileTypeText}"
-                           FontSize="11" Foreground="#888888"
+                           FontSize="11" Foreground="{DynamicResource TextDimBrush}"
                            VerticalAlignment="Center" />
 
                 <TextBlock Grid.Column="3"
                            Text="{Binding TotalRowsText}"
-                           FontSize="11" Foreground="#CCCCCC"
+                           FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}"
                            VerticalAlignment="Center" />
 
                 <TextBlock Grid.Column="4" Text="{Binding PositionText}"
-                           FontSize="11" Foreground="#888888"
+                           FontSize="11" Foreground="{DynamicResource TextDimBrush}"
                            VerticalAlignment="Center" />
             </Grid>
         </Border>
@@ -96,33 +96,33 @@
         <DockPanel Grid.Row="1" Grid.Column="0">
             <!-- Pagination -->
             <Border DockPanel.Dock="Top" Height="40"
-                    Background="#222233"
-                    BorderBrush="{StaticResource PanelBorderBrush}"
+                    Background="{DynamicResource AppSurfaceAltBrush}"
+                    BorderBrush="{DynamicResource PanelBorderBrush}"
                     BorderThickness="0,0,0,1">
                 <StackPanel Orientation="Horizontal" Spacing="6" Margin="10,0"
                             VerticalAlignment="Center">
                     <Button Content="⏮" Command="{Binding FirstPageCommand}"
-                            Background="Transparent" Foreground="#CCCCCC" FontSize="12" Padding="8,4"
+                            Background="Transparent" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" Padding="8,4"
                             ToolTip.Tip="{loc:Loc data.first_page}" />
                     <Button Content="{loc:Loc data.prev}" Command="{Binding PreviousPageCommand}"
-                            Background="Transparent" Foreground="#CCCCCC" FontSize="11" Padding="8,4" />
-                    <TextBlock Text="{Binding PositionText}" FontSize="11" Foreground="#AAAAAA"
+                            Background="Transparent" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" Padding="8,4" />
+                    <TextBlock Text="{Binding PositionText}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}"
                                VerticalAlignment="Center" Margin="4,0" />
                     <Button Content="{loc:Loc data.next}" Command="{Binding NextPageCommand}"
-                            Background="Transparent" Foreground="#CCCCCC" FontSize="11" Padding="8,4" />
+                            Background="Transparent" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" Padding="8,4" />
                     <Button Content="⏭" Command="{Binding LastPageCommand}"
-                            Background="Transparent" Foreground="#CCCCCC" FontSize="12" Padding="8,4"
+                            Background="Transparent" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" Padding="8,4"
                             ToolTip.Tip="{loc:Loc data.last_page}" />
-                    <Border Width="1" Height="18" Background="#3A3A4E" Margin="6,0" />
-                    <TextBlock Text="{loc:Loc data.go_to_row}" FontSize="10" Foreground="#888888"
+                    <Border Width="1" Height="18" Background="{DynamicResource ButtonSurfaceBrush}" Margin="6,0" />
+                    <TextBlock Text="{loc:Loc data.go_to_row}" FontSize="10" Foreground="{DynamicResource TextDimBrush}"
                                VerticalAlignment="Center" />
                     <TextBox Text="{Binding GoToRowText, Mode=TwoWay}"
                              Width="90" FontSize="11" VerticalAlignment="Center"
                              Watermark="{loc:Loc data.row}" />
                     <Button Content="{loc:Loc data.go}" Command="{Binding GoToRowCommand}"
-                            Background="#3A3A4E" Foreground="#FFFFFF" FontSize="11" Padding="10,4" />
-                    <Border Width="1" Height="18" Background="#3A3A4E" Margin="6,0" />
-                    <TextBlock Text="{loc:Loc data.page_size}" FontSize="10" Foreground="#888888"
+                            Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" FontSize="11" Padding="10,4" />
+                    <Border Width="1" Height="18" Background="{DynamicResource ButtonSurfaceBrush}" Margin="6,0" />
+                    <TextBlock Text="{loc:Loc data.page_size}" FontSize="10" Foreground="{DynamicResource TextDimBrush}"
                                VerticalAlignment="Center" />
                     <ComboBox ItemsSource="{Binding AvailablePageSizes}"
                               SelectedItem="{Binding PageSize, Mode=TwoWay}"
@@ -132,8 +132,8 @@
 
             <!-- Edit toolbar -->
             <Border DockPanel.Dock="Top" Height="38"
-                    Background="#1F1F30"
-                    BorderBrush="{StaticResource PanelBorderBrush}"
+                    Background="{DynamicResource AppSurfaceAltBrush}"
+                    BorderBrush="{DynamicResource PanelBorderBrush}"
                     BorderThickness="0,0,0,1">
                 <ScrollViewer HorizontalScrollBarVisibility="Auto"
                               VerticalScrollBarVisibility="Disabled">
@@ -141,56 +141,56 @@
                                 VerticalAlignment="Center">
                         <Button Content="{loc:Loc data.insert_above}"
                                 Command="{Binding InsertRowAboveCommand}"
-                                Background="Transparent" Foreground="#CCCCCC"
+                                Background="Transparent" Foreground="{DynamicResource TextPrimaryBrush}"
                                 FontSize="11" Padding="8,4" />
                         <Button Content="{loc:Loc data.insert_below}"
                                 Command="{Binding InsertRowBelowCommand}"
-                                Background="Transparent" Foreground="#CCCCCC"
+                                Background="Transparent" Foreground="{DynamicResource TextPrimaryBrush}"
                                 FontSize="11" Padding="8,4" />
                         <Button Content="{loc:Loc data.duplicate_row}"
                                 Command="{Binding DuplicateRowCommand}"
-                                Background="Transparent" Foreground="#CCCCCC"
+                                Background="Transparent" Foreground="{DynamicResource TextPrimaryBrush}"
                                 FontSize="11" Padding="8,4" />
                         <Button Content="{loc:Loc data.delete_row}"
                                 Command="{Binding DeleteRowCommand}"
-                                Background="Transparent" Foreground="#FF9090"
+                                Background="Transparent" Foreground="{DynamicResource DangerBrush}"
                                 FontSize="11" Padding="8,4" />
                         <Button Content="{loc:Loc data.restore_row}"
                                 Command="{Binding RestoreRowCommand}"
-                                Background="Transparent" Foreground="#7FD08A"
+                                Background="Transparent" Foreground="{DynamicResource SuccessBrush}"
                                 FontSize="11" Padding="8,4" />
-                        <Border Width="1" Height="18" Background="#3A3A4E" Margin="4,0" />
+                        <Border Width="1" Height="18" Background="{DynamicResource ButtonSurfaceBrush}" Margin="4,0" />
                         <Button Content="↶" Command="{Binding UndoEditCommand}"
                                 ToolTip.Tip="{loc:Loc data.undo_edit}"
-                                Background="Transparent" Foreground="#CCCCCC"
+                                Background="Transparent" Foreground="{DynamicResource TextPrimaryBrush}"
                                 FontSize="13" Padding="8,2" />
                         <Button Content="↷" Command="{Binding RedoEditCommand}"
                                 ToolTip.Tip="{loc:Loc data.redo_edit}"
-                                Background="Transparent" Foreground="#CCCCCC"
+                                Background="Transparent" Foreground="{DynamicResource TextPrimaryBrush}"
                                 FontSize="13" Padding="8,2" />
-                        <Border Width="1" Height="18" Background="#3A3A4E" Margin="4,0" />
+                        <Border Width="1" Height="18" Background="{DynamicResource ButtonSurfaceBrush}" Margin="4,0" />
                         <Button Content="{loc:Loc data.save_edits_as}"
                                 Click="OnSaveEditsClick"
                                 IsEnabled="{Binding HasPendingEdits}"
-                                Background="#4A90D9" Foreground="#FFFFFF"
+                                Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource AccentForegroundBrush}"
                                 FontSize="11" Padding="10,4" />
                         <Button Content="{loc:Loc data.overwrite_source}"
                                 Click="OnOverwriteSourceClick"
                                 IsEnabled="{Binding HasPendingEdits}"
-                                Background="#3A2020" Foreground="#FFB0B0"
+                                Background="{DynamicResource DangerSurfaceBrush}" Foreground="{DynamicResource DangerTextBrush}"
                                 FontSize="11" Padding="10,4" />
                         <Button Content="{loc:Loc data.discard_edits}"
                                 Command="{Binding DiscardEditsCommand}"
-                                Background="Transparent" Foreground="#AAAAAA"
+                                Background="Transparent" Foreground="{DynamicResource TextMutedBrush}"
                                 FontSize="11" Padding="8,4" />
                         <TextBlock Text="{Binding PendingEditText}"
-                                   FontSize="10" Foreground="#E0C060"
+                                   FontSize="10" Foreground="{DynamicResource WarningBrush}"
                                    VerticalAlignment="Center" Margin="6,0" />
                         <ProgressBar Value="{Binding EditProgress}" Minimum="0" Maximum="1"
                                      Width="80" Height="3" VerticalAlignment="Center"
                                      IsVisible="{Binding IsSavingEdits}" />
                         <TextBlock Text="{Binding EditStatusText}"
-                                   FontSize="10" Foreground="#888888"
+                                   FontSize="10" Foreground="{DynamicResource TextDimBrush}"
                                    VerticalAlignment="Center" Margin="4,0"
                                    MaxWidth="360" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
@@ -198,24 +198,24 @@
             </Border>
 
             <TextBlock DockPanel.Dock="Bottom" Text="{Binding StatusText}"
-                       FontSize="10" Foreground="#777777" Margin="12,6"
+                       FontSize="10" Foreground="{DynamicResource TextFaintBrush}" Margin="12,6"
                        TextWrapping="Wrap" />
 
             <!-- Row editor: per-field cells or raw JSON -->
             <Border DockPanel.Dock="Bottom" Height="304"
                     IsVisible="{Binding IsDatasetOpen}"
                     Background="{StaticResource PanelBackgroundBrush}"
-                    BorderBrush="{StaticResource PanelBorderBrush}"
+                    BorderBrush="{DynamicResource PanelBorderBrush}"
                     BorderThickness="0,1,0,0">
                 <Grid RowDefinitions="Auto,*,Auto" Margin="10,8">
                     <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
                         <TextBlock Text="{loc:Loc data.row_json_editor}" FontSize="10"
-                                   Foreground="#888888" VerticalAlignment="Center" />
+                                   Foreground="{DynamicResource TextDimBrush}" VerticalAlignment="Center" />
                         <TextBlock Grid.Column="1" Text="{Binding SelectedRow.NumberText}"
-                                   FontSize="10" Foreground="#4A90D9"
+                                   FontSize="10" Foreground="{DynamicResource AccentBrush}"
                                    VerticalAlignment="Center" />
                         <TextBlock Grid.Column="2" Text="{loc:Loc data.edit_row_hint}"
-                                   FontSize="9" Foreground="#666666"
+                                   FontSize="9" Foreground="{DynamicResource TextSubtleBrush}"
                                    VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis" />
                     </Grid>
@@ -227,25 +227,25 @@
                             <Grid RowDefinitions="*,Auto" RowSpacing="4">
                                 <ListBox ItemsSource="{Binding SelectedRowFields}"
                                          SelectedItem="{Binding SelectedField, Mode=TwoWay}"
-                                         Background="#1E1E2E" BorderBrush="#2E2E42"
+                                         Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource AppBorderBrush}"
                                          BorderThickness="1" FontSize="10" Margin="0,4,0,0">
                                     <ListBox.ItemTemplate>
                                         <DataTemplate x:DataType="vm:DatasetFieldViewModel">
                                             <Grid ColumnDefinitions="150,64,*" ColumnSpacing="6" Margin="2">
                                                 <TextBlock Text="{Binding Name}"
                                                            FontFamily="Consolas, Menlo, monospace"
-                                                           FontSize="10" Foreground="#9CCFF0"
+                                                           FontSize="10" Foreground="{DynamicResource HighlightKeyBrush}"
                                                            VerticalAlignment="Center"
                                                            TextTrimming="CharacterEllipsis" />
                                                 <TextBlock Grid.Column="1" Text="{Binding Kind}"
-                                                           FontSize="9" Foreground="#777777"
+                                                           FontSize="9" Foreground="{DynamicResource TextFaintBrush}"
                                                            VerticalAlignment="Center" />
                                                 <TextBox Grid.Column="2"
                                                          Text="{Binding ValueText, Mode=TwoWay}"
                                                          FontFamily="Consolas, Menlo, monospace"
                                                          FontSize="10" Padding="5,3"
                                                          MinHeight="24"
-                                                         Background="#171722" BorderBrush="#33334A" />
+                                                         Background="{DynamicResource AppSurfaceDeepBrush}" BorderBrush="{DynamicResource AppBorderStrongBrush}" />
                                             </Grid>
                                         </DataTemplate>
                                     </ListBox.ItemTemplate>
@@ -258,13 +258,13 @@
                                     <Button Content="{loc:Loc data.add_field}"
                                             Command="{Binding AddFieldCommand}"
                                             FontSize="10" Padding="8,3"
-                                            Background="#3A3A4E" Foreground="#FFFFFF" />
+                                            Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
                                     <Button Content="{loc:Loc data.remove_field}"
                                             Command="{Binding RemoveFieldCommand}"
                                             FontSize="10" Padding="8,3"
-                                            Background="#3A2020" Foreground="#FFB0B0" />
+                                            Background="{DynamicResource DangerSurfaceBrush}" Foreground="{DynamicResource DangerTextBrush}" />
                                     <TextBlock Text="{loc:Loc data.fields_not_available}"
-                                               FontSize="9" Foreground="#777777"
+                                               FontSize="9" Foreground="{DynamicResource TextFaintBrush}"
                                                VerticalAlignment="Center"
                                                IsVisible="{Binding !FieldsAvailable}" />
                                 </StackPanel>
@@ -277,7 +277,7 @@
                                      IsEnabled="{Binding SelectedRow.IsEditable}"
                                      AcceptsReturn="True" TextWrapping="NoWrap"
                                      FontFamily="Consolas, Menlo, monospace" FontSize="11"
-                                     Background="#1E1E2E" BorderBrush="#2E2E42"
+                                     Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource AppBorderBrush}"
                                      BorderThickness="1" Padding="8,5"
                                      VerticalAlignment="Stretch" Margin="0,4"
                                      Watermark="{loc:Loc data.select_a_row_to_edit}" />
@@ -286,16 +286,16 @@
 
                     <Grid Grid.Row="2" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
                         <TextBlock Text="{Binding RowEditError}" FontSize="10"
-                                   Foreground="#FF8080" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap"
                                    VerticalAlignment="Center" />
                         <Button Grid.Column="1" Content="{loc:Loc data.apply_fields}"
                                 Command="{Binding ApplyFieldsCommand}"
                                 IsVisible="{Binding FieldsAvailable}"
-                                Background="#3A3A4E" Foreground="#FFFFFF"
+                                Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}"
                                 FontSize="11" Padding="12,4" />
                         <Button Grid.Column="2" Content="{loc:Loc data.apply_row_edit}"
                                 Command="{Binding ApplyRowEditCommand}"
-                                Background="#3A3A4E" Foreground="#FFFFFF"
+                                Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}"
                                 FontSize="11" Padding="12,4" />
                     </Grid>
                 </Grid>
@@ -305,9 +305,9 @@
             <StackPanel IsVisible="{Binding !IsDatasetOpen}"
                         VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="8">
                 <TextBlock Text="{loc:Loc data.open_a_dataset_to_preview_it_page_by_page}"
-                           FontSize="13" Foreground="#888888" HorizontalAlignment="Center" />
+                           FontSize="13" Foreground="{DynamicResource TextDimBrush}" HorizontalAlignment="Center" />
                 <TextBlock Text="{loc:Loc data.right_panel_convert_search_replace_dedup_shuffle}"
-                           FontSize="10" Foreground="#666666" HorizontalAlignment="Center" />
+                           FontSize="10" Foreground="{DynamicResource TextSubtleBrush}" HorizontalAlignment="Center" />
             </StackPanel>
 
             <!-- Virtualized rows -->
@@ -328,17 +328,17 @@
                             <Grid ColumnDefinitions="48,*">
                                 <StackPanel Grid.Column="0" Margin="0,3,0,0">
                                     <TextBlock Text="{Binding NumberText}" FontSize="10"
-                                               Foreground="#6A7A8A"
+                                               Foreground="{DynamicResource TextFaintBrush}"
                                                HorizontalAlignment="Right"
                                                Margin="0,0,4,0" />
                                     <TextBlock Classes="tag" Text="{loc:Loc data.row_tag_new}"
-                                               Foreground="#7FD08A"
+                                               Foreground="{DynamicResource SuccessBrush}"
                                                IsVisible="{Binding IsInserted}" />
                                     <TextBlock Classes="tag" Text="{loc:Loc data.row_tag_edited}"
-                                               Foreground="#E0C060"
+                                               Foreground="{DynamicResource WarningBrush}"
                                                IsVisible="{Binding IsModified}" />
                                     <TextBlock Classes="tag" Text="{loc:Loc data.row_tag_deleted}"
-                                               Foreground="#FF8080"
+                                               Foreground="{DynamicResource DangerBrush}"
                                                IsVisible="{Binding IsDeleted}" />
                                 </StackPanel>
                                 <TextBlock Grid.Column="1"
@@ -358,7 +358,7 @@
         <!-- Tool tabs -->
         <Border Grid.Row="1" Grid.Column="1"
                 Background="{StaticResource PanelBackgroundBrush}"
-                BorderBrush="{StaticResource PanelBorderBrush}"
+                BorderBrush="{DynamicResource PanelBorderBrush}"
                 BorderThickness="1,0,0,0">
             <TabControl Padding="0" Background="Transparent">
 
@@ -386,7 +386,7 @@
                                              FontSize="10" Watermark="out.jsonl / out.csv / out.parquet" />
                                     <Button Grid.Column="1" Content="…"
                                             Click="OnBrowseTargetClick"
-                                            Background="#3A3A4E" Foreground="#FFFFFF"
+                                            Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}"
                                             FontSize="11" Padding="10,4" />
                                 </Grid>
                             </StackPanel>
@@ -395,12 +395,12 @@
                                 <Button Content="{loc:Loc common.convert}"
                                         Command="{Binding ConvertCommand}"
                                         IsEnabled="{Binding !IsConverting}"
-                                        Background="#4A90D9" Foreground="#FFFFFF"
+                                        Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource AccentForegroundBrush}"
                                         FontSize="11" Padding="14,6" />
                                 <Button Content="{loc:Loc common.cancel}"
                                         Command="{Binding CancelConversionCommand}"
                                         IsVisible="{Binding IsConverting}"
-                                        Background="#3A2020" Foreground="#FF8080"
+                                        Background="{DynamicResource DangerSurfaceBrush}" Foreground="{DynamicResource DangerBrush}"
                                         FontSize="11" Padding="12,6" />
                             </StackPanel>
 
@@ -410,30 +410,30 @@
                             </StackPanel>
 
                             <TextBlock Text="{Binding ConversionSummary}"
-                                       FontSize="10" Foreground="#AAAAAA" TextWrapping="Wrap" />
+                                       FontSize="10" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" />
 
                             <StackPanel Spacing="6" IsVisible="{Binding HasConversionErrors}">
-                                <TextBlock Text="{loc:Loc data.failed_rows}" FontSize="10" Foreground="#FF8080" />
+                                <TextBlock Text="{loc:Loc data.failed_rows}" FontSize="10" Foreground="{DynamicResource DangerBrush}" />
                                 <ListBox ItemsSource="{Binding ConversionErrors}"
-                                         Background="#1E1E2E" BorderBrush="#2E2E42"
+                                         Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource AppBorderBrush}"
                                          MaxHeight="240" FontSize="10">
                                     <ListBox.ItemTemplate>
                                         <DataTemplate>
                                             <TextBlock Text="{Binding}" FontSize="10"
-                                                       Foreground="#E0A0A0" TextWrapping="Wrap" />
+                                                       Foreground="{DynamicResource DangerTextBrush}" TextWrapping="Wrap" />
                                         </DataTemplate>
                                     </ListBox.ItemTemplate>
                                 </ListBox>
                             </StackPanel>
 
-                            <Border Background="#1E1E2E" BorderBrush="#2E2E42" BorderThickness="1"
+                            <Border Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1"
                                     CornerRadius="6" Padding="10">
                                 <StackPanel Spacing="4">
                                     <TextBlock Classes="sectionTitle" Text="{loc:Loc data.supported_conversions}" />
                                     <TextBlock Text="{loc:Loc data.openai_sharegpt_alpaca_chat_pretrain_dpo_dpo_pre}"
-                                               FontSize="10" Foreground="#AAAAAA" TextWrapping="Wrap" />
+                                               FontSize="10" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" />
                                     <TextBlock Text="{loc:Loc data.unsupported_pairs_fail_explicitly_and_are_listed}"
-                                               FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
+                                               FontSize="10" Foreground="{DynamicResource TextFaintBrush}" TextWrapping="Wrap" />
                                 </StackPanel>
                             </Border>
                         </StackPanel>
@@ -465,17 +465,17 @@
                                 <Button Content="{loc:Loc common.preview}"
                                         Command="{Binding Search.PreviewCommand}"
                                         IsEnabled="{Binding !Search.IsBusy}"
-                                        Background="#4A90D9" Foreground="#FFFFFF"
+                                        Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource AccentForegroundBrush}"
                                         FontSize="11" Padding="14,6" />
                                 <Button Content="{loc:Loc data.replace_to_file}"
                                         Command="{Binding Search.ReplaceCommand}"
                                         IsEnabled="{Binding !Search.IsBusy}"
-                                        Background="#3A3A4E" Foreground="#FFFFFF"
+                                        Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}"
                                         FontSize="11" Padding="12,6" />
                                 <Button Content="{loc:Loc common.cancel}"
                                         Command="{Binding Search.CancelCommand}"
                                         IsVisible="{Binding Search.IsCancellable}"
-                                        Background="#3A2020" Foreground="#FF8080"
+                                        Background="{DynamicResource DangerSurfaceBrush}" Foreground="{DynamicResource DangerBrush}"
                                         FontSize="11" Padding="10,6" />
                             </StackPanel>
 
@@ -483,7 +483,7 @@
                                          Height="4" IsVisible="{Binding Search.IsBusy}" />
 
                             <TextBlock Text="{Binding Search.Summary}" FontSize="10"
-                                       Foreground="#AAAAAA" TextWrapping="Wrap" />
+                                       Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" />
 
                             <StackPanel Spacing="6">
                                 <TextBlock Classes="sectionTitle" Text="{loc:Loc data.replacement_target}" />
@@ -492,7 +492,7 @@
                                              FontSize="10" Watermark="replaced.jsonl" />
                                     <Button Grid.Column="1" Content="…"
                                             Click="OnBrowseSearchTargetClick"
-                                            Background="#3A3A4E" Foreground="#FFFFFF"
+                                            Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}"
                                             FontSize="11" Padding="10,4" />
                                 </Grid>
                             </StackPanel>
@@ -502,19 +502,19 @@
                             <ListBox ItemsSource="{Binding Search.Matches}"
                                      SelectedItem="{Binding Search.SelectedMatch, Mode=TwoWay}"
                                      DoubleTapped="OnSearchMatchDoubleTapped"
-                                     Background="#1E1E2E" BorderBrush="#2E2E42"
+                                     Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource AppBorderBrush}"
                                      MaxHeight="260" FontSize="10">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate x:DataType="vm:DatasetSearchMatchViewModel">
                                         <StackPanel Spacing="2" Margin="2">
                                             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
                                                 <TextBlock Text="{Binding LineText}" FontSize="10"
-                                                           Foreground="#6A7A8A" />
+                                                           Foreground="{DynamicResource TextFaintBrush}" />
                                                 <TextBlock Grid.Column="1" Text="{Binding CountText}"
-                                                           FontSize="10" Foreground="#AAAAAA" />
+                                                           FontSize="10" Foreground="{DynamicResource TextMutedBrush}" />
                                             </Grid>
                                             <TextBlock Text="{Binding Snippet}" FontSize="10"
-                                                       Foreground="#CCCCCC" TextWrapping="Wrap"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap"
                                                        FontFamily="Consolas, Menlo, monospace" />
                                         </StackPanel>
                                     </DataTemplate>
@@ -522,7 +522,7 @@
                             </ListBox>
 
                             <TextBlock Text="{Binding Search.StatusText}" FontSize="10"
-                                       Foreground="#777777" TextWrapping="Wrap" />
+                                       Foreground="{DynamicResource TextFaintBrush}" TextWrapping="Wrap" />
                         </StackPanel>
                     </ScrollViewer>
                 </TabItem>
@@ -558,7 +558,7 @@
                                              FontSize="10" Watermark="clean.jsonl" />
                                     <Button Grid.Column="1" Content="…"
                                             Click="OnBrowseTransformOutputClick"
-                                            Background="#3A3A4E" Foreground="#FFFFFF"
+                                            Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}"
                                             FontSize="11" Padding="10,4" />
                                 </Grid>
                             </StackPanel>
@@ -570,7 +570,7 @@
                                              FontSize="10" Watermark="{loc:Loc data.folder}" />
                                     <Button Grid.Column="1" Content="…"
                                             Click="OnBrowseTransformDirectoryClick"
-                                            Background="#3A3A4E" Foreground="#FFFFFF"
+                                            Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}"
                                             FontSize="11" Padding="10,4" />
                                 </Grid>
                             </StackPanel>
@@ -579,12 +579,12 @@
                                 <Button Content="{loc:Loc common.run}"
                                         Command="{Binding Transform.RunCommand}"
                                         IsEnabled="{Binding !Transform.IsBusy}"
-                                        Background="#4A90D9" Foreground="#FFFFFF"
+                                        Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource AccentForegroundBrush}"
                                         FontSize="11" Padding="16,6" />
                                 <Button Content="{loc:Loc common.cancel}"
                                         Command="{Binding Transform.CancelCommand}"
                                         IsVisible="{Binding Transform.IsCancellable}"
-                                        Background="#3A2020" Foreground="#FF8080"
+                                        Background="{DynamicResource DangerSurfaceBrush}" Foreground="{DynamicResource DangerBrush}"
                                         FontSize="11" Padding="10,6" />
                             </StackPanel>
 
@@ -592,22 +592,22 @@
                                          Height="4" IsVisible="{Binding Transform.IsBusy}" />
 
                             <TextBlock Text="{Binding Transform.Summary}" FontSize="10"
-                                       Foreground="#AAAAAA" TextWrapping="Wrap" />
+                                       Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" />
 
                             <TextBlock Classes="sectionTitle" Text="{loc:Loc common.results}" />
                             <ListBox ItemsSource="{Binding Transform.Results}"
-                                     Background="#1E1E2E" BorderBrush="#2E2E42"
+                                     Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource AppBorderBrush}"
                                      MaxHeight="220" FontSize="10">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate x:DataType="vm:DatasetTransformOutputLine">
                                         <TextBlock Text="{Binding Text}" FontSize="10"
-                                                   Foreground="#CCCCCC" TextWrapping="Wrap" />
+                                                   Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap" />
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
                             </ListBox>
 
                             <TextBlock Text="{Binding Transform.StatusText}" FontSize="10"
-                                       Foreground="#777777" TextWrapping="Wrap" />
+                                       Foreground="{DynamicResource TextFaintBrush}" TextWrapping="Wrap" />
                         </StackPanel>
                     </ScrollViewer>
                 </TabItem>
@@ -625,12 +625,12 @@
                                 <Button Content="{loc:Loc data.compute}"
                                         Command="{Binding Statistics.ComputeCommand}"
                                         IsEnabled="{Binding !Statistics.IsBusy}"
-                                        Background="#4A90D9" Foreground="#FFFFFF"
+                                        Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource AccentForegroundBrush}"
                                         FontSize="11" Padding="14,6" />
                                 <Button Content="{loc:Loc common.cancel}"
                                         Command="{Binding Statistics.CancelCommand}"
                                         IsVisible="{Binding Statistics.IsCancellable}"
-                                        Background="#3A2020" Foreground="#FF8080"
+                                        Background="{DynamicResource DangerSurfaceBrush}" Foreground="{DynamicResource DangerBrush}"
                                         FontSize="11" Padding="10,6" />
                             </StackPanel>
 
@@ -638,15 +638,15 @@
                                          Height="4" IsVisible="{Binding Statistics.IsBusy}" />
 
                             <TextBlock Text="{Binding Statistics.Summary}" FontSize="10"
-                                       Foreground="#AAAAAA" TextWrapping="Wrap" />
+                                       Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" />
 
                             <ItemsControl ItemsSource="{Binding Statistics.Metrics}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:DatasetMetric">
                                         <Grid ColumnDefinitions="*,Auto" Margin="0,2">
-                                            <TextBlock Text="{Binding Name}" FontSize="10" Foreground="#AAAAAA" />
+                                            <TextBlock Text="{Binding Name}" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" />
                                             <TextBlock Grid.Column="1" Text="{Binding Value}" FontSize="10"
-                                                       Foreground="#E0E0E0" />
+                                                       Foreground="{DynamicResource TextBrightBrush}" />
                                         </Grid>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
@@ -657,9 +657,9 @@
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:DatasetMetric">
                                         <Grid ColumnDefinitions="*,Auto" Margin="0,1">
-                                            <TextBlock Text="{Binding Name}" FontSize="10" Foreground="#AAAAAA" />
+                                            <TextBlock Text="{Binding Name}" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" />
                                             <TextBlock Grid.Column="1" Text="{Binding Value}" FontSize="10"
-                                                       Foreground="#E0E0E0" />
+                                                       Foreground="{DynamicResource TextBrightBrush}" />
                                         </Grid>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
@@ -670,9 +670,9 @@
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:DatasetMetric">
                                         <Grid ColumnDefinitions="*,Auto" Margin="0,1">
-                                            <TextBlock Text="{Binding Name}" FontSize="10" Foreground="#AAAAAA" />
+                                            <TextBlock Text="{Binding Name}" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" />
                                             <TextBlock Grid.Column="1" Text="{Binding Value}" FontSize="10"
-                                                       Foreground="#E0E0E0" />
+                                                       Foreground="{DynamicResource TextBrightBrush}" />
                                         </Grid>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
@@ -683,16 +683,16 @@
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:DatasetMetric">
                                         <Grid ColumnDefinitions="*,Auto" Margin="0,1">
-                                            <TextBlock Text="{Binding Name}" FontSize="10" Foreground="#AAAAAA" />
+                                            <TextBlock Text="{Binding Name}" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" />
                                             <TextBlock Grid.Column="1" Text="{Binding Value}" FontSize="10"
-                                                       Foreground="#E0E0E0" />
+                                                       Foreground="{DynamicResource TextBrightBrush}" />
                                         </Grid>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
 
                             <TextBlock Text="{Binding Statistics.StatusText}" FontSize="10"
-                                       Foreground="#777777" TextWrapping="Wrap" />
+                                       Foreground="{DynamicResource TextFaintBrush}" TextWrapping="Wrap" />
                         </StackPanel>
                     </ScrollViewer>
                 </TabItem>
@@ -704,7 +704,7 @@
                             <TextBlock Classes="sectionTitle" Text="{loc:Loc data.quality_validation}" />
 
                             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
-                                <TextBlock Text="{loc:Loc data.max_issues}" FontSize="10" Foreground="#888888"
+                                <TextBlock Text="{loc:Loc data.max_issues}" FontSize="10" Foreground="{DynamicResource TextDimBrush}"
                                            VerticalAlignment="Center" />
                                 <TextBox Grid.Column="1" Text="{Binding Validation.MaxIssuesText, Mode=TwoWay}"
                                          FontSize="11" Width="90" HorizontalAlignment="Left" />
@@ -714,12 +714,12 @@
                                 <Button Content="{loc:Loc common.validate}"
                                         Command="{Binding Validation.ValidateCommand}"
                                         IsEnabled="{Binding !Validation.IsBusy}"
-                                        Background="#4A90D9" Foreground="#FFFFFF"
+                                        Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource AccentForegroundBrush}"
                                         FontSize="11" Padding="14,6" />
                                 <Button Content="{loc:Loc common.cancel}"
                                         Command="{Binding Validation.CancelCommand}"
                                         IsVisible="{Binding Validation.IsCancellable}"
-                                        Background="#3A2020" Foreground="#FF8080"
+                                        Background="{DynamicResource DangerSurfaceBrush}" Foreground="{DynamicResource DangerBrush}"
                                         FontSize="11" Padding="10,6" />
                             </StackPanel>
 
@@ -727,11 +727,11 @@
                                          Height="4" IsVisible="{Binding Validation.IsBusy}" />
 
                             <TextBlock Text="{Binding Validation.Summary}" FontSize="10"
-                                       Foreground="#AAAAAA" TextWrapping="Wrap" />
+                                       Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" />
 
                             <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="6">
                                 <TextBlock Text="{loc:Loc data.severity_filter}" FontSize="10"
-                                           Foreground="#888888" VerticalAlignment="Center" />
+                                           Foreground="{DynamicResource TextDimBrush}" VerticalAlignment="Center" />
                                 <ComboBox Grid.Column="1" FontSize="11" HorizontalAlignment="Stretch"
                                           ItemsSource="{Binding Validation.SeverityOptions}"
                                           SelectedItem="{Binding Validation.SelectedSeverityOption, Mode=TwoWay}">
@@ -742,7 +742,7 @@
                                     </ComboBox.ItemTemplate>
                                 </ComboBox>
                                 <TextBlock Grid.Column="2" Text="{loc:Loc data.code_filter}" FontSize="10"
-                                           Foreground="#888888" VerticalAlignment="Center" />
+                                           Foreground="{DynamicResource TextDimBrush}" VerticalAlignment="Center" />
                                 <ComboBox Grid.Column="3" FontSize="11" HorizontalAlignment="Stretch"
                                           ItemsSource="{Binding Validation.CodeOptions}"
                                           SelectedItem="{Binding Validation.SelectedCodeOption, Mode=TwoWay}">
@@ -756,7 +756,7 @@
 
                             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
                                 <TextBlock Text="{loc:Loc data.group_by}" FontSize="10"
-                                           Foreground="#888888" VerticalAlignment="Center" />
+                                           Foreground="{DynamicResource TextDimBrush}" VerticalAlignment="Center" />
                                 <ComboBox Grid.Column="1" FontSize="11" HorizontalAlignment="Stretch"
                                           ItemsSource="{Binding Validation.GroupModes}"
                                           SelectedItem="{Binding Validation.SelectedGroupMode, Mode=TwoWay}">
@@ -769,7 +769,7 @@
                             </Grid>
 
                             <TextBlock Text="{Binding Validation.FilterSummary}" FontSize="9"
-                                       Foreground="#777777" />
+                                       Foreground="{DynamicResource TextFaintBrush}" />
 
                             <TextBlock Classes="sectionTitle"
                                        Text="{loc:Loc data.issues_double_click_to_jump}" />
@@ -777,22 +777,22 @@
                                      IsVisible="{Binding !Validation.IsGrouped}"
                                      SelectedItem="{Binding Validation.SelectedIssue, Mode=TwoWay}"
                                      DoubleTapped="OnIssueDoubleTapped"
-                                     Background="#1E1E2E" BorderBrush="#2E2E42"
+                                     Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource AppBorderBrush}"
                                      MaxHeight="260" FontSize="10">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate x:DataType="vm:DatasetIssueViewModel">
                                         <StackPanel Spacing="2" Margin="2">
                                             <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
                                                 <TextBlock Text="{Binding LineText}" FontSize="10"
-                                                           Foreground="#6A7A8A" />
+                                                           Foreground="{DynamicResource TextFaintBrush}" />
                                                 <TextBlock Grid.Column="1" Text="{Binding CodeText}"
-                                                           FontSize="10" Foreground="#AAAAAA" />
+                                                           FontSize="10" Foreground="{DynamicResource TextMutedBrush}" />
                                                 <TextBlock Grid.Column="2" Text="{Binding PathText}"
-                                                           FontSize="10" Foreground="#777777"
+                                                           FontSize="10" Foreground="{DynamicResource TextFaintBrush}"
                                                            TextTrimming="CharacterEllipsis" />
                                             </Grid>
                                             <TextBlock Text="{Binding Message}" FontSize="10"
-                                                       Foreground="#CCCCCC" TextWrapping="Wrap" />
+                                                       Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap" />
                                         </StackPanel>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
@@ -802,27 +802,27 @@
                                       IsVisible="{Binding Validation.IsGrouped}"
                                       SelectedItem="{Binding Validation.SelectedTreeNode, Mode=TwoWay}"
                                       DoubleTapped="OnIssueTreeDoubleTapped"
-                                      Background="#1E1E2E" BorderBrush="#2E2E42"
+                                      Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource AppBorderBrush}"
                                       MaxHeight="260" FontSize="10">
                                 <TreeView.ItemTemplate>
                                     <TreeDataTemplate x:DataType="vm:ValidationIssueNodeViewModel"
                                                       ItemsSource="{Binding Children}">
                                         <StackPanel Spacing="2" Margin="2">
                                             <TextBlock Text="{Binding Header}" FontSize="10"
-                                                       FontWeight="SemiBold" Foreground="#DDDDDD"
+                                                       FontWeight="SemiBold" Foreground="{DynamicResource TextBrightBrush}"
                                                        IsVisible="{Binding IsGroup}" />
                                             <StackPanel Spacing="2" IsVisible="{Binding IsLeaf}">
                                                 <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
                                                     <TextBlock Text="{Binding LineText}" FontSize="10"
-                                                               Foreground="#6A7A8A" />
+                                                               Foreground="{DynamicResource TextFaintBrush}" />
                                                     <TextBlock Grid.Column="1" Text="{Binding CodeText}"
-                                                               FontSize="10" Foreground="#AAAAAA" />
+                                                               FontSize="10" Foreground="{DynamicResource TextMutedBrush}" />
                                                     <TextBlock Grid.Column="2" Text="{Binding PathText}"
-                                                               FontSize="10" Foreground="#777777"
+                                                               FontSize="10" Foreground="{DynamicResource TextFaintBrush}"
                                                                TextTrimming="CharacterEllipsis" />
                                                 </Grid>
                                                 <TextBlock Text="{Binding Message}" FontSize="10"
-                                                           Foreground="#CCCCCC" TextWrapping="Wrap" />
+                                                           Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap" />
                                             </StackPanel>
                                         </StackPanel>
                                     </TreeDataTemplate>
@@ -830,10 +830,10 @@
                             </TreeView>
 
                             <TextBlock Text="{loc:Loc data.issue_list_is_capped_totals_keep_counting_after}"
-                                       FontSize="9" Foreground="#666666"
+                                       FontSize="9" Foreground="{DynamicResource TextSubtleBrush}"
                                        IsVisible="{Binding Validation.IssuesTruncated}" />
 
-                            <Border Height="1" Background="#3A3A4E" Margin="0,4" />
+                            <Border Height="1" Background="{DynamicResource ButtonSurfaceBrush}" Margin="0,4" />
 
                             <TextBlock Classes="sectionTitle" Text="{loc:Loc data.auto_fix_jsonl_only}" />
 
@@ -841,12 +841,12 @@
                                 <Button Content="{loc:Loc data.preview_fixes}"
                                         Command="{Binding Validation.PreviewFixesCommand}"
                                         IsEnabled="{Binding !Validation.IsBusy}"
-                                        Background="#3A3A4E" Foreground="#FFFFFF"
+                                        Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}"
                                         FontSize="11" Padding="12,6" />
                                 <Button Content="{loc:Loc data.write_fixed_copy}"
                                         Command="{Binding Validation.WriteFixesCommand}"
                                         IsEnabled="{Binding !Validation.IsBusy}"
-                                        Background="#3A3A4E" Foreground="#FFFFFF"
+                                        Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}"
                                         FontSize="11" Padding="12,6" />
                             </StackPanel>
 
@@ -855,24 +855,24 @@
                                          FontSize="10" Watermark="fixed.jsonl" />
                                 <Button Grid.Column="1" Content="…"
                                         Click="OnBrowseFixTargetClick"
-                                        Background="#3A3A4E" Foreground="#FFFFFF"
+                                        Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}"
                                         FontSize="11" Padding="10,4" />
                             </Grid>
 
                             <TextBlock Text="{Binding Validation.FixSummary}" FontSize="10"
-                                       Foreground="#AAAAAA" TextWrapping="Wrap" />
+                                       Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" />
 
                             <ListBox ItemsSource="{Binding Validation.FixSamples}"
                                      IsVisible="{Binding Validation.HasFixPreview}"
-                                     Background="#1E1E2E" BorderBrush="#2E2E42"
+                                     Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource AppBorderBrush}"
                                      MaxHeight="220" FontSize="10">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate x:DataType="services:DatasetFixSample">
                                         <StackPanel Spacing="2" Margin="2">
                                             <TextBlock Text="{Binding LineNumber}"
-                                                       FontSize="10" Foreground="#6A7A8A" />
+                                                       FontSize="10" Foreground="{DynamicResource TextFaintBrush}" />
                                             <TextBlock Text="{Binding Fixed}" FontSize="10"
-                                                       Foreground="#A0D0A0" TextWrapping="Wrap"
+                                                       Foreground="{DynamicResource SuccessBrush}" TextWrapping="Wrap"
                                                        FontFamily="Consolas, Menlo, monospace" />
                                         </StackPanel>
                                     </DataTemplate>
@@ -880,7 +880,7 @@
                             </ListBox>
 
                             <TextBlock Text="{Binding Validation.StatusText}" FontSize="10"
-                                       Foreground="#777777" TextWrapping="Wrap" />
+                                       Foreground="{DynamicResource TextFaintBrush}" TextWrapping="Wrap" />
                         </StackPanel>
                     </ScrollViewer>
                 </TabItem>

@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "id": "llm_batch",
+  "name": "LLM Batch Generation",
+  "blocks": [
+    {
+      "id": "seed",
+      "type": "Seed",
+      "name": "seed",
+      "displayName": "Seed Source",
+      "x": 80,
+      "y": 160,
+      "width": 200,
+      "height": 80,
+      "inputPorts": [],
+      "outputPorts": [
+        {
+          "id": "seed_out_0",
+          "name": "rows",
+          "dataType": "rows",
+          "direction": "Output"
+        }
+      ],
+      "config": {
+        "kind": "seed",
+        "sourcePath": "",
+        "fileType": "Jsonl",
+        "streaming": false,
+        "useIndexCache": true
+      }
+    },
+    {
+      "id": "llm",
+      "type": "Llm",
+      "name": "llm",
+      "displayName": "LLM Model Call",
+      "x": 360,
+      "y": 160,
+      "width": 200,
+      "height": 80,
+      "inputPorts": [
+        {
+          "id": "llm_in_0",
+          "name": "input",
+          "dataType": "rows",
+          "direction": "Input"
+        }
+      ],
+      "outputPorts": [
+        {
+          "id": "llm_out_0",
+          "name": "output",
+          "dataType": "rows",
+          "direction": "Output"
+        }
+      ],
+      "config": {
+        "kind": "llm",
+        "provider": "openai_chat",
+        "modelAlias": "gpt-4o-mini",
+        "temperature": 0.7,
+        "maxTokens": 2048,
+        "timeoutSeconds": 100,
+        "maxRetries": 2,
+        "useRowMessages": false,
+        "maxConcurrency": 1,
+        "maxFailureSamples": 100,
+        "inputCostPerMillionTokens": 0,
+        "outputCostPerMillionTokens": 0,
+        "continueOnError": false
+      }
+    },
+    {
+      "id": "export",
+      "type": "SftExport",
+      "name": "export",
+      "displayName": "SFT Export",
+      "x": 640,
+      "y": 160,
+      "width": 200,
+      "height": 80,
+      "inputPorts": [
+        {
+          "id": "export_in_0",
+          "name": "input",
+          "dataType": "rows",
+          "direction": "Input"
+        }
+      ],
+      "outputPorts": [],
+      "config": {
+        "kind": "sft_export",
+        "outputPath": "out/llm-batch.jsonl"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_seed_llm",
+      "sourceBlockId": "seed",
+      "sourcePortId": "seed_out_0",
+      "targetBlockId": "llm",
+      "targetPortId": "llm_in_0",
+      "label": "rows"
+    },
+    {
+      "id": "edge_llm_export",
+      "sourceBlockId": "llm",
+      "sourcePortId": "llm_out_0",
+      "targetBlockId": "export",
+      "targetPortId": "export_in_0",
+      "label": "rows"
+    }
+  ],
+  "createdAt": "2026-01-01T00:00:00Z",
+  "modifiedAt": "2026-01-01T00:00:00Z"
+}

@@ -1,0 +1,193 @@
+{
+  "schemaVersion": 1,
+  "id": "real_tools",
+  "name": "Real Tool Calls",
+  "blocks": [
+    {
+      "id": "queries",
+      "type": "QuerySource",
+      "name": "queries",
+      "displayName": "Query Source",
+      "x": 80,
+      "y": 160,
+      "width": 200,
+      "height": 80,
+      "inputPorts": [],
+      "outputPorts": [
+        {
+          "id": "queries_out_0",
+          "name": "queries",
+          "dataType": "rows",
+          "direction": "Output"
+        }
+      ],
+      "config": {
+        "kind": "query_source",
+        "queries": [
+          "Use the python tool to compute 21 * 2 and explain the result."
+        ],
+        "mode": "MultipleQueries",
+        "repeat": 1,
+        "systemPrompt": "You are a precise tool-using assistant.",
+        "queryField": "query",
+        "systemField": "system"
+      }
+    },
+    {
+      "id": "simulation",
+      "type": "Simulation",
+      "name": "simulation",
+      "displayName": "Simulation",
+      "x": 360,
+      "y": 120,
+      "width": 200,
+      "height": 80,
+      "inputPorts": [
+        {
+          "id": "simulation_in_0",
+          "name": "input",
+          "dataType": "rows",
+          "direction": "Input"
+        }
+      ],
+      "outputPorts": [
+        {
+          "id": "simulation_out_0",
+          "name": "output",
+          "dataType": "rows",
+          "direction": "Output"
+        }
+      ],
+      "config": {
+        "kind": "simulation",
+        "modelAlias": "gpt-4o-mini",
+        "maxRounds": 4,
+        "systemPrompt": "Call the python tool when a calculation is needed.",
+        "tools": [
+          {
+            "name": "python",
+            "description": "Execute Python source code and return its output.",
+            "parametersJson": "{\u0022type\u0022:\u0022object\u0022,\u0022properties\u0022:{\u0022code\u0022:{\u0022type\u0022:\u0022string\u0022,\u0022description\u0022:\u0022Python source to execute.\u0022}},\u0022required\u0022:[\u0022code\u0022]}",
+            "behavior": "Success",
+            "responseTemplate": "[simulated python] executed: {{arguments}}",
+            "errorMessage": "Simulated tool failure.",
+            "delayMs": 0,
+            "failuresBeforeSuccess": 0,
+            "timeoutMs": 0
+          }
+        ],
+        "rules": {
+          "allowedTools": [
+            "python"
+          ],
+          "defaultTimeoutMs": 30000,
+          "maxRetries": 1,
+          "retryDelayMs": 0,
+          "abortOnToolFailure": false
+        },
+        "provider": "openai_chat",
+        "temperature": 0.7,
+        "maxTokens": 2048,
+        "timeoutSeconds": 100,
+        "modelMaxRetries": 0,
+        "emitIncompleteTrajectories": false,
+        "modelMode": "Provider",
+        "toolMode": "Real",
+        "maxConcurrency": 1,
+        "failureOutputPath": "out/real-tools-failed.jsonl",
+        "maxFailureSamples": 100,
+        "inputCostPerMillionTokens": 0,
+        "outputCostPerMillionTokens": 0,
+        "requestsPerMinute": 0,
+        "streamDeltas": false
+      }
+    },
+    {
+      "id": "cleaner",
+      "type": "Cleaner",
+      "name": "cleaner",
+      "displayName": "Cleaner",
+      "x": 640,
+      "y": 160,
+      "width": 200,
+      "height": 80,
+      "inputPorts": [
+        {
+          "id": "cleaner_in_0",
+          "name": "input",
+          "dataType": "rows",
+          "direction": "Input"
+        }
+      ],
+      "outputPorts": [
+        {
+          "id": "cleaner_out_0",
+          "name": "output",
+          "dataType": "rows",
+          "direction": "Output"
+        }
+      ],
+      "config": {
+        "kind": "cleaner",
+        "rules": {
+          "normalizeWhitespace": true,
+          "normalizeNewlines": true,
+          "stripAnsi": false,
+          "removeReasoningContent": true,
+          "dropEmptyMessages": true
+        }
+      }
+    },
+    {
+      "id": "export",
+      "type": "SftExport",
+      "name": "export",
+      "displayName": "SFT Export",
+      "x": 920,
+      "y": 160,
+      "width": 200,
+      "height": 80,
+      "inputPorts": [
+        {
+          "id": "export_in_0",
+          "name": "input",
+          "dataType": "rows",
+          "direction": "Input"
+        }
+      ],
+      "outputPorts": [],
+      "config": {
+        "kind": "sft_export",
+        "outputPath": "out/real-tools-sft.jsonl"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_queries_simulation",
+      "sourceBlockId": "queries",
+      "sourcePortId": "queries_out_0",
+      "targetBlockId": "simulation",
+      "targetPortId": "simulation_in_0",
+      "label": "rows"
+    },
+    {
+      "id": "edge_simulation_cleaner",
+      "sourceBlockId": "simulation",
+      "sourcePortId": "simulation_out_0",
+      "targetBlockId": "cleaner",
+      "targetPortId": "cleaner_in_0",
+      "label": "rows"
+    },
+    {
+      "id": "edge_cleaner_export",
+      "sourceBlockId": "cleaner",
+      "sourcePortId": "cleaner_out_0",
+      "targetBlockId": "export",
+      "targetPortId": "export_in_0",
+      "label": "rows"
+    }
+  ],
+  "createdAt": "2026-01-01T00:00:00Z",
+  "modifiedAt": "2026-01-01T00:00:00Z"
+}

@@ -652,7 +652,7 @@ public sealed class Round15NodeCapabilityTests
             MaxConcurrency = Math.Max(MaxConcurrency, running);
             try
             {
-                var prompt = request.Messages.Last().Content ?? string.Empty;
+                var prompt = request.Messages[^1].Content ?? string.Empty;
                 await Task.Delay(25, cancellationToken);
                 if (prompt.Contains("fail", StringComparison.OrdinalIgnoreCase))
                 {

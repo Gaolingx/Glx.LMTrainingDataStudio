@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "id": "oai_clean",
+  "name": "OAI Trajectory Cleanup",
+  "blocks": [
+    {
+      "id": "seed",
+      "type": "Seed",
+      "name": "seed",
+      "displayName": "Seed Source",
+      "x": 80,
+      "y": 160,
+      "width": 200,
+      "height": 80,
+      "inputPorts": [],
+      "outputPorts": [
+        {
+          "id": "seed_out_0",
+          "name": "rows",
+          "dataType": "rows",
+          "direction": "Output"
+        }
+      ],
+      "config": {
+        "kind": "seed",
+        "sourcePath": "",
+        "fileType": "Jsonl",
+        "streaming": false,
+        "useIndexCache": true
+      }
+    },
+    {
+      "id": "cleaner",
+      "type": "Cleaner",
+      "name": "cleaner",
+      "displayName": "Cleaner",
+      "x": 360,
+      "y": 160,
+      "width": 200,
+      "height": 80,
+      "inputPorts": [
+        {
+          "id": "cleaner_in_0",
+          "name": "input",
+          "dataType": "rows",
+          "direction": "Input"
+        }
+      ],
+      "outputPorts": [
+        {
+          "id": "cleaner_out_0",
+          "name": "output",
+          "dataType": "rows",
+          "direction": "Output"
+        }
+      ],
+      "config": {
+        "kind": "cleaner",
+        "rules": {
+          "normalizeWhitespace": true,
+          "normalizeNewlines": true,
+          "stripAnsi": true,
+          "removeReasoningContent": true,
+          "dropEmptyMessages": true
+        }
+      }
+    },
+    {
+      "id": "export",
+      "type": "SftExport",
+      "name": "export",
+      "displayName": "SFT Export",
+      "x": 640,
+      "y": 160,
+      "width": 200,
+      "height": 80,
+      "inputPorts": [
+        {
+          "id": "export_in_0",
+          "name": "input",
+          "dataType": "rows",
+          "direction": "Input"
+        }
+      ],
+      "outputPorts": [],
+      "config": {
+        "kind": "sft_export",
+        "outputPath": "out/clean-sft.jsonl"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_seed_cleaner",
+      "sourceBlockId": "seed",
+      "sourcePortId": "seed_out_0",
+      "targetBlockId": "cleaner",
+      "targetPortId": "cleaner_in_0",
+      "label": "rows"
+    },
+    {
+      "id": "edge_cleaner_export",
+      "sourceBlockId": "cleaner",
+      "sourcePortId": "cleaner_out_0",
+      "targetBlockId": "export",
+      "targetPortId": "export_in_0",
+      "label": "rows"
+    }
+  ],
+  "createdAt": "2026-01-01T00:00:00Z",
+  "modifiedAt": "2026-01-01T00:00:00Z"
+}

@@ -40,13 +40,13 @@ public sealed class RealToolRuntime : IToolRuntime
 
     public async Task<string> ExecuteAsync(
         SimulatedToolRule rule,
-        ToolCall call,
+        ToolCall toolCall,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(rule);
-        ArgumentNullException.ThrowIfNull(call);
+        ArgumentNullException.ThrowIfNull(toolCall);
 
-        var arguments = ParseArguments(rule.Name, call);
+        var arguments = ParseArguments(rule.Name, toolCall);
         var tool = rule.Name.Trim().ToLowerInvariant();
 
         return tool switch

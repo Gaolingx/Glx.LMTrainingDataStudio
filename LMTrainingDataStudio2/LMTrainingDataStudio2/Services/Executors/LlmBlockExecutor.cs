@@ -19,8 +19,8 @@ public interface ILlmClient
         LlmBlockConfig config,
         CancellationToken cancellationToken = default)
     {
-        var prompt = request.Messages.LastOrDefault(message => message.Role == "user")?.Content
-                     ?? request.Messages.LastOrDefault()?.Content
+        var prompt = (request.Messages.LastOrDefault(message => message.Role == "user")?.Content
+                      ?? (request.Messages.Count > 0 ? request.Messages[^1].Content : null))
                      ?? string.Empty;
         return new LlmCompletionResult(
             await CompleteAsync(prompt, config, cancellationToken),

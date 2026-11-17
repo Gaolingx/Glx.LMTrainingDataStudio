@@ -1,7 +1,7 @@
 # STATUS — 功能清单、节点能力矩阵与下一阶段规划
 
-> 最后核对：2026-11-17（Round 15 完成）
-> 验证基线：`dotnet build` 0 警告 0 错误；`dotnet test` 495 通过 + 6 个 gated 测试（2 个真实 provider 冒烟 + 4 个性能，默认跳过）；Headless UI 测试通过；1M 行 JSONL、1M 行质量操作与 1M 行编辑保存基线通过；win-x64 单文件发布与 Debug 启动冒烟通过。
+> 最后核对：2026-11-17（Round 16 完成）
+> 验证基线：`dotnet build` 0 警告 0 错误（分析器开启）；`dotnet test` 505 通过 + 7 个 gated 测试（2 个真实 provider 冒烟 + 5 个性能 gated，默认跳过）；Headless UI 测试通过；1M 行 JSONL、1M 行质量操作与 1M 行编辑保存基线通过；10M 行链路与 CSV/Parquet 大规模基线入口已提供；win-x64 单文件发布与 Debug 启动冒烟通过。
 >
 > 图例：`[x]` 已完成并有测试/验证；`[部分]` 可用但有明确缺口；`[ ]` 未实现。
 >
@@ -35,6 +35,8 @@
 - 节点级检查点与中断恢复：失败/取消运行保留已完成节点输出，Executions “恢复执行”从首个未完成节点继续；成功运行后清理检查点。
 - SFT Export：文件选择器、运行前覆盖确认、可选字段白名单、写出行数与首行预览日志。
 - 1M 行 Seed → Expression → SFT Export 基线：17.2s，托管内存增量 1MB；取消后 1s 内停止的测试通过。
+- 10M 行 Seed → Expression → SFT Export 基线：生成 5.0s、运行 154.0s、托管内存增量 1MB、输出 10,000,000 行。
+- CSV/Parquet 大规模基线：20 万行 @256B，JSONL→CSV 14.3s、JSONL→Parquet 13.1s、最慢 100 行分页 18.2ms、托管内存增量 17MB。
 - 10 种节点类型全部接入 Block Sheet、画布、默认配置与 Recipe JSON。
 - Query Source → Simulation → Cleaner → SFT Export 端到端 SFT 轨迹生成可用（脚本/真实 provider、模拟/真实工具均可切换）。
 - 真实 provider tool-calling（OpenAI Chat/Responses、Anthropic）与真实沙箱工具（python/PowerShell/bash/web_fetch）。
@@ -49,15 +51,22 @@
 - Sampler 多端口切分、分层字段、切分统计预览。
 - Simulation Tools/Rules/Script 可视化编辑器、OpenAI Chat 流式 delta、RequestsPerMinute 限速与价格预设。
 - Query Source Fluid 模板变量与外部 JSONL/CSV/Parquet query 源。
-- 工程化：滚动日志与全局异常、Dark/Light 主题资源、GitHub Actions CI、win-x64 单文件发布脚本、Headless UI 测试、MIT LICENSE、应用图标。
-- 501 个自动化测试：495 个常规通过 + 6 个 gated（2 个真实 provider 冒烟 + 4 个性能）。
+- 画布 polish：节点尺寸手柄（持久化 + 撤销）、边 hover 流动动画、边标签避让；Undo/Redo 菜单与 `Ctrl+Shift+Z`；属性名称/配置修改进入撤销历史并自动合并。
+- 完整 Dark/Light 主题：所有 Views 使用主题资源，无硬编码颜色字面量；主题切换即时刷新画布与窗口背景。
+- 状态栏内存占用定时刷新（2s）。
+- 单实例与命令行打开（命名互斥体 + 命名管道转发）；`.recipe` 文件关联清单与安装脚本。
+- 诊断与崩溃报告：Help → Export Diagnostics（脱敏设置 + 日志 + 最近运行摘要）；未处理异常自动写崩溃 zip。
+- 发布：MSIX 清单/打包脚本、Inno Setup 安装脚本；`examples/` 6 个示例 Recipe；README Dark/Light 截图。
+- 工程质量：`.editorconfig`、.NET 分析器 `latest-recommended`、警告即错误；构建 0 警告。
+- 工程化：滚动日志与全局异常、GitHub Actions CI、win-x64 单文件发布脚本、Headless UI 测试、MIT LICENSE、应用图标。
+- 512 个自动化测试：505 个常规通过 + 7 个 gated（2 个真实 provider 冒烟 + 5 个性能 gated）。
 
 ### 1.2 当前最大缺口（按优先级）
 
-1. **发布与体验**：10M 行实测、MSIX/安装包、文件关联/单实例、README 截图、完整浅色主题、节点尺寸手柄/边过渡动画、Undo/Redo 菜单尚未完成。
-2. **执行韧性残余**：恢复仅验证行数与内容，未做逐字节/哈希比对；溢写阈值按行数计；检查点无磁盘配额。
-3. **数据编辑残余**：编辑只保存为源格式；字段编辑覆盖顶层字段，`messages` 等嵌套结构仍按 JSON 文本编辑；匹配项导航与预览分页未做。
-4. **节点能力残余**：LLM 不执行 tool_calls 回填；Anthropic 无结构化输出约束；Validator script 为 Fluid 布尔表达式而非任意脚本；Sampler 分层仅对 ratio/splits 生效；Tool Profile 无 MCP。
+1. **执行韧性残余**：恢复仅验证行数与内容，未做逐字节/哈希比对；溢写阈值按行数计；检查点无磁盘配额。
+2. **数据编辑残余**：编辑只保存为源格式；字段编辑覆盖顶层字段，`messages` 等嵌套结构仍按 JSON 文本编辑；匹配项导航与预览分页未做。
+3. **节点能力残余**：LLM 不执行 tool_calls 回填；Anthropic 无结构化输出约束；Validator script 为 Fluid 布尔表达式而非任意脚本；Sampler 分层仅对 ratio/splits 生效；Tool Profile 无 MCP。
+4. **发布残余**：MSIX/Inno 安装包未在本机实际安装验证；单实例管道未做双进程自动化测试；10M 行结果需按本机实测记录。
 
 ### 1.3 一页总览
 
@@ -80,8 +89,8 @@
 - Cleaner：5 个布尔规则 + 正则规则可用；正则规则仍走 Config JSON；已有清洗前后 diff 预览，无坏行报告。
 - SFT Export：流式 + 原子替换 + 行透传 + 文件选择器 + 覆盖确认 + 字段白名单可用；已有输出预览弹窗；无拆分/DPO-Pretrain 直出。
 - 执行：层内并行/暂停/重试、输出摘要、溢写/流式、检查点恢复可用；检查点无配额，恢复未做哈希比对。
-- 画布：核心交互可用；无节点尺寸手柄/边动画/Undo-Redo 菜单；配置修改未进撤销历史。
-- 设置：主题变体与网格吸附生效；部分视图仍硬编码深色；内存占用只在启动时采样一次。
+- 画布：核心交互、尺寸手柄、边动画、标签避让、Undo/Redo 菜单与属性撤销可用；逐帧性能未做 UI 级计时。
+- 设置：完整 Dark/Light 主题、网格吸附与内存定时刷新生效；其他设置变更仍不通知已创建的服务。
 
 **未实现（下一阶段工作池）**
 
@@ -93,11 +102,11 @@
 - Query Source 随机/模型生成 query、query 去重与权重。
 - Tool Profile MCP 适配、共享工具库、LLM 请求侧复用。
 - Seed 多文件/目录、过滤/列映射、编码选项、HuggingFace/HTTP 数据源。
-- 10M 行实测、CSV/Parquet 大规模质量基线、CSV 类型推断。
-- 节点尺寸手柄、边过渡动画、标签避让、自动布局间距选项、完整浅色主题。
-- Undo/Redo 菜单与属性修改撤销、全局快捷键、系统剪贴板/跨实例粘贴。
-- MSIX/安装包、文件关联、单实例、命令行打开、崩溃报告导出、README 截图。
-- API Key 加密存储、设置变更通知、运行日志/执行状态本地化、分析器与警告即错误。
+- 10M 行实测与 CSV/Parquet 大规模基线按需运行（入口已提供）。
+- 节点尺寸手柄、边过渡动画、标签避让、完整浅色主题已完成。
+- 单实例、命令行打开、文件关联、MSIX/Inno 脚本与诊断导出已完成；安装包未做本机安装验证。
+- 跨格式数据编辑保存、消息/角色级表单、匹配项导航、预览分页。
+- API Key 加密存储、设置变更通知、运行日志/执行状态本地化、Tool Profile MCP。
 
 ---
 
@@ -432,6 +441,7 @@
 | 13 | 执行与 IO 韧性 | 溢写缓冲、检查点/恢复、取消清理硬化、SFT 收尾 | 437 测试 + 5 gated |
 | 14 | 数据工作台编辑与预览 | 逐行 CRUD/字段级单元格编辑/撤销重做/另存与覆盖、搜索高亮、校验筛选与分组树、统一样本预览 | 480 测试 + 6 gated |
 | 15 | 节点能力收紧 | 多输出端口、LLM tools/结构化输出/并发/失败样本、Validator 多规则/超时/双端口、Sampler 分层与端口、Simulation 可视化编辑器/流式/限速/价格、Query Source 模板与外部源 | 495 测试 + 6 gated |
+| 16 | 发布与体验 | 画布尺寸/边动画/标签避让、Undo/Redo 菜单与属性撤销、完整浅色主题、内存定时刷新、单实例/命令行/诊断、MSIX/Inno、示例与截图、10M/CSV/Parquet 基线入口、分析器 | 505 测试 + 7 gated |
 
 ---
 
@@ -506,6 +516,8 @@
 
 ### Round 16 — 发布与体验（P2）
 
+> 状态：已完成（2026-11-17）。节点尺寸手柄/边动画/标签避让、Undo/Redo 菜单与属性撤销、完整浅色主题、内存定时刷新、单实例/命令行/文件关联、诊断与崩溃报告、MSIX/Inno 脚本、示例 Recipe 与截图、分析器与警告即错误落地；新增 10 个测试，505 通过 + 7 gated。
+
 **目标**：达到可对外演示/分发的完成度。
 
 **交付**
@@ -524,7 +536,6 @@
 - 10M 行基线数据记录在文档中，README 截图与示例可直接使用。
 
 ### 6.1 后续 backlog（暂不排期）
-
 - Tool Profile MCP（stdio/HTTP）、共享工具库与鉴权。
 - 容器级沙箱隔离、非 Windows 资源限制。
 - HuggingFace/HTTP 数据源。

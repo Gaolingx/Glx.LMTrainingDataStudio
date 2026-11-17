@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using LMTrainingDataStudio2.Commands;
 using LMTrainingDataStudio2.Models;
 using LMTrainingDataStudio2.Services;
 using System.Collections.ObjectModel;
@@ -91,6 +92,12 @@ public partial class BlockNodeViewModel : ObservableObject
     private string? _configJsonError;
 
     private BlockConfig _config = null!;
+
+    /// <summary>
+    /// Receives configuration edits so they can be recorded in the document history.
+    /// When null (tests, bulk loads), edits are applied directly.
+    /// </summary>
+    public Action<IUndoableCommand>? ConfigCommandSink { get; set; }
 
     /// <summary>
     /// Configuration whose block kind must match <see cref="Type"/>.
@@ -186,7 +193,7 @@ public partial class BlockNodeViewModel : ObservableObject
             return false;
         }
 
-        Config = config;
+        ApplyConfigEdit(config);
         return true;
     }
 
@@ -194,7 +201,25 @@ public partial class BlockNodeViewModel : ObservableObject
 
     private void ApplyLlmConfig(LlmBlockConfig config) => ApplyConfig(config);
 
-    private void ApplyConfig(BlockConfig config)
+    private void ApplyConfig(BlockConfig config) => ApplyConfigEdit(config);
+
+    private void ApplyConfigEdit(BlockConfig config)
+    {
+        if (_config.Equals(config)) return;
+
+        if (ConfigCommandSink is { } sink)
+        {
+            sink(new SetBlockConfigCommand(this, _config, config));
+            return;
+        }
+
+        SetConfigFromHistory(config);
+    }
+
+    /// <summary>
+    /// Applies a configuration without creating a history entry (used by undo/redo and loading).
+    /// </summary>
+    public void SetConfigFromHistory(BlockConfig config)
     {
         if (_config.Equals(config)) return;
 

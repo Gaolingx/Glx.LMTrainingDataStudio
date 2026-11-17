@@ -330,16 +330,16 @@ public sealed class RecipeValidationService
 
         foreach (var edge in recipe.Edges)
         {
-            if (adjacency.ContainsKey(edge.SourceBlockId))
-                adjacency[edge.SourceBlockId].Add(edge.TargetBlockId);
+            if (adjacency.TryGetValue(edge.SourceBlockId, out var targets))
+                targets.Add(edge.TargetBlockId);
         }
 
         // Topological sort with cycle detection (Kahn's algorithm)
         var inDegree = recipe.Blocks.ToDictionary(b => b.Id, _ => 0);
         foreach (var edge in recipe.Edges)
         {
-            if (inDegree.ContainsKey(edge.TargetBlockId))
-                inDegree[edge.TargetBlockId]++;
+            if (inDegree.TryGetValue(edge.TargetBlockId, out var degree))
+                inDegree[edge.TargetBlockId] = degree + 1;
         }
 
         var queue = new Queue<string>(inDegree.Where(kv => kv.Value == 0).Select(kv => kv.Key));

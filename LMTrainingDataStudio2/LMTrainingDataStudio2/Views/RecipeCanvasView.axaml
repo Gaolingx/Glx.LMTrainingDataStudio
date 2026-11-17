@@ -9,25 +9,6 @@
              x:Class="LMTrainingDataStudio2.Views.RecipeCanvasView"
              x:DataType="vm:MainWindowViewModel">
 
-    <UserControl.Styles>
-        <!-- Block Node Style -->
-        <Style Selector="Border.block-node">
-            <Setter Property="CornerRadius" Value="8" />
-            <Setter Property="Background" Value="#2A2A3E" />
-            <Setter Property="BorderBrush" Value="#3A3A4E" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Width" Value="200" />
-            <Setter Property="Cursor" Value="Hand" />
-        </Style>
-        <Style Selector="Border.block-node:pointerover">
-            <Setter Property="BorderBrush" Value="#5A5A7E" />
-        </Style>
-        <Style Selector="Border.block-node-selected">
-            <Setter Property="BorderBrush" Value="#4A90D9" />
-            <Setter Property="BorderThickness" Value="2" />
-        </Style>
-    </UserControl.Styles>
-
     <Panel>
         <!-- Grid background follows pan and zoom -->
         <controls:GridBackground Name="GridBackground"
@@ -35,99 +16,11 @@
                                  LineBrush="{DynamicResource CanvasGridBrush}" />
 
         <Canvas Name="CanvasArea" Background="Transparent"
-                ClipToBounds="True">
-
-            <!-- Edges rendered as bezier curves -->
-            <ItemsControl ItemsSource="{Binding Edges}">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <Canvas />
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:EdgeViewModel">
-                        <!-- Edge placeholder - actual bezier rendering in code-behind -->
-                        <Canvas />
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-
-            <!-- Block Nodes -->
-            <ItemsControl ItemsSource="{Binding Blocks}">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <Canvas />
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:BlockNodeViewModel">
-                        <Border Classes="block-node"
-                                Classes.block-node-selected="{Binding IsSelected}"
-                                ToolTip.Tip="{Binding DescriptionText}">
-                            <StackPanel>
-                                <!-- Header with type color -->
-                                <Border Height="28" CornerRadius="8,8,0,0"
-                                        Padding="10,4">
-                                    <StackPanel Orientation="Horizontal" Spacing="6"
-                                                VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding IconText}" FontSize="12" />
-                                        <TextBlock Text="{Binding DisplayName}" FontSize="11"
-                                                   FontWeight="SemiBold" Foreground="#FFFFFF" />
-                                    </StackPanel>
-                                </Border>
-
-                                <!-- Body -->
-                                <StackPanel Margin="10,6,10,8" Spacing="4">
-                                    <!-- Jinja reference name -->
-                                    <TextBlock FontSize="10" Foreground="#AAAAAA">
-                                        <Run Text="{loc:Loc canvas.name_prefix}" /><Run Text="{Binding Name}" /><Run Text="{loc:Loc canvas.name_suffix}" />
-                                    </TextBlock>
-
-                                    <!-- Separator -->
-                                    <Border Height="1" Background="#3A3A4E" Margin="0,2" />
-
-                                    <!-- Output Ports -->
-                                    <ItemsControl ItemsSource="{Binding OutputPorts}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate x:DataType="vm:PortViewModel">
-                                                <StackPanel Orientation="Horizontal" Spacing="4"
-                                                            HorizontalAlignment="Right" Margin="0,1">
-                                                    <TextBlock Text="{Binding Name}" FontSize="10"
-                                                               Foreground="#888888" />
-                                                    <Ellipse Width="10" Height="10"
-                                                             Fill="#4A90D9" Stroke="#6AB0F9"
-                                                             StrokeThickness="1" />
-                                                </StackPanel>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-
-                                    <!-- Input Ports -->
-                                    <ItemsControl ItemsSource="{Binding InputPorts}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate x:DataType="vm:PortViewModel">
-                                                <StackPanel Orientation="Horizontal" Spacing="4"
-                                                            HorizontalAlignment="Left" Margin="0,1">
-                                                    <Ellipse Width="10" Height="10"
-                                                             Fill="#F5A623" Stroke="#FFD080"
-                                                             StrokeThickness="1" />
-                                                    <TextBlock Text="{Binding Name}" FontSize="10"
-                                                               Foreground="#888888" />
-                                                </StackPanel>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </StackPanel>
-                            </StackPanel>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </Canvas>
+                ClipToBounds="True" />
 
         <!-- Empty state hint -->
         <TextBlock Text="{loc:Loc canvas.double_click_to_add_a_block_or_drag_from_the_blo}"
-                   FontSize="12" Foreground="#555555"
+                   FontSize="12" Foreground="{DynamicResource TextSubtleBrush}"
                    HorizontalAlignment="Center" VerticalAlignment="Center"
                    IsVisible="{Binding !Blocks.Count}" />
 
@@ -135,8 +28,8 @@
         <Border HorizontalAlignment="Right" VerticalAlignment="Bottom"
                 Width="160" Height="100"
                 Margin="0,0,16,60"
-                Background="#1A1A2A" CornerRadius="4"
-                BorderBrush="#3A3A4E" BorderThickness="1"
+                Background="{DynamicResource StatusBarBackgroundBrush}" CornerRadius="4"
+                BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1"
                 Opacity="0.9"
                 Cursor="Hand">
             <Canvas Name="MiniMapCanvas" ClipToBounds="True" />

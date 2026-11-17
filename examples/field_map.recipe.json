@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "id": "field_map",
+  "name": "Field Mapping",
+  "blocks": [
+    {
+      "id": "seed",
+      "type": "Seed",
+      "name": "seed",
+      "displayName": "Seed Source",
+      "x": 80,
+      "y": 160,
+      "width": 200,
+      "height": 80,
+      "inputPorts": [],
+      "outputPorts": [
+        {
+          "id": "seed_out_0",
+          "name": "rows",
+          "dataType": "rows",
+          "direction": "Output"
+        }
+      ],
+      "config": {
+        "kind": "seed",
+        "sourcePath": "",
+        "fileType": "Jsonl",
+        "streaming": false,
+        "useIndexCache": true
+      }
+    },
+    {
+      "id": "expression",
+      "type": "Expression",
+      "name": "expression",
+      "displayName": "Expression Transform",
+      "x": 360,
+      "y": 160,
+      "width": 200,
+      "height": 80,
+      "inputPorts": [
+        {
+          "id": "expression_in_0",
+          "name": "input",
+          "dataType": "rows",
+          "direction": "Input"
+        }
+      ],
+      "outputPorts": [
+        {
+          "id": "expression_out_0",
+          "name": "output",
+          "dataType": "rows",
+          "direction": "Output"
+        }
+      ],
+      "config": {
+        "kind": "expression",
+        "template": "{\u0022messages\u0022:[{\u0022role\u0022:\u0022assistant\u0022,\u0022content\u0022:{{ text | json }}}]}",
+        "fields": {
+          "text": "text"
+        }
+      }
+    },
+    {
+      "id": "export",
+      "type": "SftExport",
+      "name": "export",
+      "displayName": "SFT Export",
+      "x": 640,
+      "y": 160,
+      "width": 200,
+      "height": 80,
+      "inputPorts": [
+        {
+          "id": "export_in_0",
+          "name": "input",
+          "dataType": "rows",
+          "direction": "Input"
+        }
+      ],
+      "outputPorts": [],
+      "config": {
+        "kind": "sft_export",
+        "outputPath": "out/mapped-sft.jsonl"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_seed_expression",
+      "sourceBlockId": "seed",
+      "sourcePortId": "seed_out_0",
+      "targetBlockId": "expression",
+      "targetPortId": "expression_in_0",
+      "label": "rows"
+    },
+    {
+      "id": "edge_expression_export",
+      "sourceBlockId": "expression",
+      "sourcePortId": "expression_out_0",
+      "targetBlockId": "export",
+      "targetPortId": "export_in_0",
+      "label": "rows"
+    }
+  ],
+  "createdAt": "2026-01-01T00:00:00Z",
+  "modifiedAt": "2026-01-01T00:00:00Z"
+}

@@ -234,12 +234,14 @@ public sealed class DatasetIOTests
         var first = await converter.ConvertAsync(new BatchConversionRequest(
             source, DataFileType.Jsonl, DatasetFormat.Auto,
             parquet, DataFileType.Parquet, DatasetFormat.OpenAI));
-        Assert.That(first.ConvertedRows, Is.EqualTo(2), first.SampleErrors.FirstOrDefault());
+        Assert.That(first.ConvertedRows, Is.EqualTo(2),
+            first.SampleErrors.Count > 0 ? first.SampleErrors[0] : string.Empty);
 
         var second = await converter.ConvertAsync(new BatchConversionRequest(
             parquet, DataFileType.Parquet, DatasetFormat.Auto,
             back, DataFileType.Jsonl, DatasetFormat.OpenAI));
-        Assert.That(second.ConvertedRows, Is.EqualTo(2), second.SampleErrors.FirstOrDefault());
+        Assert.That(second.ConvertedRows, Is.EqualTo(2),
+            second.SampleErrors.Count > 0 ? second.SampleErrors[0] : string.Empty);
 
         var lines = await File.ReadAllLinesAsync(back);
         Assert.That(lines, Has.Length.EqualTo(2));

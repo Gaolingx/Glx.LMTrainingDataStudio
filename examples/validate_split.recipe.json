@@ -1,0 +1,173 @@
+{
+  "schemaVersion": 1,
+  "id": "validate_split",
+  "name": "Validate \u0026 Split",
+  "blocks": [
+    {
+      "id": "seed",
+      "type": "Seed",
+      "name": "seed",
+      "displayName": "Seed Source",
+      "x": 80,
+      "y": 160,
+      "width": 200,
+      "height": 80,
+      "inputPorts": [],
+      "outputPorts": [
+        {
+          "id": "seed_out_0",
+          "name": "rows",
+          "dataType": "rows",
+          "direction": "Output"
+        }
+      ],
+      "config": {
+        "kind": "seed",
+        "sourcePath": "",
+        "fileType": "Jsonl",
+        "streaming": false,
+        "useIndexCache": true
+      }
+    },
+    {
+      "id": "validator",
+      "type": "Validator",
+      "name": "validator",
+      "displayName": "Validator",
+      "x": 360,
+      "y": 160,
+      "width": 200,
+      "height": 80,
+      "inputPorts": [
+        {
+          "id": "validator_in_0",
+          "name": "input",
+          "dataType": "rows",
+          "direction": "Input"
+        }
+      ],
+      "outputPorts": [
+        {
+          "id": "validator_out_0",
+          "name": "pass",
+          "dataType": "rows",
+          "direction": "Output"
+        },
+        {
+          "id": "validator_out_1",
+          "name": "reject",
+          "dataType": "rows",
+          "direction": "Output"
+        }
+      ],
+      "config": {
+        "kind": "validator",
+        "ruleKind": "expression",
+        "rule": "messages.length \u003E 0",
+        "rejectOnFailure": true,
+        "rejectOutputPath": "out/rejected.jsonl",
+        "matchAllRules": true,
+        "timeoutMs": 0
+      }
+    },
+    {
+      "id": "sampler",
+      "type": "Sampler",
+      "name": "sampler",
+      "displayName": "Sampler",
+      "x": 640,
+      "y": 160,
+      "width": 200,
+      "height": 80,
+      "inputPorts": [
+        {
+          "id": "sampler_in_0",
+          "name": "input",
+          "dataType": "rows",
+          "direction": "Input"
+        }
+      ],
+      "outputPorts": [
+        {
+          "id": "sampler_out_0",
+          "name": "train",
+          "dataType": "rows",
+          "direction": "Output"
+        },
+        {
+          "id": "sampler_out_1",
+          "name": "valid",
+          "dataType": "rows",
+          "direction": "Output"
+        },
+        {
+          "id": "sampler_out_2",
+          "name": "test",
+          "dataType": "rows",
+          "direction": "Output"
+        }
+      ],
+      "config": {
+        "kind": "sampler",
+        "seed": 42,
+        "splits": [
+          "train:0.8",
+          "valid:0.1",
+          "test:0.1"
+        ],
+        "outputDirectory": "out/splits"
+      }
+    },
+    {
+      "id": "export",
+      "type": "SftExport",
+      "name": "export",
+      "displayName": "SFT Export",
+      "x": 920,
+      "y": 160,
+      "width": 200,
+      "height": 80,
+      "inputPorts": [
+        {
+          "id": "export_in_0",
+          "name": "input",
+          "dataType": "rows",
+          "direction": "Input"
+        }
+      ],
+      "outputPorts": [],
+      "config": {
+        "kind": "sft_export",
+        "outputPath": "out/sampled-sft.jsonl"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_seed_validator",
+      "sourceBlockId": "seed",
+      "sourcePortId": "seed_out_0",
+      "targetBlockId": "validator",
+      "targetPortId": "validator_in_0",
+      "label": "rows"
+    },
+    {
+      "id": "edge_validator_sampler",
+      "sourceBlockId": "validator",
+      "sourcePortId": "validator_out_0",
+      "targetBlockId": "sampler",
+      "targetPortId": "sampler_in_0",
+      "label": "rows"
+    },
+    {
+      "id": "edge_sampler_export",
+      "sourceBlockId": "sampler",
+      "sourcePortId": "sampler_out_0",
+      "targetBlockId": "export",
+      "targetPortId": "export_in_0",
+      "label": "rows"
+    }
+  ],
+  "createdAt": "2026-01-01T00:00:00Z",
+  "modifiedAt": "2026-01-01T00:00:00Z"
+}

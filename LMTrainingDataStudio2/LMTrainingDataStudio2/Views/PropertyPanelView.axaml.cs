@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using LMTrainingDataStudio2.Commands;
 using LMTrainingDataStudio2.Localization;
 using LMTrainingDataStudio2.Models;
 using LMTrainingDataStudio2.ViewModels;
@@ -9,9 +10,62 @@ namespace LMTrainingDataStudio2.Views;
 
 public partial class PropertyPanelView : UserControl
 {
+    private BlockNodeViewModel? _nameEditBlock;
+    private string? _nameEditOriginal;
+    private BlockNodeViewModel? _displayNameEditBlock;
+    private string? _displayNameEditOriginal;
+
     public PropertyPanelView()
     {
         InitializeComponent();
+    }
+
+    private void OnBlockNameGotFocus(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm || vm.SelectedBlock is not { } block) return;
+        _nameEditBlock = block;
+        _nameEditOriginal = block.Name;
+    }
+
+    private void OnBlockNameLostFocus(object? sender, RoutedEventArgs e)
+    {
+        var block = _nameEditBlock;
+        var original = _nameEditOriginal;
+        _nameEditBlock = null;
+        _nameEditOriginal = null;
+
+        if (block is null || original is null || DataContext is not MainWindowViewModel vm) return;
+        var current = block.Name;
+        if (string.IsNullOrWhiteSpace(current) || string.Equals(current, original, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        vm.CommandHistory.Execute(new RenameBlockCommand(block, original, current));
+    }
+
+    private void OnBlockDisplayNameGotFocus(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm || vm.SelectedBlock is not { } block) return;
+        _displayNameEditBlock = block;
+        _displayNameEditOriginal = block.DisplayName;
+    }
+
+    private void OnBlockDisplayNameLostFocus(object? sender, RoutedEventArgs e)
+    {
+        var block = _displayNameEditBlock;
+        var original = _displayNameEditOriginal;
+        _displayNameEditBlock = null;
+        _displayNameEditOriginal = null;
+
+        if (block is null || original is null || DataContext is not MainWindowViewModel vm) return;
+        var current = block.DisplayName;
+        if (string.IsNullOrWhiteSpace(current) || string.Equals(current, original, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        vm.CommandHistory.Execute(new RenameBlockCommand(block, original, current, isDisplayName: true));
     }
 
     private async void OnBrowseSeedSourceClick(object? sender, RoutedEventArgs e)

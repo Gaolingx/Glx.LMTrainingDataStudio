@@ -22,6 +22,10 @@ public sealed class CommandHistory
     public bool CanUndo => _undoStack.Count > 0;
     public bool CanRedo => _redoStack.Count > 0;
 
+    public string? UndoDescription => _undoStack.Count > 0 ? _undoStack.Peek().Description : null;
+
+    public string? RedoDescription => _redoStack.Count > 0 ? _redoStack.Peek().Description : null;
+
     public event EventHandler? HistoryChanged;
 
     /// <summary>
@@ -32,17 +36,50 @@ public sealed class CommandHistory
         command.Execute();
         _undoStack.Push(command);
         _redoStack.Clear();
+        TrimHistory();
+        HistoryChanged?.Invoke(this, EventArgs.Empty);
+    }
 
-        // Trim history if too large
-        if (_undoStack.Count > MaxHistorySize)
+    /// <summary>
+    /// Executes a command and merges it into the previous entry when
+    /// <paramref name="merge"/> returns a combined command (used for rapid property edits).
+    /// </summary>
+    public void ExecuteMerged(
+        IUndoableCommand command,
+        Func<IUndoableCommand, IUndoableCommand, IUndoableCommand?> merge)
+    {
+        command.Execute();
+
+        bool merged = false;
+        if (_undoStack.Count > 0 && _redoStack.Count == 0)
         {
-            var items = _undoStack.ToArray();
-            _undoStack.Clear();
-            for (int i = 0; i < MaxHistorySize; i++)
-                _undoStack.Push(items[i]);
+            var combined = merge(_undoStack.Peek(), command);
+            if (combined is not null)
+            {
+                _undoStack.Pop();
+                _undoStack.Push(combined);
+                merged = true;
+            }
         }
 
+        if (!merged)
+        {
+            _undoStack.Push(command);
+        }
+
+        _redoStack.Clear();
+        TrimHistory();
         HistoryChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void TrimHistory()
+    {
+        if (_undoStack.Count <= MaxHistorySize) return;
+
+        var items = _undoStack.ToArray();
+        _undoStack.Clear();
+        for (int i = 0; i < MaxHistorySize; i++)
+            _undoStack.Push(items[i]);
     }
 
     /// <summary>

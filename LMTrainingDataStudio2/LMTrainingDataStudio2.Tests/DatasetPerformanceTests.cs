@@ -105,6 +105,96 @@ public sealed class DatasetPerformanceTests
     }
 
     [Test]
+    public async Task CsvAndParquet_LargeInput_MeetsPagingAndRoundTripBaseline()
+    {
+        if (Environment.GetEnvironmentVariable("LMTDS_PERF_TESTS") != "1")
+        {
+            Assert.Ignore("Set LMTDS_PERF_TESTS=1 to run the CSV/Parquet baseline.");
+            return;
+        }
+
+        var rows = int.TryParse(Environment.GetEnvironmentVariable("LMTDS_PERF_ROWS"), out var configured)
+            ? Math.Clamp(configured, 10_000, 2_000_000)
+            : 200_000;
+        const int rowBytes = 256;
+
+        var directory = Path.Combine(Path.GetTempPath(), "lmtds-perf-formats", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            var sourcePath = Path.Combine(directory, "source.jsonl");
+            var csvPath = Path.Combine(directory, "source.csv");
+            var parquetPath = Path.Combine(directory, "source.parquet");
+
+            var generate = Stopwatch.StartNew();
+            GenerateDuplicates(sourcePath, rows, rowBytes);
+            generate.Stop();
+
+            var settings = new AppSettings
+            {
+                CacheDirectory = Path.Combine(directory, "cache"),
+                MaxCacheSizeMb = 512
+            };
+            var converter = new DatasetBatchConverter(settings);
+
+            var toCsv = Stopwatch.StartNew();
+            var csvResult = await converter.ConvertAsync(new BatchConversionRequest(
+                sourcePath, DataFileType.Jsonl, DatasetFormat.Auto,
+                csvPath, DataFileType.Csv, DatasetFormat.OpenAI));
+            toCsv.Stop();
+
+            var toParquet = Stopwatch.StartNew();
+            var parquetResult = await converter.ConvertAsync(new BatchConversionRequest(
+                sourcePath, DataFileType.Jsonl, DatasetFormat.Auto,
+                parquetPath, DataFileType.Parquet, DatasetFormat.OpenAI));
+            toParquet.Stop();
+
+            Assert.That(csvResult.ConvertedRows, Is.EqualTo(rows));
+            Assert.That(parquetResult.ConvertedRows, Is.EqualTo(rows));
+
+            var memoryBefore = GC.GetTotalMemory(forceFullCollection: true);
+            var maxPage = TimeSpan.Zero;
+            foreach (var (path, type) in new[] { (csvPath, DataFileType.Csv), (parquetPath, DataFileType.Parquet) })
+            {
+                await using var reader = DatasetIO.CreateReader(type, settings);
+                await reader.OpenAsync(path);
+                Assert.That(reader.TotalRows, Is.EqualTo(rows), $"{type} total rows.");
+
+                foreach (var start in new long[] { 0, rows / 2, rows - 100 })
+                {
+                    var read = Stopwatch.StartNew();
+                    var page = await reader.ReadPageAsync(start, 100);
+                    read.Stop();
+                    maxPage = read.Elapsed > maxPage ? read.Elapsed : maxPage;
+                    Assert.That(page, Has.Count.EqualTo(100), $"{type} page at {start}.");
+                }
+            }
+
+            var memoryAfter = GC.GetTotalMemory(forceFullCollection: false);
+
+            var backToJsonl = Path.Combine(directory, "csv-back.jsonl");
+            var roundTrip = await converter.ConvertAsync(new BatchConversionRequest(
+                csvPath, DataFileType.Csv, DatasetFormat.Auto,
+                backToJsonl, DataFileType.Jsonl, DatasetFormat.OpenAI));
+            Assert.That(roundTrip.ConvertedRows, Is.EqualTo(rows));
+
+            TestContext.Progress.WriteLine(
+                $"{rows:N0} rows @ {rowBytes}B: generate {generate.Elapsed.TotalSeconds:F1}s, " +
+                $"jsonl->csv {toCsv.Elapsed.TotalSeconds:F1}s, jsonl->parquet {toParquet.Elapsed.TotalSeconds:F1}s, " +
+                $"slowest page {maxPage.TotalMilliseconds:F1}ms, " +
+                $"managed memory delta {(memoryAfter - memoryBefore) / 1024.0 / 1024.0:F0} MB.");
+
+            Assert.That(memoryAfter - memoryBefore, Is.LessThan(MemoryLimitBytes),
+                $"Managed memory delta: {(memoryAfter - memoryBefore) / 1024.0 / 1024.0:F0} MB.");
+        }
+        finally
+        {
+            try { Directory.Delete(directory, true); } catch { /* best effort */ }
+        }
+    }
+
+    [Test]
     public async Task EditSave_LargeInput_StaysBoundedAndConservesRows()
     {
         if (Environment.GetEnvironmentVariable("LMTDS_PERF_TESTS") != "1")

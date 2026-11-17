@@ -1,3 +1,4 @@
+using LMTrainingDataStudio2.Models;
 using LMTrainingDataStudio2.ViewModels;
 
 namespace LMTrainingDataStudio2.Commands;
@@ -248,24 +249,122 @@ public sealed class DeleteEdgeCommand : IUndoableCommand
 }
 
 /// <summary>
-/// Command for renaming a block from the canvas inline editor.
+/// Command for renaming a block from the canvas inline editor or property panel.
 /// </summary>
 public sealed class RenameBlockCommand : IUndoableCommand
 {
     private readonly BlockNodeViewModel _block;
     private readonly string _oldName;
     private readonly string _newName;
+    private readonly bool _isDisplayName;
 
-    public string Description => $"Rename '{_oldName}'";
+    public string Description => _isDisplayName
+        ? $"Rename display name of '{_oldName}'"
+        : $"Rename '{_oldName}'";
 
     public RenameBlockCommand(BlockNodeViewModel block, string newName)
+        : this(block, block.Name, newName, isDisplayName: false)
     {
-        _block = block;
-        _oldName = block.Name;
-        _newName = newName;
     }
 
-    public void Execute() => _block.Name = _newName;
+    public RenameBlockCommand(
+        BlockNodeViewModel block,
+        string oldName,
+        string newName,
+        bool isDisplayName = false)
+    {
+        _block = block;
+        _oldName = oldName;
+        _newName = newName;
+        _isDisplayName = isDisplayName;
+    }
 
-    public void Undo() => _block.Name = _oldName;
+    public void Execute() => Apply(_newName);
+
+    public void Undo() => Apply(_oldName);
+
+    private void Apply(string value)
+    {
+        if (_isDisplayName)
+        {
+            _block.DisplayName = value;
+        }
+        else
+        {
+            _block.Name = value;
+        }
+    }
 }
+
+/// <summary>
+/// Command for resizing one or more block nodes.
+/// </summary>
+public sealed class ResizeBlocksCommand : IUndoableCommand
+{
+    private readonly List<(BlockNodeViewModel Block, double OldWidth, double OldHeight, double NewWidth, double NewHeight)> _resizes;
+
+    public string Description => "Resize blocks";
+
+    public ResizeBlocksCommand(
+        IEnumerable<(BlockNodeViewModel Block, double OldWidth, double OldHeight, double NewWidth, double NewHeight)> resizes)
+    {
+        _resizes = resizes.ToList();
+    }
+
+    public void Execute()
+    {
+        foreach (var resize in _resizes)
+        {
+            resize.Block.Width = resize.NewWidth;
+            resize.Block.Height = resize.NewHeight;
+        }
+    }
+
+    public void Undo()
+    {
+        foreach (var resize in _resizes)
+        {
+            resize.Block.Width = resize.OldWidth;
+            resize.Block.Height = resize.OldHeight;
+        }
+    }
+}
+
+/// <summary>
+/// Command for replacing a block configuration. Consecutive edits to the same block
+/// can be merged by <see cref="CommandHistory.ExecuteMerged"/>.
+/// </summary>
+public sealed class SetBlockConfigCommand : IUndoableCommand
+{
+    public SetBlockConfigCommand(BlockNodeViewModel block, BlockConfig oldConfig, BlockConfig newConfig)
+    {
+        Block = block;
+        OldConfig = oldConfig;
+        NewConfig = newConfig;
+        TimestampUtc = DateTime.UtcNow;
+    }
+
+    public BlockNodeViewModel Block { get; }
+
+    public BlockConfig OldConfig { get; }
+
+    public BlockConfig NewConfig { get; }
+
+    public DateTime TimestampUtc { get; private set; }
+
+    public string Description => $"Edit '{Block.DisplayName}' configuration";
+
+    public void Execute() => Block.SetConfigFromHistory(NewConfig);
+
+    public void Undo() => Block.SetConfigFromHistory(OldConfig);
+
+    public SetBlockConfigCommand MergeWith(SetBlockConfigCommand newer)
+    {
+        var merged = new SetBlockConfigCommand(Block, OldConfig, newer.NewConfig)
+        {
+            TimestampUtc = newer.TimestampUtc
+        };
+        return merged;
+    }
+}
+

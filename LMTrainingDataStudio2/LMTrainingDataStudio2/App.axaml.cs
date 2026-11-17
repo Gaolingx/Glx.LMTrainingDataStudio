@@ -10,6 +10,11 @@ namespace LMTrainingDataStudio2;
 
 public partial class App : Application
 {
+    private static readonly object PendingGate = new();
+    private static readonly Queue<string> PendingExternalOpens = new();
+    private static string? _startupRecipePath;
+    private static MainWindow? _mainWindow;
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -19,16 +24,63 @@ public partial class App : Application
     {
         AppLog.Initialize();
         Dispatcher.UIThread.UnhandledException += (_, e) =>
+        {
             AppLog.Error("UI thread exception", e.Exception);
+            var report = CrashReportService.WriteAutomaticCrashReport("UI thread exception", e.Exception);
+            if (report is not null)
+            {
+                AppLog.Error($"Automatic crash report written to '{report}'.");
+            }
+        };
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            desktop.MainWindow = new MainWindow
+            _mainWindow = new MainWindow
             {
                 DataContext = new MainWindowViewModel()
             };
+            desktop.MainWindow = _mainWindow;
+
+            lock (PendingGate)
+            {
+                while (PendingExternalOpens.Count > 0)
+                {
+                    var path = PendingExternalOpens.Dequeue();
+                    _mainWindow.QueueExternalOpen(path);
+                }
+            }
         }
 
         base.OnFrameworkInitializationCompleted();
     }
+
+    /// <summary>
+    /// Stores the recipe passed on the command line; the window opens it after restoring settings.
+    /// </summary>
+    public static void QueueStartupRecipe(string path) => _startupRecipePath = path;
+
+    public static string? TakeStartupRecipe()
+    {
+        var path = _startupRecipePath;
+        _startupRecipePath = null;
+        return path;
+    }
+
+    /// <summary>
+    /// Called from the single-instance pipe when another launch requests a recipe.
+    /// </summary>
+    public static void RequestOpenFromExternal(string path)
+    {
+        if (Current is App && _mainWindow is { } window)
+        {
+            Dispatcher.UIThread.Post(() => window.QueueExternalOpen(path));
+            return;
+        }
+
+        lock (PendingGate)
+        {
+            PendingExternalOpens.Enqueue(path);
+        }
+    }
 }
+

@@ -1,0 +1,217 @@
+{
+  "schemaVersion": 1,
+  "id": "agent_trajectory",
+  "name": "Simulated Agent Trajectory",
+  "blocks": [
+    {
+      "id": "queries",
+      "type": "QuerySource",
+      "name": "queries",
+      "displayName": "Query Source",
+      "x": 80,
+      "y": 160,
+      "width": 200,
+      "height": 80,
+      "inputPorts": [],
+      "outputPorts": [
+        {
+          "id": "queries_out_0",
+          "name": "queries",
+          "dataType": "rows",
+          "direction": "Output"
+        }
+      ],
+      "config": {
+        "kind": "query_source",
+        "queries": [
+          "Explain the TCP three-way handshake with a small example."
+        ],
+        "mode": "MultipleQueries",
+        "repeat": 1,
+        "systemPrompt": "You are a concise network engineering tutor.",
+        "queryField": "query",
+        "systemField": "system"
+      }
+    },
+    {
+      "id": "simulation",
+      "type": "Simulation",
+      "name": "simulation",
+      "displayName": "Simulation",
+      "x": 360,
+      "y": 120,
+      "width": 200,
+      "height": 80,
+      "inputPorts": [
+        {
+          "id": "simulation_in_0",
+          "name": "input",
+          "dataType": "rows",
+          "direction": "Input"
+        }
+      ],
+      "outputPorts": [
+        {
+          "id": "simulation_out_0",
+          "name": "output",
+          "dataType": "rows",
+          "direction": "Output"
+        }
+      ],
+      "config": {
+        "kind": "simulation",
+        "modelAlias": "demo-model",
+        "maxRounds": 6,
+        "systemPrompt": "Use the python tool when a calculation helps.",
+        "tools": [
+          {
+            "name": "python",
+            "description": "Execute Python source code and return its output.",
+            "parametersJson": "{\u0022type\u0022:\u0022object\u0022,\u0022properties\u0022:{\u0022code\u0022:{\u0022type\u0022:\u0022string\u0022,\u0022description\u0022:\u0022Python source to execute.\u0022}},\u0022required\u0022:[\u0022code\u0022]}",
+            "behavior": "Success",
+            "responseTemplate": "[simulated python] executed: {{arguments}}",
+            "errorMessage": "Simulated tool failure.",
+            "delayMs": 0,
+            "failuresBeforeSuccess": 0,
+            "timeoutMs": 0
+          },
+          {
+            "name": "web_fetch",
+            "description": "Fetch a URL and return its text content.",
+            "parametersJson": "{\u0022type\u0022:\u0022object\u0022,\u0022properties\u0022:{\u0022url\u0022:{\u0022type\u0022:\u0022string\u0022,\u0022description\u0022:\u0022Absolute URL to fetch.\u0022}},\u0022required\u0022:[\u0022url\u0022]}",
+            "behavior": "Success",
+            "responseTemplate": "[simulated web_fetch] fetched: {{arguments}}",
+            "errorMessage": "Simulated tool failure.",
+            "delayMs": 0,
+            "failuresBeforeSuccess": 0,
+            "timeoutMs": 0
+          },
+          {
+            "name": "powershell",
+            "description": "Run a PowerShell command.",
+            "parametersJson": "{\u0022type\u0022:\u0022object\u0022,\u0022properties\u0022:{\u0022command\u0022:{\u0022type\u0022:\u0022string\u0022,\u0022description\u0022:\u0022Command to execute.\u0022}},\u0022required\u0022:[\u0022command\u0022]}",
+            "behavior": "Success",
+            "responseTemplate": "[simulated powershell] completed: {{arguments}}",
+            "errorMessage": "Simulated tool failure.",
+            "delayMs": 0,
+            "failuresBeforeSuccess": 0,
+            "timeoutMs": 0
+          },
+          {
+            "name": "bash",
+            "description": "Run a bash command.",
+            "parametersJson": "{\u0022type\u0022:\u0022object\u0022,\u0022properties\u0022:{\u0022command\u0022:{\u0022type\u0022:\u0022string\u0022,\u0022description\u0022:\u0022Command to execute.\u0022}},\u0022required\u0022:[\u0022command\u0022]}",
+            "behavior": "Success",
+            "responseTemplate": "[simulated bash] completed: {{arguments}}",
+            "errorMessage": "Simulated tool failure.",
+            "delayMs": 0,
+            "failuresBeforeSuccess": 0,
+            "timeoutMs": 0
+          }
+        ],
+        "finalContent": "The TCP handshake establishes a reliable connection with SYN, SYN-ACK and ACK.",
+        "provider": "openai_chat",
+        "temperature": 0.7,
+        "maxTokens": 2048,
+        "timeoutSeconds": 100,
+        "modelMaxRetries": 0,
+        "emitIncompleteTrajectories": false,
+        "modelMode": "Scripted",
+        "toolMode": "Simulated",
+        "maxConcurrency": 1,
+        "maxFailureSamples": 100,
+        "inputCostPerMillionTokens": 0,
+        "outputCostPerMillionTokens": 0,
+        "requestsPerMinute": 0,
+        "streamDeltas": false
+      }
+    },
+    {
+      "id": "cleaner",
+      "type": "Cleaner",
+      "name": "cleaner",
+      "displayName": "Cleaner",
+      "x": 640,
+      "y": 160,
+      "width": 200,
+      "height": 80,
+      "inputPorts": [
+        {
+          "id": "cleaner_in_0",
+          "name": "input",
+          "dataType": "rows",
+          "direction": "Input"
+        }
+      ],
+      "outputPorts": [
+        {
+          "id": "cleaner_out_0",
+          "name": "output",
+          "dataType": "rows",
+          "direction": "Output"
+        }
+      ],
+      "config": {
+        "kind": "cleaner",
+        "rules": {
+          "normalizeWhitespace": true,
+          "normalizeNewlines": true,
+          "stripAnsi": false,
+          "removeReasoningContent": true,
+          "dropEmptyMessages": true
+        }
+      }
+    },
+    {
+      "id": "export",
+      "type": "SftExport",
+      "name": "export",
+      "displayName": "SFT Export",
+      "x": 920,
+      "y": 160,
+      "width": 200,
+      "height": 80,
+      "inputPorts": [
+        {
+          "id": "export_in_0",
+          "name": "input",
+          "dataType": "rows",
+          "direction": "Input"
+        }
+      ],
+      "outputPorts": [],
+      "config": {
+        "kind": "sft_export",
+        "outputPath": "out/agent-sft.jsonl"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_queries_simulation",
+      "sourceBlockId": "queries",
+      "sourcePortId": "queries_out_0",
+      "targetBlockId": "simulation",
+      "targetPortId": "simulation_in_0",
+      "label": "rows"
+    },
+    {
+      "id": "edge_simulation_cleaner",
+      "sourceBlockId": "simulation",
+      "sourcePortId": "simulation_out_0",
+      "targetBlockId": "cleaner",
+      "targetPortId": "cleaner_in_0",
+      "label": "rows"
+    },
+    {
+      "id": "edge_cleaner_export",
+      "sourceBlockId": "cleaner",
+      "sourcePortId": "cleaner_out_0",
+      "targetBlockId": "export",
+      "targetPortId": "export_in_0",
+      "label": "rows"
+    }
+  ],
+  "createdAt": "2026-01-01T00:00:00Z",
+  "modifiedAt": "2026-01-01T00:00:00Z"
+}

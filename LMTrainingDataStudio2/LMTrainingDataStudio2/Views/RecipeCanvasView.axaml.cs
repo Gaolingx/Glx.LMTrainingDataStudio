@@ -1,9 +1,11 @@
 using System.ComponentModel;
 using Avalonia;
+using Avalonia.Animation;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LMTrainingDataStudio2.Commands;
@@ -21,6 +23,10 @@ public partial class RecipeCanvasView : UserControl
     private const double MiniMapWidth = 160;
     private const double MiniMapHeight = 100;
     private const double MiniMapPadding = 8;
+    private const double MinNodeWidth = 140;
+    private const double MinNodeHeight = 64;
+    private const double ResizeGripSize = 12;
+    private static readonly Cursor ResizeCursor = new(StandardCursorType.BottomRightCorner);
 
     private Canvas? _canvas;
     private Canvas? _miniMapCanvas;
@@ -34,9 +40,14 @@ public partial class RecipeCanvasView : UserControl
     private bool _isPanning;
     private bool _isSelecting;
     private bool _isConnecting;
+    private bool _isResizingNode;
     private Point _dragStartPoint;
     private Point _panStartPoint;
     private Point _selectionStartPoint;
+    private Point _resizeStartPoint;
+    private double _resizeStartWidth;
+    private double _resizeStartHeight;
+    private BlockNodeViewModel? _resizedBlock;
     private readonly CanvasViewport _viewport = new();
     private BlockNodeViewModel? _draggedBlock;
     private Border? _draggedBorder;
@@ -51,6 +62,8 @@ public partial class RecipeCanvasView : UserControl
     private readonly Dictionary<(string BlockId, string PortId), Point> _portOffsets = new();
     private readonly Dictionary<string, Path> _edgeVisuals = new();
     private readonly Dictionary<string, TextBlock> _edgeLabels = new();
+    private readonly Dictionary<string, CancellationTokenSource> _edgeAnimations = new();
+    private readonly List<Rect> _edgeLabelBounds = new();
     private MainWindowViewModel? _subscribedViewModel;
     private EdgeViewModel? _hoveredEdge;
     private TextBox? _renameBox;
@@ -102,6 +115,7 @@ public partial class RecipeCanvasView : UserControl
         }
 
         KeyDown += OnKeyDown;
+        ActualThemeVariantChanged += (_, _) => RenderBlocks();
         UpdateGrid();
         RenderBlocks();
     }
@@ -207,6 +221,23 @@ public partial class RecipeCanvasView : UserControl
             return;
         }
 
+        if (HitTestResizeHandle(point) is { } resizeBlock)
+        {
+            ClearEdgeSelection(vm);
+            foreach (var b in vm.Blocks) b.IsSelected = false;
+            resizeBlock.IsSelected = true;
+            vm.SelectedBlock = resizeBlock;
+            _isResizingNode = true;
+            _resizedBlock = resizeBlock;
+            _resizeStartPoint = point;
+            _resizeStartWidth = resizeBlock.Width;
+            _resizeStartHeight = resizeBlock.Height;
+            e.Pointer.Capture(_canvas);
+            UpdateBlockSelectionVisuals();
+            e.Handled = true;
+            return;
+        }
+
         var (hitBlock, hitBorder) = HitTestBlock(point);
         if (hitBlock != null && hitBorder != null)
         {
@@ -296,6 +327,24 @@ public partial class RecipeCanvasView : UserControl
             return;
         }
 
+        if (_isResizingNode && _resizedBlock != null)
+        {
+            var width = Math.Max(MinNodeWidth, _resizeStartWidth + (point.X - _resizeStartPoint.X));
+            var height = Math.Max(MinNodeHeight, _resizeStartHeight + (point.Y - _resizeStartPoint.Y));
+            _resizedBlock.Width = width;
+            _resizedBlock.Height = height;
+
+            if (_blockBorders.TryGetValue(_resizedBlock.Id, out var border))
+            {
+                border.Width = width;
+                border.MinHeight = height;
+            }
+
+            RefreshPortOffsets();
+            e.Handled = true;
+            return;
+        }
+
         if (_isPanning)
         {
             var dx = point.X - _panStartPoint.X;
@@ -308,6 +357,10 @@ public partial class RecipeCanvasView : UserControl
         }
 
         UpdateEdgeHover(point);
+        if (HitTestResizeHandle(point) is not null)
+        {
+            Cursor = ResizeCursor;
+        }
     }
 
     private void OnCanvasPointerReleased(object? sender, PointerReleasedEventArgs e)
@@ -345,7 +398,15 @@ public partial class RecipeCanvasView : UserControl
             RenderMiniMap();
         }
 
+        if (_isResizingNode)
+        {
+            CommitResizeCommand(vm);
+            RenderBlocks();
+        }
+
         _isDraggingNode = false;
+        _isResizingNode = false;
+        _resizedBlock = null;
         _draggedBlock = null;
         _draggedBorder = null;
         _isPanning = false;
@@ -443,9 +504,9 @@ public partial class RecipeCanvasView : UserControl
             Height = 26,
             FontSize = 12,
             Padding = new Thickness(6, 2, 6, 2),
-            Background = new SolidColorBrush(Color.Parse("#1E1E2E")),
-            Foreground = Brushes.White,
-            BorderBrush = new SolidColorBrush(Color.Parse("#4A90D9")),
+            Background = ThemeBrush("InputBackgroundBrush", "#1E1E2E"),
+            Foreground = ThemeBrush("TextPrimaryBrush", "#FFFFFF"),
+            BorderBrush = ThemeBrush("AccentBrush", "#4A90D9"),
             BorderThickness = new Thickness(1),
             Tag = "inline-rename"
         };
@@ -521,6 +582,19 @@ public partial class RecipeCanvasView : UserControl
         RenderMiniMap();
     }
 
+    /// <summary>
+    /// Centers the viewport on a world point at the requested scale.
+    /// </summary>
+    public void CenterView(double scale, double worldX, double worldY)
+    {
+        if (_canvas is null || DataContext is not MainWindowViewModel vm) return;
+        _viewport.Set(scale, 0, 0);
+        _viewport.CenterOn(worldX, worldY, _canvas.Bounds.Width, _canvas.Bounds.Height);
+        ApplyCanvasTransform();
+        UpdateCanvasZoomText(vm);
+        RenderMiniMap();
+    }
+
     private void UpdateGrid()
     {
         if (_gridBackground is null) return;
@@ -557,7 +631,15 @@ public partial class RecipeCanvasView : UserControl
 
         if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && e.Key == Key.Z)
         {
-            vm.CommandHistory.Undo();
+            if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+            {
+                vm.CommandHistory.Redo();
+            }
+            else
+            {
+                vm.CommandHistory.Undo();
+            }
+
             e.Handled = true;
             return;
         }
@@ -633,6 +715,28 @@ public partial class RecipeCanvasView : UserControl
             }
         }
         return (null, null);
+    }
+
+    private BlockNodeViewModel? HitTestResizeHandle(Point point)
+    {
+        if (DataContext is not MainWindowViewModel vm) return null;
+        foreach (var block in vm.Blocks.AsEnumerable().Reverse())
+        {
+            if (!_blockBorders.TryGetValue(block.Id, out var border)) continue;
+            var left = Canvas.GetLeft(border);
+            var top = Canvas.GetTop(border);
+            var width = border.Bounds.Width > 0 ? border.Bounds.Width : block.Width;
+            var height = GetBlockHeight(block);
+            if (point.X >= left + width - ResizeGripSize &&
+                point.X <= left + width &&
+                point.Y >= top + height - ResizeGripSize &&
+                point.Y <= top + height)
+            {
+                return block;
+            }
+        }
+
+        return null;
     }
 
     private EdgeViewModel? HitTestEdge(Point point)
@@ -734,15 +838,15 @@ public partial class RecipeCanvasView : UserControl
         {
             Watermark = "Search block...",
             Margin = new Thickness(8, 8, 8, 4),
-            Background = new SolidColorBrush(Color.Parse("#1E1E2E")),
-            Foreground = Brushes.White
+            Background = ThemeBrush("InputBackgroundBrush", "#1E1E2E"),
+            Foreground = ThemeBrush("TextPrimaryBrush", "#FFFFFF")
         };
         var list = new ListBox
         {
             Height = 190,
             Margin = new Thickness(8, 0, 8, 8),
-            Background = new SolidColorBrush(Color.Parse("#202033")),
-            Foreground = Brushes.White
+            Background = ThemeBrush("AppSurfaceBrush", "#202033"),
+            Foreground = ThemeBrush("TextPrimaryBrush", "#FFFFFF")
         };
 
         void Refresh(string? query = null)
@@ -768,8 +872,8 @@ public partial class RecipeCanvasView : UserControl
         _nodeMenu = new Border
         {
             Width = 240,
-            Background = new SolidColorBrush(Color.Parse("#28283A")),
-            BorderBrush = new SolidColorBrush(Color.Parse("#4A90D9")),
+            Background = ThemeBrush("MenuBackgroundBrush", "#28283A"),
+            BorderBrush = ThemeBrush("AccentBrush", "#4A90D9"),
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(8),
             Tag = "node-menu",
@@ -802,8 +906,8 @@ public partial class RecipeCanvasView : UserControl
         if (_canvas == null) return;
         _marquee ??= new Border
         {
-            Background = new SolidColorBrush(Color.FromArgb(35, 74, 144, 217)),
-            BorderBrush = new SolidColorBrush(Color.Parse("#4A90D9")),
+            Background = ThemeBrush("SelectionFillBrush", "#234A90D9"),
+            BorderBrush = ThemeBrush("AccentBrush", "#4A90D9"),
             BorderThickness = new Thickness(1),
             Tag = "marquee"
         };
@@ -863,6 +967,21 @@ public partial class RecipeCanvasView : UserControl
         }
 
         _dragInitialPositions.Clear();
+    }
+
+    private void CommitResizeCommand(MainWindowViewModel vm)
+    {
+        if (_resizedBlock is not { } block) return;
+        if (Math.Abs(block.Width - _resizeStartWidth) < 0.1 &&
+            Math.Abs(block.Height - _resizeStartHeight) < 0.1)
+        {
+            return;
+        }
+
+        vm.CommandHistory.Execute(new ResizeBlocksCommand(new[]
+        {
+            (block, _resizeStartWidth, _resizeStartHeight, block.Width, block.Height)
+        }));
     }
 
     private void DeleteEdge(MainWindowViewModel vm, EdgeViewModel edge)
@@ -1048,11 +1167,13 @@ public partial class RecipeCanvasView : UserControl
     private void RenderBlocks()
     {
         if (_canvas == null || DataContext is not MainWindowViewModel vm) return;
+        StopEdgeAnimations();
         _canvas.Children.Clear();
         _blockBorders.Clear();
         _portOffsets.Clear();
         _edgeVisuals.Clear();
         _edgeLabels.Clear();
+        _edgeLabelBounds.Clear();
 
         foreach (var block in vm.Blocks)
         {
@@ -1134,8 +1255,12 @@ public partial class RecipeCanvasView : UserControl
         {
             if (child is Border { Tag: BlockNodeViewModel block } border)
             {
-                border.BorderBrush = new SolidColorBrush(Color.Parse(block.IsSelected ? "#4A90D9" : "#3A3A4E"));
-                border.BorderThickness = new Thickness(block.IsSelected ? 2 : 1);
+                border.BorderBrush = block.IsSelected
+                    ? ThemeBrush("NodeBorderSelectedBrush", "#4A90D9")
+                    : block.HasValidationError
+                        ? ThemeBrush("DangerBrush", "#D0021B")
+                        : ThemeBrush("NodeBorderBrush", "#3A3A4E");
+                border.BorderThickness = new Thickness(block.IsSelected || block.HasValidationError ? 2 : 1);
             }
         }
     }
@@ -1153,7 +1278,7 @@ public partial class RecipeCanvasView : UserControl
             {
                 Text = "Mini-map",
                 FontSize = 10,
-                Foreground = new SolidColorBrush(Color.Parse("#666666"))
+                Foreground = ThemeBrush("TextDimBrush", "#666666")
             };
             Canvas.SetLeft(hint, 58);
             Canvas.SetTop(hint, 42);
@@ -1182,7 +1307,9 @@ public partial class RecipeCanvasView : UserControl
             {
                 StartPoint = ToMiniMapPoint(GetOutputPortCenter(sourceBlock, sourceBlock.OutputPorts.FirstOrDefault(p => p.Id == edge.SourcePortId)), minX, minY, scale),
                 EndPoint = ToMiniMapPoint(GetInputPortCenter(targetBlock, targetBlock.InputPorts.FirstOrDefault(p => p.Id == edge.TargetPortId)), minX, minY, scale),
-                Stroke = new SolidColorBrush(Color.Parse(edge.IsSelected || edge.IsHighlighted ? "#4A90D9" : "#55556A")),
+                Stroke = edge.IsSelected || edge.IsHighlighted
+                    ? ThemeBrush("EdgeHoverBrush", "#4A90D9")
+                    : ThemeBrush("MiniMapEdgeBrush", "#55556A"),
                 StrokeThickness = edge.IsSelected || edge.IsHighlighted ? 1.5 : 1
             };
             _miniMapCanvas.Children.Add(line);
@@ -1195,7 +1322,9 @@ public partial class RecipeCanvasView : UserControl
                 Width = Math.Max(5, block.Width * scale),
                 Height = Math.Max(4, GetBlockHeight(block) * scale),
                 Fill = new SolidColorBrush(Color.Parse(GetBlockHeaderColor(block.Type))),
-                Stroke = new SolidColorBrush(Color.Parse(block.IsSelected ? "#FFFFFF" : "#3A3A4E")),
+                Stroke = block.IsSelected
+                    ? ThemeBrush("MiniMapSelectedStrokeBrush", "#FFFFFF")
+                    : ThemeBrush("MiniMapBlockBorderBrush", "#3A3A4E"),
                 StrokeThickness = block.IsSelected ? 1.5 : 1,
                 RadiusX = 2,
                 RadiusY = 2
@@ -1214,8 +1343,8 @@ public partial class RecipeCanvasView : UserControl
             {
                 Width = Math.Max(4, (worldRight - worldLeft) * scale),
                 Height = Math.Max(4, (worldBottom - worldTop) * scale),
-                Fill = new SolidColorBrush(Color.FromArgb(20, 74, 144, 217)),
-                Stroke = new SolidColorBrush(Color.Parse("#FFFFFF")),
+                Fill = ThemeBrush("SelectionFillBrush", "#234A90D9"),
+                Stroke = ThemeBrush("MiniMapSelectedStrokeBrush", "#FFFFFF"),
                 StrokeThickness = 1,
                 StrokeDashArray = new Avalonia.Collections.AvaloniaList<double> { 3, 2 }
             };
@@ -1236,9 +1365,11 @@ public partial class RecipeCanvasView : UserControl
         if (sourceBlock == null || targetBlock == null) return;
         var start = GetOutputPortCenter(sourceBlock, sourceBlock.OutputPorts.FirstOrDefault(p => p.Id == edge.SourcePortId));
         var end = GetInputPortCenter(targetBlock, targetBlock.InputPorts.FirstOrDefault(p => p.Id == edge.TargetPortId));
-        var path = CreateBezierEdge(start.X, start.Y, end.X, end.Y, edge.IsHighlighted || edge.IsSelected, edge);
+        var highlighted = edge.IsHighlighted || edge.IsSelected || ReferenceEquals(edge, _hoveredEdge);
+        var path = CreateBezierEdge(start.X, start.Y, end.X, end.Y, highlighted, edge);
         _canvas.Children.Insert(0, path);
         _edgeVisuals[edge.Id] = path;
+        ApplyEdgeAnimation(edge.Id, path, highlighted);
 
         if (!string.IsNullOrEmpty(edge.Label))
         {
@@ -1246,15 +1377,16 @@ public partial class RecipeCanvasView : UserControl
             {
                 Text = edge.Label,
                 FontSize = 9,
-                Foreground = new SolidColorBrush(Color.Parse(edge.IsSelected ? "#FFFFFF" : "#888888")),
-                Background = new SolidColorBrush(Color.Parse("#1E1E2E")),
+                Foreground = edge.IsSelected
+                    ? ThemeBrush("EdgeLabelSelectedTextBrush", "#FFFFFF")
+                    : ThemeBrush("EdgeLabelTextBrush", "#888888"),
+                Background = ThemeBrush("EdgeLabelBackgroundBrush", "#1E1E2E"),
                 Padding = new Thickness(3, 1),
                 Tag = "edge-label"
             };
-            Canvas.SetLeft(label, (start.X + end.X) / 2 - 20);
-            Canvas.SetTop(label, (start.Y + end.Y) / 2 - 8);
             _canvas.Children.Add(label);
             _edgeLabels[edge.Id] = label;
+            PositionEdgeLabel(label, start, end, sourceBlock, targetBlock);
         }
     }
 
@@ -1265,6 +1397,7 @@ public partial class RecipeCanvasView : UserControl
     {
         if (_canvas == null || DataContext is not MainWindowViewModel vm) return;
 
+        _edgeLabelBounds.Clear();
         var activeEdges = new HashSet<string>();
         foreach (var edge in vm.Edges)
         {
@@ -1286,16 +1419,18 @@ public partial class RecipeCanvasView : UserControl
 
             path.Data = CreateBezierGeometry(start.X, start.Y, end.X, end.Y);
             var highlighted = edge.IsHighlighted || edge.IsSelected || ReferenceEquals(edge, _hoveredEdge);
-            path.Stroke = new SolidColorBrush(Color.Parse(highlighted ? "#4A90D9" : "#AAAAAA"));
-            path.StrokeThickness = highlighted ? 4 : 2;
-            path.StrokeDashArray = highlighted
-                ? null
-                : new Avalonia.Collections.AvaloniaList<double> { 4, 2 };
+            path.Stroke = highlighted
+                ? ThemeBrush("EdgeHoverBrush", "#4A90D9")
+                : ThemeBrush("EdgeDefaultBrush", "#AAAAAA");
+            path.StrokeThickness = highlighted ? 3.5 : 2;
+            ApplyEdgeAnimation(edge.Id, path, highlighted);
 
             if (_edgeLabels.TryGetValue(edge.Id, out var label))
             {
-                Canvas.SetLeft(label, (start.X + end.X) / 2 - 20);
-                Canvas.SetTop(label, (start.Y + end.Y) / 2 - 8);
+                label.Foreground = edge.IsSelected
+                    ? ThemeBrush("EdgeLabelSelectedTextBrush", "#FFFFFF")
+                    : ThemeBrush("EdgeLabelTextBrush", "#888888");
+                PositionEdgeLabel(label, start, end, sourceBlock, targetBlock);
             }
         }
 
@@ -1303,6 +1438,7 @@ public partial class RecipeCanvasView : UserControl
         {
             _canvas.Children.Remove(_edgeVisuals[edgeId]);
             _edgeVisuals.Remove(edgeId);
+            StopEdgeAnimation(edgeId);
         }
 
         foreach (var edgeId in _edgeLabels.Keys.Where(id => !activeEdges.Contains(id)).ToList())
@@ -1336,15 +1472,142 @@ public partial class RecipeCanvasView : UserControl
         UpdateEdgesOnly();
     }
 
-    private static Path CreateBezierEdge(double startX, double startY, double endX, double endY, bool isHighlighted, EdgeViewModel? edge)
+    private Path CreateBezierEdge(double startX, double startY, double endX, double endY, bool isHighlighted, EdgeViewModel? edge)
         => new()
         {
             Data = CreateBezierGeometry(startX, startY, endX, endY),
-            Stroke = new SolidColorBrush(Color.Parse(isHighlighted ? "#4A90D9" : "#AAAAAA")),
-            StrokeThickness = isHighlighted ? 4 : 2,
-            StrokeDashArray = isHighlighted ? null : new Avalonia.Collections.AvaloniaList<double> { 4, 2 },
+            Stroke = isHighlighted
+                ? ThemeBrush("EdgeHoverBrush", "#4A90D9")
+                : ThemeBrush("EdgeDefaultBrush", "#AAAAAA"),
+            StrokeThickness = isHighlighted ? 3.5 : 2,
+            StrokeDashArray = isHighlighted
+                ? null
+                : new Avalonia.Collections.AvaloniaList<double> { 4, 2 },
+            Transitions = new Transitions
+            {
+                new DoubleTransition
+                {
+                    Property = Shape.StrokeThicknessProperty,
+                    Duration = TimeSpan.FromMilliseconds(140)
+                }
+            },
             Tag = edge
         };
+
+    /// <summary>
+    /// Animates a flowing dash for highlighted edges and stops it otherwise.
+    /// </summary>
+    private void ApplyEdgeAnimation(string edgeId, Path path, bool animated)
+    {
+        if (animated)
+        {
+            if (_edgeAnimations.ContainsKey(edgeId)) return;
+
+            path.StrokeDashArray = new Avalonia.Collections.AvaloniaList<double> { 6, 4 };
+            var cancellation = new CancellationTokenSource();
+            _edgeAnimations[edgeId] = cancellation;
+
+            var animation = new Animation
+            {
+                Duration = TimeSpan.FromSeconds(1.1),
+                IterationCount = IterationCount.Infinite,
+                Children =
+                {
+                    new KeyFrame
+                    {
+                        Cue = new Cue(0d),
+                        Setters = { new Setter(Shape.StrokeDashOffsetProperty, 0d) }
+                    },
+                    new KeyFrame
+                    {
+                        Cue = new Cue(1d),
+                        Setters = { new Setter(Shape.StrokeDashOffsetProperty, 20d) }
+                    }
+                }
+            };
+
+            _ = RunEdgeAnimationAsync(animation, path, cancellation.Token);
+            return;
+        }
+
+        if (_edgeAnimations.Remove(edgeId, out var existing))
+        {
+            existing.Cancel();
+            existing.Dispose();
+        }
+
+        path.StrokeDashOffset = 0;
+        path.StrokeDashArray = new Avalonia.Collections.AvaloniaList<double> { 4, 2 };
+    }
+
+    private static async Task RunEdgeAnimationAsync(
+        Animation animation,
+        Animatable target,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await animation.RunAsync(target, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // Highlight ended before the animation completed.
+        }
+    }
+
+    private void StopEdgeAnimation(string edgeId)
+    {
+        if (!_edgeAnimations.Remove(edgeId, out var cancellation)) return;
+        cancellation.Cancel();
+        cancellation.Dispose();
+    }
+
+    private void StopEdgeAnimations()
+    {
+        foreach (var cancellation in _edgeAnimations.Values)
+        {
+            cancellation.Cancel();
+            cancellation.Dispose();
+        }
+
+        _edgeAnimations.Clear();
+    }
+
+    /// <summary>
+    /// Places an edge label near the curve midpoint while avoiding nodes and other labels.
+    /// </summary>
+    private void PositionEdgeLabel(
+        TextBlock label,
+        Point start,
+        Point end,
+        BlockNodeViewModel source,
+        BlockNodeViewModel target)
+    {
+        var bounds = EdgeLabelLayout.FindBounds(
+            start,
+            end,
+            label.Text?.Length ?? 0,
+            GetNodeBounds(source).Inflate(4),
+            GetNodeBounds(target).Inflate(4),
+            _edgeLabelBounds);
+
+        Canvas.SetLeft(label, bounds.X);
+        Canvas.SetTop(label, bounds.Y);
+        _edgeLabelBounds.Add(bounds);
+    }
+
+    private Rect GetNodeBounds(BlockNodeViewModel block)
+        => new(block.X, block.Y, block.Width, GetBlockHeight(block));
+
+    private IBrush ThemeBrush(string key, string fallback)
+    {
+        if (this.TryFindResource(key, out var resource) && resource is IBrush brush)
+        {
+            return brush;
+        }
+
+        return new SolidColorBrush(Color.Parse(fallback));
+    }
 
     private static Geometry CreateBezierGeometry(double startX, double startY, double endX, double endY)
     {
@@ -1364,15 +1627,24 @@ public partial class RecipeCanvasView : UserControl
     private Border CreateBlockNode(BlockNodeViewModel block)
     {
         var headerColor = GetBlockHeaderColor(block.Type);
-
         var body = new StackPanel
         {
             Margin = new Thickness(10, 6, 10, 8),
             Spacing = 4,
             Children =
             {
-                new TextBlock { Text = $"Name: {{{{ {block.Name} }}}}", FontSize = 10, Foreground = new SolidColorBrush(Color.Parse("#AAAAAA")) },
-                new Border { Height = 1, Background = new SolidColorBrush(Color.Parse("#3A3A4E")), Margin = new Thickness(0, 2) }
+                new TextBlock
+                {
+                    Text = $"Name: {{{{ {block.Name} }}}}",
+                    FontSize = 10,
+                    Foreground = ThemeBrush("NodeMutedTextBrush", "#AAAAAA")
+                },
+                new Border
+                {
+                    Height = 1,
+                    Background = ThemeBrush("NodeSeparatorBrush", "#3A3A4E"),
+                    Margin = new Thickness(0, 2)
+                }
             }
         };
 
@@ -1383,7 +1655,16 @@ public partial class RecipeCanvasView : UserControl
                 Orientation = Avalonia.Layout.Orientation.Horizontal,
                 Spacing = 4,
                 HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
-                Children = { new TextBlock { Text = port.Name, FontSize = 10, Foreground = new SolidColorBrush(Color.Parse("#888888")) }, CreatePortEllipse(port, isOutput: true) }
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = port.Name,
+                        FontSize = 10,
+                        Foreground = ThemeBrush("NodePortTextBrush", "#888888")
+                    },
+                    CreatePortEllipse(port, isOutput: true)
+                }
             });
         }
 
@@ -1394,7 +1675,16 @@ public partial class RecipeCanvasView : UserControl
                 Orientation = Avalonia.Layout.Orientation.Horizontal,
                 Spacing = 4,
                 HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left,
-                Children = { CreatePortEllipse(port, isOutput: false), new TextBlock { Text = port.Name, FontSize = 10, Foreground = new SolidColorBrush(Color.Parse("#888888")) } }
+                Children =
+                {
+                    CreatePortEllipse(port, isOutput: false),
+                    new TextBlock
+                    {
+                        Text = port.Name,
+                        FontSize = 10,
+                        Foreground = ThemeBrush("NodePortTextBrush", "#888888")
+                    }
+                }
             });
         }
 
@@ -1406,7 +1696,13 @@ public partial class RecipeCanvasView : UserControl
             Children =
             {
                 new TextBlock { Text = block.IconText, FontSize = 12 },
-                new TextBlock { Text = block.DisplayName, FontSize = 11, FontWeight = FontWeight.SemiBold, Foreground = Brushes.White }
+                new TextBlock
+                {
+                    Text = block.DisplayName,
+                    FontSize = 11,
+                    FontWeight = FontWeight.SemiBold,
+                    Foreground = Brushes.White
+                }
             }
         };
 
@@ -1417,7 +1713,7 @@ public partial class RecipeCanvasView : UserControl
                 Width = 18,
                 Height = 18,
                 CornerRadius = new CornerRadius(9),
-                Background = new SolidColorBrush(Color.Parse("#D0021B")),
+                Background = ThemeBrush("DangerBrush", "#D0021B"),
                 Margin = new Thickness(4, 0, 0, 0),
                 Child = new TextBlock
                 {
@@ -1439,7 +1735,7 @@ public partial class RecipeCanvasView : UserControl
                 Width = 18,
                 Height = 18,
                 CornerRadius = new CornerRadius(9),
-                Background = new SolidColorBrush(Color.Parse("#F5A623")),
+                Background = ThemeBrush("WarningBrush", "#F5A623"),
                 Margin = new Thickness(4, 0, 0, 0),
                 Child = new TextBlock
                 {
@@ -1455,39 +1751,65 @@ public partial class RecipeCanvasView : UserControl
             header.Children.Add(badge);
         }
 
+        var content = new StackPanel
+        {
+            Children =
+            {
+                new Border
+                {
+                    Height = 28,
+                    CornerRadius = new CornerRadius(8, 8, 0, 0),
+                    Background = new SolidColorBrush(Color.Parse(headerColor)),
+                    Padding = new Thickness(10, 4),
+                    Child = header
+                },
+                body
+            }
+        };
+
+        var root = new Grid();
+        root.Children.Add(content);
+        root.Children.Add(new Border
+        {
+            Width = ResizeGripSize,
+            Height = ResizeGripSize,
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Bottom,
+            Margin = new Thickness(0, 0, 3, 3),
+            CornerRadius = new CornerRadius(2),
+            Background = ThemeBrush("ResizeGripBrush", "#5A5A7E"),
+            Cursor = ResizeCursor,
+            Tag = "resize-grip"
+        });
+
         return new Border
         {
             Width = block.Width,
+            MinHeight = block.Height,
             CornerRadius = new CornerRadius(8),
-            Background = new SolidColorBrush(Color.Parse("#2A2A3E")),
-            BorderBrush = new SolidColorBrush(Color.Parse(block.HasValidationError ? "#D0021B" : block.IsSelected ? "#4A90D9" : "#3A3A4E")),
+            Background = ThemeBrush("NodeBackgroundBrush", "#2A2A3E"),
+            BorderBrush = block.HasValidationError
+                ? ThemeBrush("DangerBrush", "#D0021B")
+                : block.IsSelected
+                    ? ThemeBrush("NodeBorderSelectedBrush", "#4A90D9")
+                    : ThemeBrush("NodeBorderBrush", "#3A3A4E"),
             BorderThickness = new Thickness(block.IsSelected || block.HasValidationError ? 2 : 1),
             Tag = block,
-            Child = new StackPanel
-            {
-                Children =
-                {
-                    new Border
-                    {
-                        Height = 28,
-                        CornerRadius = new CornerRadius(8, 8, 0, 0),
-                        Background = new SolidColorBrush(Color.Parse(headerColor)),
-                        Padding = new Thickness(10, 4),
-                        Child = header
-                    },
-                    body
-                }
-            }
+            Child = root
         };
     }
 
-    private static Ellipse CreatePortEllipse(PortViewModel port, bool isOutput)
+    private Ellipse CreatePortEllipse(PortViewModel port, bool isOutput)
         => new()
         {
             Width = 10,
             Height = 10,
-            Fill = new SolidColorBrush(Color.Parse(isOutput ? "#4A90D9" : "#F5A623")),
-            Stroke = new SolidColorBrush(Color.Parse(isOutput ? "#6AB0F9" : "#FFD080")),
+            Fill = isOutput
+                ? ThemeBrush("PortOutputBrush", "#4A90D9")
+                : ThemeBrush("PortInputBrush", "#F5A623"),
+            Stroke = isOutput
+                ? ThemeBrush("PortOutputStrokeBrush", "#6AB0F9")
+                : ThemeBrush("PortInputStrokeBrush", "#FFD080"),
             StrokeThickness = 1,
             Tag = port
         };

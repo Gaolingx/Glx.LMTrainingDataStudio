@@ -4,6 +4,10 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 
 项目目标是为 JSONL / CSV / Parquet 等常见训练数据格式提供专业级 GUI：支持大文件流式处理、数据格式互转、DAG Recipe 编排、可视化 Tool Schema 编辑、异步执行、实时进度与结果预览。
 
+![Editor dark theme](docs/screenshots/editor-dark.png)
+
+![Editor light theme](docs/screenshots/editor-light.png)
+
 ## 当前状态
 
 当前版本已完成应用骨架、核心服务与可执行 Recipe 引擎：
@@ -11,6 +15,8 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - Avalonia 桌面应用与三栏式 Studio UI（Block Sheet / Canvas / Property Panel / Status Bar）
 - Recipe / 设置持久化：原子写入、camelCase 多态 JSON、schema 版本校验
 - Recipe 文件生命周期：新建（空白/示例）、打开、保存、另存为、最近文件、脏标记、关闭确认与重启恢复
+- 单实例与命令行打开：重复启动会复用已运行窗口，并把 Recipe 路径转发给主实例；支持 `.recipe.json` / `.recipe` 文件关联
+- 诊断导出：Help → Export Diagnostics 生成 zip（日志、脱敏设置、最近运行摘要）；未处理异常自动写入崩溃报告
 - 按 BlockType 的端口契约与连接守卫：方向/类型/单输入/重复/环校验；校验问题列表与画布错误/警告徽标
 - Expression：Fluid 模板引擎（条件/循环/过滤器）、输出 JSON 校验、专属面板与样本预览
 - Validator：表达式 / JSON Schema / 正则 / Fluid 脚本多规则、超时、pass/reject 双端口、reject JSONL 与失败率日志
@@ -22,10 +28,14 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - 统一样本预览弹窗：SFT Export 输出、Validator 拒绝行、Simulation 失败样本、Cleaner 前后 diff，可一键在数据工作台打开
 - 数据质量与治理：校验问题列表（级别/行号/JSON 路径/错误码）与跳行、JSONL 自动修复预览与写副本、搜索/正则替换、去重、固定 seed 混洗、比例/份数切分、数据集统计
 - 画布：网格/吸附（Alt 关闭）、鼠标中心缩放、Fit、拓扑自动布局、Mini-map 视口与点击导航、双击添加、复制携带连线、内联重命名、真实端口坐标、边 hover
+- 画布 polish：节点右下角尺寸手柄（宽高持久化、可撤销）、边 hover 流动虚线动画、边标签避让节点与其他标签、Edit 菜单撤销/重做与 `Ctrl+Shift+Z`
+- 属性修改可撤销：名称/显示名与所有节点配置编辑进入同一撤销历史，连续编辑自动合并
 - 执行：层内受控并行、暂停/恢复、节点重试、运行输出目录与 `run-summary.json`
 - 执行韧性：节点间溢写磁盘（阈值与临时目录可配置）、节点级检查点与中断恢复、取消 1s 内停止与临时目录清理
 - SFT Export：文件选择器、运行前覆盖确认、可选字段白名单、写出行数与首行预览日志
-- 工程化：滚动日志与全局异常、Dark/Light 主题变体、GitHub Actions CI、win-x64 单文件发布、Headless UI 测试、MIT LICENSE、应用图标
+- 工程化：滚动日志与全局异常、完整 Dark/Light 主题（全部视图使用主题资源）、GitHub Actions CI、win-x64 单文件发布、Headless UI 测试、MIT LICENSE、应用图标
+- 发布：MSIX 清单与打包脚本、Inno Setup 安装脚本（`.recipe` 文件关联）
+- 工程质量：`.editorconfig`、.NET 分析器（`latest-recommended`）与警告即错误；构建 0 警告
 - 批量格式转换：OpenAI / ShareGPT / Alpaca / DPO / Pretrain，进度、取消、失败行 `.errors.jsonl`
 - JSONL SQLite 行索引缓存与分页读取；1M 行 1KB/行基线通过（索引 8.8s、分页 10.9ms、内存增量 14MB）
 - 1M 行质量操作基线通过（去重+混洗+切分 124.2s、统计 63.6s、托管内存增量 2MB）
@@ -40,12 +50,12 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - 真实沙箱工具：python / PowerShell / bash / web_fetch；环境白名单、临时目录、超时杀进程树、输出上限，Windows 额外限制内存与进程数
 - Simulation 支持并发 query（输出保序）与失败轨迹独立 JSONL 输出
 - Query Source / Simulation / Cleaner / SFT Export / Expression / Validator / Sampler / Tool Profile 专属属性面板
-- 内置 6 个基础工作流预设，可从 File → New from Preset 或节点库一键加载
+- 内置 6 个基础工作流预设，可从 File → New from Preset 或节点库一键加载；`examples/` 目录提供可直接打开的示例 Recipe
 - 自定义预设：保存当前 Recipe 为预设、导入/删除预设文件；预设保存在本机 `%APPDATA%\LMTrainingDataStudio\presets`
 - 中英文界面本地化（zh-CN / en-US，可在设置中切换），节点库、属性面板与画布悬停提示包含完整节点说明
 - 通用 Block Config JSON 编辑器，可直接配置所有节点类型
 
-> 注意：当前仍是开发版。**10M 实测、节点尺寸手柄/边过渡动画、MSIX 安装包、README 截图、完整浅色主题、LLM tool_calls 回填、Anthropic 结构化输出、Sampler count 模式分层、MCP 适配尚未实现**；应用默认启动空白 Recipe，可通过 File → New from Sample 加载 4 节点示例，或恢复上次打开的文件。
+> 注意：当前仍是开发版。**LLM tool_calls 回填、Anthropic 结构化输出约束、Sampler count 模式分层、Tool Profile MCP 适配、跨格式数据编辑保存、容器级隔离尚未实现**；应用默认启动空白 Recipe，可通过 File → New from Sample 加载 4 节点示例，或恢复上次打开的文件。
 >
 > - 完整功能清单与节点能力矩阵：[PLAN/STATUS.md](PLAN/STATUS.md)
 > - 分阶段实施计划、阶段目标与验收标准：[PLAN/TODO.md](PLAN/TODO.md)
@@ -402,6 +412,20 @@ LMTrainingDataStudio2/                      # 主项目目录
 └── Assets/                                 # 应用图标等静态资源
 ```
 
+仓库根目录还包含：
+
+```text
+examples/                                   # 6 个可直接打开的示例 Recipe（*.recipe.json）
+docs/screenshots/                           # README 使用的 Dark/Light 截图
+packaging/msix/AppxManifest.xml             # MSIX 清单（.recipe 关联、lmtds.exe 别名）
+packaging/inno/LMTrainingDataStudio.iss     # Inno Setup 安装脚本
+scripts/package-msix.ps1                    # MSIX 打包（makeappx，可选签名）
+scripts/package-inno.ps1                    # Inno Setup 编译
+scripts/publish-win-x64.ps1                 # win-x64 单文件发布
+Directory.Build.props                       # 分析器与警告即错误
+.editorconfig                               # 代码风格
+```
+
 ## 快速开始
 
 ### 环境要求
@@ -434,12 +458,40 @@ dotnet test .\LMTrainingDataStudio2.slnx
 dotnet test .\LMTrainingDataStudio2.slnx --filter HeadlessUiTests
 ```
 
+当前基线：**505 个常规测试通过 + 7 个 gated 跳过**（2 个真实 provider 冒烟 + 5 个性能 gated）。构建启用 .NET 分析器与警告即错误，`dotnet build` 为 0 警告。
+
+### 1M / 10M 行与 CSV/Parquet 基线（gated）
+
+```powershell
+$env:LMTDS_PERF_TESTS = "1"
+
+# 1M 行数据索引/分页/转换
+dotnet test .\LMTrainingDataStudio2.slnx --filter OneMillionJsonlRows
+
+# 10M 行 Seed → Expression → SFT Export（约 3–6 分钟，临时文件数 GB）
+$env:LMTDS_PERF_PIPELINE_ROWS = "10000000"
+dotnet test .\LMTrainingDataStudio2.slnx --filter OneMillionRowPipeline
+
+# CSV/Parquet 大规模分页与往返（默认 20 万行，可用 LMTDS_PERF_ROWS 调整）
+dotnet test .\LMTrainingDataStudio2.slnx --filter CsvAndParquet_LargeInput
+```
+
 ### 1M 行编辑保存基线（gated）
 
 ```powershell
 $env:LMTDS_PERF_TESTS = "1"
 dotnet test .\LMTrainingDataStudio2.slnx --filter EditSave_LargeInput
 ```
+
+### 示例 Recipe 与截图
+
+`examples/` 包含 6 个可直接打开的 Recipe（`*.recipe.json`）。`ExampleRecipeTests.WriteExamples` 是显式测试，修改预设后可重新生成：
+
+```powershell
+dotnet test .\LMTrainingDataStudio2.slnx --filter ExampleRecipeTests.WriteExamples
+```
+
+README 截图位于 `docs/screenshots/`（Dark/Light 主题各一张）。
 
 ### 发布（win-x64 单文件）
 
@@ -448,6 +500,31 @@ powershell -ExecutionPolicy Bypass -File scripts/publish-win-x64.ps1
 ```
 
 输出在 `artifacts/publish/win-x64`，并生成同名 zip。CI 配置见 `.github/workflows/ci.yml`。
+
+### MSIX / 安装包
+
+```powershell
+# MSIX（需要 Windows SDK 的 makeappx；可选 -CertificatePath 签名）
+powershell -ExecutionPolicy Bypass -File scripts/package-msix.ps1
+
+# Inno Setup 安装包（需要 Inno Setup 6；包含 .recipe 文件关联）
+powershell -ExecutionPolicy Bypass -File scripts/package-inno.ps1
+```
+
+MSIX 清单位于 `packaging/msix/AppxManifest.xml`，Inno 脚本位于 `packaging/inno/LMTrainingDataStudio.iss`。
+
+### 命令行打开与单实例
+
+```powershell
+LMTrainingDataStudio2.exe examples\agent_trajectory.recipe.json
+```
+
+重复启动不会创建第二个窗口：后启动的进程通过命名管道把文件路径转发给主实例。应用也接受任意 `.json` Recipe 路径；安装包会注册 `.recipe` 关联。
+
+### 诊断与崩溃报告
+
+- Help → Export Diagnostics：导出 zip，包含日志、脱敏后的设置（移除 API Key）和最近运行摘要。
+- 未处理异常：自动在 `%LOCALAPPDATA%\LMTrainingDataStudio\crashes` 写入崩溃报告，并在应用日志中记录路径。
 
 ### 真实 provider 冒烟测试（可选）
 
@@ -511,7 +588,7 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 
 显示当前状态、行数、文件路径、进度条、内存占用和缩放百分比。
 
-> `CurrentFilePath`、`TotalLines` 和缩放百分比已接入真实数据；内存占用仍只在启动时采样一次，定时刷新列在 Round 16。
+> `CurrentFilePath`、`TotalLines` 和缩放百分比已接入真实数据；内存占用每 2 秒刷新，窗口关闭时停止定时器。
 
 ## 数据格式示例
 
@@ -565,7 +642,7 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 - [x] JSONL / CSV / Parquet 流式读取与分页预览
 - [x] 大文件随机行跳转
 - [x] 数据增删查改（逐行插入/复制/删除/恢复、行 JSON 编辑、撤销/重做、另存/覆盖）
-- [ ] 10M 行与 CSV/Parquet 大规模基线
+- [x] 10M 行与 CSV/Parquet 大规模基线
 - [x] 搜索命中高亮、校验问题级别/错误码筛选
 - [x] 统一样本/输出预览弹窗（SFT / Validator reject / Simulation 失败样本 / Cleaner diff）
 - [x] 去重、混洗、切分文件
@@ -578,16 +655,20 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 - [x] 网格背景/吸附、鼠标中心缩放、Fit、自动布局
 - [x] Mini-map 视口矩形与点击导航
 - [x] 双击添加、复制携带内部连线、内联重命名、真实端口坐标、边 hover
-- [ ] Node 尺寸手柄、Edge 过渡动画与标签避让
-- [x] Command Pattern 撤销 / 重做
-- [部分] 亮色 / 暗色主题切换（主面板/画布已主题化，部分视图仍硬编码深色）
+- [x] Node 尺寸手柄、Edge 过渡动画与标签避让
+- [x] Command Pattern 撤销 / 重做（含属性修改与 `Ctrl+Shift+Z`）
+- [x] 完整亮色 / 暗色主题切换（所有视图使用主题资源）
 - [ ] LiveCharts2 或 OxyPlot 进度图表
 - [x] 执行层内并行、暂停/恢复、节点重试、output 目录摘要
 - [x] 节点间溢写/流式读取、节点级检查点与中断恢复、取消/清理定量验收
 - [x] SFT Export 文件选择器、覆盖确认、字段白名单、行数与预览日志
 - [x] 1M 行 Seed → Expression → SFT Export 基线（17.2s，托管内存增量 1MB）
+- [x] 10M 行 Seed → Expression → SFT Export 基线（生成 5.0s、运行 154.0s、托管内存增量 1MB）
+- [x] CSV/Parquet 20 万行基线（JSONL→CSV 14.3s、→Parquet 13.1s、最慢分页 18.2ms、内存增量 17MB）
 - [x] 滚动日志、全局异常、CI、win-x64 单文件发布、Headless UI 测试、MIT LICENSE、应用图标
-- [x] 单元测试与集成测试（501 个：495 自动化通过 + 6 个 gated：2 个真实 provider 冒烟 + 4 个性能）
+- [x] 单实例、命令行打开、MSIX/Inno Setup 打包、文件关联、诊断/崩溃报告导出
+- [x] `.editorconfig`、.NET 分析器、警告即错误
+- [x] 单元测试与集成测试（512 个：505 常规通过 + 7 个 gated：2 个真实 provider 冒烟 + 5 个性能 gated）
 - [x] Round 8：Recipe 新建/打开/保存、脏标记、最近文件、按类型端口契约
 - [x] Round 9：Expression/Validator/Sampler/Tool Profile 节点能力补齐
 - [x] Round 10：数据预览、CSV/Parquet、格式转换、DPO/Pretrain
@@ -596,7 +677,7 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 - [x] Round 13：执行与 IO 韧性（节点间溢写/流式、中断恢复、取消/清理硬化、SFT Export 收尾）
 - [x] Round 14：数据工作台逐行编辑（CRUD/字段级单元格/撤销/另存/覆盖确认）、搜索高亮、校验筛选与分组树、统一样本预览
 - [x] Round 15：节点能力收紧（多输出端口、LLM tools/结构化输出/并发/失败样本、Validator 多规则/超时/双端口、Sampler 分层与多端口、Simulation 可视化编辑器/流式/限速/价格、Query Source 模板与外部源）
-- [ ] Round 16：发布与体验（画布 polish、完整浅色主题、MSIX/文件关联、10M 基线、README 截图）
+- [x] Round 16：发布与体验（画布 polish、完整浅色主题、单实例/文件关联、MSIX/安装包、10M 基线、README 截图、分析器）
 
 ## 编码约定
 

@@ -32,6 +32,69 @@
             <!-- Status Bar -->
             <Color x:Key="StatusBarBackgroundColor">#1A1A2A</Color>
 
+            <!-- Surfaces -->
+            <Color x:Key="AppSurfaceColor">#202033</Color>
+            <Color x:Key="AppSurfaceAltColor">#1F1F30</Color>
+            <Color x:Key="AppSurfaceDeepColor">#171722</Color>
+            <Color x:Key="InputBackgroundColor">#1E1E2E</Color>
+            <Color x:Key="MenuBackgroundColor">#28283A</Color>
+            <Color x:Key="AppBorderColor">#2E2E42</Color>
+            <Color x:Key="AppBorderStrongColor">#33334A</Color>
+            <Color x:Key="SuccessSurfaceColor">#1E3A28</Color>
+            <Color x:Key="CardBackgroundColor">#232336</Color>
+            <Color x:Key="CardBorderColor">#34344A</Color>
+            <Color x:Key="ButtonSurfaceColor">#3A3A4E</Color>
+            <Color x:Key="ButtonSurfaceTextColor">#FFFFFF</Color>
+            <Color x:Key="CanvasToolColor">#2A3A4E</Color>
+            <Color x:Key="CanvasToolTextColor">#FFFFFF</Color>
+            <Color x:Key="RunButtonColor">#2D5A2D</Color>
+
+            <!-- Text -->
+            <Color x:Key="TextPrimaryColor">#CCCCCC</Color>
+            <Color x:Key="TextBrightColor">#FFFFFF</Color>
+            <Color x:Key="TextMutedColor">#AAAAAA</Color>
+            <Color x:Key="TextDimColor">#888888</Color>
+            <Color x:Key="TextFaintColor">#777777</Color>
+            <Color x:Key="TextSubtleColor">#666666</Color>
+            <Color x:Key="RowJsonColor">#D6D6E0</Color>
+            <Color x:Key="HighlightKeyColor">#9CCFF0</Color>
+
+            <!-- Semantic -->
+            <Color x:Key="AccentColor">#4A90D9</Color>
+            <Color x:Key="AccentForegroundColor">#FFFFFF</Color>
+            <Color x:Key="SuccessColor">#7FD08A</Color>
+            <Color x:Key="WarningColor">#E0C060</Color>
+            <Color x:Key="DangerColor">#FF8080</Color>
+            <Color x:Key="DangerTextColor">#FFB0B0</Color>
+            <Color x:Key="DangerSurfaceColor">#3A2020</Color>
+            <Color x:Key="DangerSurfaceBorderColor">#5A2A2A</Color>
+            <Color x:Key="DiffInsertedBackgroundColor">#1B2A20</Color>
+            <Color x:Key="DiffInsertedBorderColor">#4E7A5A</Color>
+            <Color x:Key="MatchBorderColor">#B08A2A</Color>
+            <Color x:Key="BadgeColor">#7B61FF</Color>
+
+            <!-- Node -->
+            <Color x:Key="NodeBackgroundColor">#2A2A3E</Color>
+            <Color x:Key="NodeBorderColor">#3A3A4E</Color>
+            <Color x:Key="NodeBorderSelectedColor">#4A90D9</Color>
+            <Color x:Key="NodeSeparatorColor">#3A3A4E</Color>
+            <Color x:Key="NodeMutedTextColor">#AAAAAA</Color>
+            <Color x:Key="NodePortTextColor">#888888</Color>
+            <Color x:Key="PortInputColor">#F5A623</Color>
+            <Color x:Key="PortInputStrokeColor">#FFD080</Color>
+            <Color x:Key="PortOutputColor">#4A90D9</Color>
+            <Color x:Key="PortOutputStrokeColor">#6AB0F9</Color>
+            <Color x:Key="ResizeGripColor">#5A5A7E</Color>
+            <Color x:Key="EdgeLabelBackgroundColor">#1E1E2E</Color>
+            <Color x:Key="EdgeLabelTextColor">#888888</Color>
+            <Color x:Key="EdgeLabelSelectedTextColor">#FFFFFF</Color>
+            <Color x:Key="MiniMapEdgeColor">#55556A</Color>
+            <Color x:Key="MiniMapBlockBorderColor">#3A3A4E</Color>
+            <Color x:Key="MiniMapSelectedStrokeColor">#FFFFFF</Color>
+            <Color x:Key="SelectionFillColor">#234A90D9</Color>
+            <Color x:Key="ModalOverlayColor">#99000000</Color>
+            <BoxShadows x:Key="OverlayShadow">0 18 42 0 #66000000</BoxShadows>
+
             <!-- Brushes -->
             <SolidColorBrush x:Key="SeedBlockBrush" Color="{StaticResource SeedBlockColor}" />
             <SolidColorBrush x:Key="LlmBlockBrush" Color="{StaticResource LlmBlockColor}" />
@@ -51,6 +114,61 @@
             <SolidColorBrush x:Key="PanelBorderBrush" Color="{StaticResource PanelBorderColor}" />
             <SolidColorBrush x:Key="HeaderBackgroundBrush" Color="{StaticResource HeaderBackgroundColor}" />
             <SolidColorBrush x:Key="StatusBarBackgroundBrush" Color="{StaticResource StatusBarBackgroundColor}" />
+
+            <SolidColorBrush x:Key="AppSurfaceBrush" Color="{StaticResource AppSurfaceColor}" />
+            <SolidColorBrush x:Key="AppSurfaceAltBrush" Color="{StaticResource AppSurfaceAltColor}" />
+            <SolidColorBrush x:Key="AppSurfaceDeepBrush" Color="{StaticResource AppSurfaceDeepColor}" />
+            <SolidColorBrush x:Key="InputBackgroundBrush" Color="{StaticResource InputBackgroundColor}" />
+            <SolidColorBrush x:Key="MenuBackgroundBrush" Color="{StaticResource MenuBackgroundColor}" />
+            <SolidColorBrush x:Key="AppBorderBrush" Color="{StaticResource AppBorderColor}" />
+            <SolidColorBrush x:Key="AppBorderStrongBrush" Color="{StaticResource AppBorderStrongColor}" />
+            <SolidColorBrush x:Key="SuccessSurfaceBrush" Color="{StaticResource SuccessSurfaceColor}" />
+            <SolidColorBrush x:Key="CardBackgroundBrush" Color="{StaticResource CardBackgroundColor}" />
+            <SolidColorBrush x:Key="CardBorderBrush" Color="{StaticResource CardBorderColor}" />
+            <SolidColorBrush x:Key="ButtonSurfaceBrush" Color="{StaticResource ButtonSurfaceColor}" />
+            <SolidColorBrush x:Key="ButtonSurfaceTextBrush" Color="{StaticResource ButtonSurfaceTextColor}" />
+            <SolidColorBrush x:Key="CanvasToolBrush" Color="{StaticResource CanvasToolColor}" />
+            <SolidColorBrush x:Key="CanvasToolTextBrush" Color="{StaticResource CanvasToolTextColor}" />
+            <SolidColorBrush x:Key="RunButtonBrush" Color="{StaticResource RunButtonColor}" />
+            <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimaryColor}" />
+            <SolidColorBrush x:Key="TextBrightBrush" Color="{StaticResource TextBrightColor}" />
+            <SolidColorBrush x:Key="TextMutedBrush" Color="{StaticResource TextMutedColor}" />
+            <SolidColorBrush x:Key="TextDimBrush" Color="{StaticResource TextDimColor}" />
+            <SolidColorBrush x:Key="TextFaintBrush" Color="{StaticResource TextFaintColor}" />
+            <SolidColorBrush x:Key="TextSubtleBrush" Color="{StaticResource TextSubtleColor}" />
+            <SolidColorBrush x:Key="RowJsonBrush" Color="{StaticResource RowJsonColor}" />
+            <SolidColorBrush x:Key="HighlightKeyBrush" Color="{StaticResource HighlightKeyColor}" />
+            <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}" />
+            <SolidColorBrush x:Key="AccentForegroundBrush" Color="{StaticResource AccentForegroundColor}" />
+            <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource SuccessColor}" />
+            <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource WarningColor}" />
+            <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource DangerColor}" />
+            <SolidColorBrush x:Key="DangerTextBrush" Color="{StaticResource DangerTextColor}" />
+            <SolidColorBrush x:Key="DangerSurfaceBrush" Color="{StaticResource DangerSurfaceColor}" />
+            <SolidColorBrush x:Key="DangerSurfaceBorderBrush" Color="{StaticResource DangerSurfaceBorderColor}" />
+            <SolidColorBrush x:Key="DiffInsertedBackgroundBrush" Color="{StaticResource DiffInsertedBackgroundColor}" />
+            <SolidColorBrush x:Key="DiffInsertedBorderBrush" Color="{StaticResource DiffInsertedBorderColor}" />
+            <SolidColorBrush x:Key="MatchBorderBrush" Color="{StaticResource MatchBorderColor}" />
+            <SolidColorBrush x:Key="BadgeBrush" Color="{StaticResource BadgeColor}" />
+            <SolidColorBrush x:Key="NodeBackgroundBrush" Color="{StaticResource NodeBackgroundColor}" />
+            <SolidColorBrush x:Key="NodeBorderBrush" Color="{StaticResource NodeBorderColor}" />
+            <SolidColorBrush x:Key="NodeBorderSelectedBrush" Color="{StaticResource NodeBorderSelectedColor}" />
+            <SolidColorBrush x:Key="NodeSeparatorBrush" Color="{StaticResource NodeSeparatorColor}" />
+            <SolidColorBrush x:Key="NodeMutedTextBrush" Color="{StaticResource NodeMutedTextColor}" />
+            <SolidColorBrush x:Key="NodePortTextBrush" Color="{StaticResource NodePortTextColor}" />
+            <SolidColorBrush x:Key="PortInputBrush" Color="{StaticResource PortInputColor}" />
+            <SolidColorBrush x:Key="PortInputStrokeBrush" Color="{StaticResource PortInputStrokeColor}" />
+            <SolidColorBrush x:Key="PortOutputBrush" Color="{StaticResource PortOutputColor}" />
+            <SolidColorBrush x:Key="PortOutputStrokeBrush" Color="{StaticResource PortOutputStrokeColor}" />
+            <SolidColorBrush x:Key="ResizeGripBrush" Color="{StaticResource ResizeGripColor}" />
+            <SolidColorBrush x:Key="EdgeLabelBackgroundBrush" Color="{StaticResource EdgeLabelBackgroundColor}" />
+            <SolidColorBrush x:Key="EdgeLabelTextBrush" Color="{StaticResource EdgeLabelTextColor}" />
+            <SolidColorBrush x:Key="EdgeLabelSelectedTextBrush" Color="{StaticResource EdgeLabelSelectedTextColor}" />
+            <SolidColorBrush x:Key="MiniMapEdgeBrush" Color="{StaticResource MiniMapEdgeColor}" />
+            <SolidColorBrush x:Key="MiniMapBlockBorderBrush" Color="{StaticResource MiniMapBlockBorderColor}" />
+            <SolidColorBrush x:Key="MiniMapSelectedStrokeBrush" Color="{StaticResource MiniMapSelectedStrokeColor}" />
+            <SolidColorBrush x:Key="SelectionFillBrush" Color="{StaticResource SelectionFillColor}" />
+            <SolidColorBrush x:Key="ModalOverlayBrush" Color="{StaticResource ModalOverlayColor}" />
         </ResourceDictionary>
 
         <ResourceDictionary x:Key="Light">
@@ -83,6 +201,69 @@
             <!-- Status Bar -->
             <Color x:Key="StatusBarBackgroundColor">#F7F8FB</Color>
 
+            <!-- Surfaces -->
+            <Color x:Key="AppSurfaceColor">#FFFFFF</Color>
+            <Color x:Key="AppSurfaceAltColor">#F7F9FC</Color>
+            <Color x:Key="AppSurfaceDeepColor">#EEF1F6</Color>
+            <Color x:Key="InputBackgroundColor">#FFFFFF</Color>
+            <Color x:Key="MenuBackgroundColor">#FFFFFF</Color>
+            <Color x:Key="AppBorderColor">#E2E6EE</Color>
+            <Color x:Key="AppBorderStrongColor">#CBD5E1</Color>
+            <Color x:Key="SuccessSurfaceColor">#DCFCE7</Color>
+            <Color x:Key="CardBackgroundColor">#F7F9FC</Color>
+            <Color x:Key="CardBorderColor">#D5DAE3</Color>
+            <Color x:Key="ButtonSurfaceColor">#E5E7EB</Color>
+            <Color x:Key="ButtonSurfaceTextColor">#111827</Color>
+            <Color x:Key="CanvasToolColor">#DBEAFE</Color>
+            <Color x:Key="CanvasToolTextColor">#1E3A8A</Color>
+            <Color x:Key="RunButtonColor">#15803D</Color>
+
+            <!-- Text -->
+            <Color x:Key="TextPrimaryColor">#1F2937</Color>
+            <Color x:Key="TextBrightColor">#111827</Color>
+            <Color x:Key="TextMutedColor">#4B5563</Color>
+            <Color x:Key="TextDimColor">#6B7280</Color>
+            <Color x:Key="TextFaintColor">#9CA3AF</Color>
+            <Color x:Key="TextSubtleColor">#9CA3AF</Color>
+            <Color x:Key="RowJsonColor">#1F2937</Color>
+            <Color x:Key="HighlightKeyColor">#1D4ED8</Color>
+
+            <!-- Semantic -->
+            <Color x:Key="AccentColor">#2563EB</Color>
+            <Color x:Key="AccentForegroundColor">#FFFFFF</Color>
+            <Color x:Key="SuccessColor">#15803D</Color>
+            <Color x:Key="WarningColor">#B45309</Color>
+            <Color x:Key="DangerColor">#B91C1C</Color>
+            <Color x:Key="DangerTextColor">#991B1B</Color>
+            <Color x:Key="DangerSurfaceColor">#FEF2F2</Color>
+            <Color x:Key="DangerSurfaceBorderColor">#FCA5A5</Color>
+            <Color x:Key="DiffInsertedBackgroundColor">#DCFCE7</Color>
+            <Color x:Key="DiffInsertedBorderColor">#86EFAC</Color>
+            <Color x:Key="MatchBorderColor">#B45309</Color>
+            <Color x:Key="BadgeColor">#6D4AE0</Color>
+
+            <!-- Node -->
+            <Color x:Key="NodeBackgroundColor">#FFFFFF</Color>
+            <Color x:Key="NodeBorderColor">#D5DAE3</Color>
+            <Color x:Key="NodeBorderSelectedColor">#2563EB</Color>
+            <Color x:Key="NodeSeparatorColor">#E2E6EE</Color>
+            <Color x:Key="NodeMutedTextColor">#4B5563</Color>
+            <Color x:Key="NodePortTextColor">#6B7280</Color>
+            <Color x:Key="PortInputColor">#D97706</Color>
+            <Color x:Key="PortInputStrokeColor">#B45309</Color>
+            <Color x:Key="PortOutputColor">#2563EB</Color>
+            <Color x:Key="PortOutputStrokeColor">#1D4ED8</Color>
+            <Color x:Key="ResizeGripColor">#94A3B8</Color>
+            <Color x:Key="EdgeLabelBackgroundColor">#FFFFFF</Color>
+            <Color x:Key="EdgeLabelTextColor">#6B7280</Color>
+            <Color x:Key="EdgeLabelSelectedTextColor">#1D4ED8</Color>
+            <Color x:Key="MiniMapEdgeColor">#94A3B8</Color>
+            <Color x:Key="MiniMapBlockBorderColor">#CBD5E1</Color>
+            <Color x:Key="MiniMapSelectedStrokeColor">#111827</Color>
+            <Color x:Key="SelectionFillColor">#222563EB</Color>
+            <Color x:Key="ModalOverlayColor">#66000000</Color>
+            <BoxShadows x:Key="OverlayShadow">0 18 42 0 #33000000</BoxShadows>
+
             <!-- Brushes -->
             <SolidColorBrush x:Key="SeedBlockBrush" Color="{StaticResource SeedBlockColor}" />
             <SolidColorBrush x:Key="LlmBlockBrush" Color="{StaticResource LlmBlockColor}" />
@@ -102,6 +283,61 @@
             <SolidColorBrush x:Key="PanelBorderBrush" Color="{StaticResource PanelBorderColor}" />
             <SolidColorBrush x:Key="HeaderBackgroundBrush" Color="{StaticResource HeaderBackgroundColor}" />
             <SolidColorBrush x:Key="StatusBarBackgroundBrush" Color="{StaticResource StatusBarBackgroundColor}" />
+
+            <SolidColorBrush x:Key="AppSurfaceBrush" Color="{StaticResource AppSurfaceColor}" />
+            <SolidColorBrush x:Key="AppSurfaceAltBrush" Color="{StaticResource AppSurfaceAltColor}" />
+            <SolidColorBrush x:Key="AppSurfaceDeepBrush" Color="{StaticResource AppSurfaceDeepColor}" />
+            <SolidColorBrush x:Key="InputBackgroundBrush" Color="{StaticResource InputBackgroundColor}" />
+            <SolidColorBrush x:Key="MenuBackgroundBrush" Color="{StaticResource MenuBackgroundColor}" />
+            <SolidColorBrush x:Key="AppBorderBrush" Color="{StaticResource AppBorderColor}" />
+            <SolidColorBrush x:Key="AppBorderStrongBrush" Color="{StaticResource AppBorderStrongColor}" />
+            <SolidColorBrush x:Key="SuccessSurfaceBrush" Color="{StaticResource SuccessSurfaceColor}" />
+            <SolidColorBrush x:Key="CardBackgroundBrush" Color="{StaticResource CardBackgroundColor}" />
+            <SolidColorBrush x:Key="CardBorderBrush" Color="{StaticResource CardBorderColor}" />
+            <SolidColorBrush x:Key="ButtonSurfaceBrush" Color="{StaticResource ButtonSurfaceColor}" />
+            <SolidColorBrush x:Key="ButtonSurfaceTextBrush" Color="{StaticResource ButtonSurfaceTextColor}" />
+            <SolidColorBrush x:Key="CanvasToolBrush" Color="{StaticResource CanvasToolColor}" />
+            <SolidColorBrush x:Key="CanvasToolTextBrush" Color="{StaticResource CanvasToolTextColor}" />
+            <SolidColorBrush x:Key="RunButtonBrush" Color="{StaticResource RunButtonColor}" />
+            <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimaryColor}" />
+            <SolidColorBrush x:Key="TextBrightBrush" Color="{StaticResource TextBrightColor}" />
+            <SolidColorBrush x:Key="TextMutedBrush" Color="{StaticResource TextMutedColor}" />
+            <SolidColorBrush x:Key="TextDimBrush" Color="{StaticResource TextDimColor}" />
+            <SolidColorBrush x:Key="TextFaintBrush" Color="{StaticResource TextFaintColor}" />
+            <SolidColorBrush x:Key="TextSubtleBrush" Color="{StaticResource TextSubtleColor}" />
+            <SolidColorBrush x:Key="RowJsonBrush" Color="{StaticResource RowJsonColor}" />
+            <SolidColorBrush x:Key="HighlightKeyBrush" Color="{StaticResource HighlightKeyColor}" />
+            <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}" />
+            <SolidColorBrush x:Key="AccentForegroundBrush" Color="{StaticResource AccentForegroundColor}" />
+            <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource SuccessColor}" />
+            <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource WarningColor}" />
+            <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource DangerColor}" />
+            <SolidColorBrush x:Key="DangerTextBrush" Color="{StaticResource DangerTextColor}" />
+            <SolidColorBrush x:Key="DangerSurfaceBrush" Color="{StaticResource DangerSurfaceColor}" />
+            <SolidColorBrush x:Key="DangerSurfaceBorderBrush" Color="{StaticResource DangerSurfaceBorderColor}" />
+            <SolidColorBrush x:Key="DiffInsertedBackgroundBrush" Color="{StaticResource DiffInsertedBackgroundColor}" />
+            <SolidColorBrush x:Key="DiffInsertedBorderBrush" Color="{StaticResource DiffInsertedBorderColor}" />
+            <SolidColorBrush x:Key="MatchBorderBrush" Color="{StaticResource MatchBorderColor}" />
+            <SolidColorBrush x:Key="BadgeBrush" Color="{StaticResource BadgeColor}" />
+            <SolidColorBrush x:Key="NodeBackgroundBrush" Color="{StaticResource NodeBackgroundColor}" />
+            <SolidColorBrush x:Key="NodeBorderBrush" Color="{StaticResource NodeBorderColor}" />
+            <SolidColorBrush x:Key="NodeBorderSelectedBrush" Color="{StaticResource NodeBorderSelectedColor}" />
+            <SolidColorBrush x:Key="NodeSeparatorBrush" Color="{StaticResource NodeSeparatorColor}" />
+            <SolidColorBrush x:Key="NodeMutedTextBrush" Color="{StaticResource NodeMutedTextColor}" />
+            <SolidColorBrush x:Key="NodePortTextBrush" Color="{StaticResource NodePortTextColor}" />
+            <SolidColorBrush x:Key="PortInputBrush" Color="{StaticResource PortInputColor}" />
+            <SolidColorBrush x:Key="PortInputStrokeBrush" Color="{StaticResource PortInputStrokeColor}" />
+            <SolidColorBrush x:Key="PortOutputBrush" Color="{StaticResource PortOutputColor}" />
+            <SolidColorBrush x:Key="PortOutputStrokeBrush" Color="{StaticResource PortOutputStrokeColor}" />
+            <SolidColorBrush x:Key="ResizeGripBrush" Color="{StaticResource ResizeGripColor}" />
+            <SolidColorBrush x:Key="EdgeLabelBackgroundBrush" Color="{StaticResource EdgeLabelBackgroundColor}" />
+            <SolidColorBrush x:Key="EdgeLabelTextBrush" Color="{StaticResource EdgeLabelTextColor}" />
+            <SolidColorBrush x:Key="EdgeLabelSelectedTextBrush" Color="{StaticResource EdgeLabelSelectedTextColor}" />
+            <SolidColorBrush x:Key="MiniMapEdgeBrush" Color="{StaticResource MiniMapEdgeColor}" />
+            <SolidColorBrush x:Key="MiniMapBlockBorderBrush" Color="{StaticResource MiniMapBlockBorderColor}" />
+            <SolidColorBrush x:Key="MiniMapSelectedStrokeBrush" Color="{StaticResource MiniMapSelectedStrokeColor}" />
+            <SolidColorBrush x:Key="SelectionFillBrush" Color="{StaticResource SelectionFillColor}" />
+            <SolidColorBrush x:Key="ModalOverlayBrush" Color="{StaticResource ModalOverlayColor}" />
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
 </ResourceDictionary>

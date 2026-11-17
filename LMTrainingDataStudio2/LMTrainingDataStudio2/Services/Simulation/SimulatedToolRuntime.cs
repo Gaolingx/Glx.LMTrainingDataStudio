@@ -9,7 +9,7 @@ public interface IToolRuntime
 {
     Task<string> ExecuteAsync(
         SimulatedToolRule rule,
-        ToolCall call,
+        ToolCall toolCall,
         CancellationToken cancellationToken);
 }
 
@@ -27,7 +27,7 @@ public sealed class SimulatedToolRuntime : IToolRuntime
 
     public async Task<string> ExecuteAsync(
         SimulatedToolRule rule,
-        ToolCall call,
+        ToolCall toolCall,
         CancellationToken cancellationToken)
     {
         var attempt = _attempts.GetValueOrDefault(rule.Name) + 1;
@@ -53,7 +53,7 @@ public sealed class SimulatedToolRuntime : IToolRuntime
                     : rule.ErrorMessage);
         }
 
-        var arguments = call.Function.Arguments?.ToString() ?? "{}";
+        var arguments = toolCall.Function.Arguments?.ToString() ?? "{}";
         return rule.ResponseTemplate
             .Replace("{{name}}", rule.Name, StringComparison.Ordinal)
             .Replace("{{arguments}}", arguments, StringComparison.Ordinal);

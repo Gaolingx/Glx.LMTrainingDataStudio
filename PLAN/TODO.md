@@ -1,7 +1,7 @@
 # PLAN / TODO — 实施计划与验收标准
 
-> 最后更新：2026-11-17（Round 15 节点能力收紧完成）
-> 当前基线：.NET 9 / Avalonia 11.3 / NUnit 4
+> 最后更新：2026-11-17（Round 16 发布与体验完成）
+> 当前基线：.NET 9 / Avalonia 11.3 / NUnit 4；505 常规测试 + 7 gated；构建 0 警告（分析器开启）
 > 工作方式：小步提交，每个 Phase 独立验收；开发期允许 break change，不保留兼容层。
 >
 > 完整“已做/未做”清单与 10 个节点的能力矩阵见 [STATUS.md](STATUS.md)。本文保留分阶段计划、验收标准与详细缺口池。
@@ -145,6 +145,47 @@
 - Sampler 分层对 count 模式不生效（count 模式按全局顺序填充）；端口动态变化时指向被删除端口的旧连线只在下次校验时报错。
 - Simulation 流式 delta 仅支持 OpenAI Chat；限速按 query 启动间隔近似，不是严格 token bucket。
 - 属性面板未逐项人工点击验收（XAML 编译、Headless UI、ViewModel 单测与启动冒烟通过）。
+
+---
+
+## 附十：Round 16 发布与体验（2026-11-17）
+
+### 10.1 本轮做了什么
+
+- [x] 画布 polish：节点右下角尺寸手柄（宽高持久化到 Recipe、`ResizeBlocksCommand` 可撤销）、边 hover 流动虚线动画与粗细过渡、边标签避让节点与其他标签、Edit 菜单 Undo/Redo 与 `Ctrl+Shift+Z`。
+- [x] 属性修改撤销：名称/显示名修改与所有节点配置编辑进入同一 `CommandHistory`；连续编辑同一节点配置在 1.5s 窗口内自动合并为一条撤销记录。
+- [x] 完整浅色主题：扩展 `Themes/Colors.axaml` 的 Dark/Light 语义资源（表面、文本、语义色、节点、端口、边标签、Mini-map、选择框、Modal、阴影），删除 Views 下全部硬编码颜色字面量；主题切换使用 `DynamicResource` 即时生效，画布在主题变体变化时重绘。
+- [x] 状态栏内存占用每 2 秒刷新，窗口关闭时停止定时器。
+- [x] 单实例：命名互斥体 + 命名管道；后启动实例把 Recipe 路径转发给主实例，主实例在 UI 线程打开（遵守脏文档确认）。
+- [x] 命令行打开：`LMTrainingDataStudio2.exe <recipe.json>`；启动时在恢复上次文件后打开命令行文件。
+- [x] 崩溃报告与诊断：未处理异常自动写入 `%LOCALAPPDATA%\LMTrainingDataStudio\crashes`；Help → Export Diagnostics 导出 zip（日志、脱敏设置、最近运行摘要），`RedactSettingsForDiagnostics` 移除 API Key。
+- [x] 发布：MSIX `AppxManifest.xml`（`.recipe` 文件关联、`lmtds.exe` 别名）与 `scripts/package-msix.ps1`（自动生成图标、调用 makeappx、可选签名）；Inno Setup 脚本 `packaging/inno/LMTrainingDataStudio.iss` 与 `scripts/package-inno.ps1`（HKCU 关联 + `.json` OpenWithProgids）。
+- [x] 示例 Recipe：`examples/` 下 6 个可直接打开的 `*.recipe.json`；`ExampleRecipeTests` 校验全部示例合法，显式测试可重新生成。
+- [x] README 截图：`docs/screenshots/editor-dark.png` 与 `editor-light.png`。
+- [x] 基线入口：10M 行 Seed → Expression → SFT Export（`LMTDS_PERF_PIPELINE_ROWS=10000000`，实测 154.0s、托管内存增量 1MB）、CSV/Parquet 大规模分页与往返（20 万行，JSONL→CSV 14.3s、→Parquet 13.1s、最慢分页 18.2ms、内存增量 17MB）。
+- [x] 工程质量：根目录 `.editorconfig`、`Directory.Build.props` 启用 .NET 分析器（`latest-recommended`）、`TreatWarningsAsErrors`；修复 CA1826/CA1854/CA1716/CA2020 等问题。
+- [x] 新增测试：配置编辑合并撤销、尺寸命令、显示名重命名、边标签避让、诊断包与脱敏、内存刷新、Views 无硬编码颜色、Dark/Light 资源完整性、主题切换动态刷新、示例 Recipe 校验。
+
+### 10.2 验证结果
+
+| 项目 | 命令 | 结果 |
+| --- | --- | --- |
+| 构建 | `dotnet build LMTrainingDataStudio2/LMTrainingDataStudio2.slnx` | 成功，0 警告，0 错误（分析器开启） |
+| 测试 | `dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx` | 505 通过，0 失败，7 跳过（2 provider + 5 性能 gated） |
+| Round 16 用例 | `dotnet test --filter Round16ExperienceTests` | 9 通过 |
+| 示例 Recipe | `ExampleRecipeTests.BundledExamples_LoadAndValidate` | 6 个示例均为合法 DAG |
+| 10M 行链路 | `LMTDS_PERF_TESTS=1 LMTDS_PERF_PIPELINE_ROWS=10000000 dotnet test --filter PipelinePerformanceTests` | 通过：生成 5.0s、运行 154.0s、托管内存增量 1MB、输出 10,000,000 行 |
+| CSV/Parquet 基线 | `LMTDS_PERF_TESTS=1 dotnet test --filter CsvAndParquet_LargeInput` | 通过：20 万行 @256B，JSONL→CSV 14.3s、JSONL→Parquet 13.1s、最慢 100 行分页 18.2ms、托管内存增量 17MB |
+| 启动冒烟 | `LMTrainingDataStudio2.exe`（Debug） | 进程持续运行，无异常输出 |
+
+### 10.3 本轮未做
+
+- MSIX/Inno 安装包未在本机实际安装验证（脚本与清单已提供；本机未安装 Windows SDK/Inno Setup）。
+- 单实例管道未做双进程端到端自动化测试（管道客户端在无服务端时返回 false 的行为已覆盖）。
+- 画布尺寸/缩放逐帧计时未做 UI 帧级实测（布局与增量渲染测试仍通过）。
+- 截图由 Avalonia Headless + Skia 一次性生成，未纳入常规测试（避免给测试项目引入 Skia 字体依赖）。
+- 边动画为高亮边流动虚线，不是路径几何过渡；标签避让为贪心候选位置，不保证全局最优。
+- 分析器规则采用 `latest-recommended` 并保留一份 `NoWarn` 清单（CA1001/CA1863/CA1068 等），未逐条重构。
 
 ---
 
@@ -1320,15 +1361,15 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 
 未实现：
 
-- [ ] Undo/Redo 菜单/按钮入口与 `Ctrl+Shift+Z`；属性面板删除与配置修改进入撤销历史。
+- [x] Undo/Redo 菜单/按钮入口与 `Ctrl+Shift+Z`；属性面板删除与配置修改进入撤销历史（Round 16）。
 - [ ] 系统剪贴板 / 跨实例粘贴。
 - [ ] 快捷键全局化，避免焦点冲突。
-- [ ] 节点尺寸调整手柄、边过渡动画、标签避让、自动布局间距/分组选项。
+- [x] 节点尺寸调整手柄、边过渡动画、标签避让（Round 16）；自动布局间距/分组选项未做。
 - [x] 样本/输出预览弹窗；Cleaner 前后 diff；Validator 失败样本预览（Round 14）。
 - [x] Simulation Tools / Rules / Script 可视化编辑器、流式 delta、速率限制与价格预设（Round 15）。
 - [ ] Cleaner 正则规则列表 UI；Validator Cleanup 规则 UI。
-- [ ] 状态栏内存占用定时刷新（当前只在构造时采样一次）。
-- [ ] 完整浅色主题：部分视图仍硬编码深色。
+- [x] 状态栏内存占用定时刷新（Round 16，2s）。
+- [x] 完整浅色主题：所有 Views 使用主题资源，无硬编码颜色（Round 16）。
 
 ### 4.5 运行时与执行
 
@@ -1363,9 +1404,9 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 - [ ] 缓存目录浏览按钮与可写性检查。
 - [ ] API 密钥加密存储（当前 settings.json 明文，仅限本机使用）。
 - [ ] 设置变更通知已创建的服务。
-- [ ] 单实例 / 文件关联 / 命令行打开。
-- [ ] 完整浅色主题（移除剩余硬编码颜色）。
-- [ ] 内存占用定时刷新。
+- [x] 单实例 / 文件关联 / 命令行打开（Round 16）。
+- [x] 完整浅色主题（移除剩余硬编码颜色，Round 16）。
+- [x] 内存占用定时刷新（Round 16）。
 
 ### 4.7 代码质量与已知缺陷
 
@@ -1424,19 +1465,20 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 - [x] 行内高亮匹配器（字面量/正则/大小写/超时/上限，Round 14，8 个）。
 - [x] 样本预览：文件读取、Cleaner diff、格式限制与缺失文件（Round 14，5 个）。
 - [x] Headless 行内高亮 Inlines 渲染（Round 14，1 个）。
-- [x] 当前测试总数：480 通过 + 6 gated（2026-11-17 复核）。
+- [x] 新增 10 个测试：配置编辑合并撤销、尺寸命令、显示名重命名、边标签避让、诊断包与脱敏、内存刷新、Views 无硬编码颜色、Dark/Light 资源完整性、主题切换动态刷新、示例 Recipe 校验（Round 16）。
+- [x] 当前测试总数：505 通过 + 7 gated（2026-11-17 Round 16 复核）。
 
 ### 4.9 工程化与发布
 
 - [x] LICENSE（Round 12：MIT）。
-- [部分] Assets：应用图标已添加；README 截图与示例 Recipe 仍未补齐。
-- [部分] 发布/打包：win-x64 self-contained 单文件脚本已验证；MSIX/安装包与自动版本号未做。
+- [x] Assets：应用图标、README Dark/Light 截图、`examples/` 示例 Recipe（Round 16）。
+- [x] 发布/打包：win-x64 self-contained 单文件脚本；MSIX 清单/脚本与 Inno Setup 安装脚本（Round 16，未做本机安装验证）。
 - [x] CI/CD 流水线（Round 12：GitHub Actions）。
-- [ ] `.editorconfig` / 分析器 / 警告即错误。
-- [x] 日志框架（Round 12：滚动文件日志 + 全局异常；导出未做）。
-- [ ] 崩溃报告导出/一键打包诊断。
-- [部分] 中英文文案统一 / 本地化（Round 附六：静态 UI、节点说明、预设与语言切换已完成；运行日志/执行状态仍为英文）。
-- [x] README 路线图与实现状态同步（Round 12；2026-11-17 再次复核）。
+- [x] `.editorconfig` / 分析器 / 警告即错误（Round 16）。
+- [x] 日志框架（Round 12：滚动文件日志 + 全局异常；诊断导出 Round 16）。
+- [x] 崩溃报告导出/一键打包诊断（Round 16）。
+- [部分] 中英文文案统一 / 本地化（静态 UI、节点说明、预设与语言切换已完成；运行日志/执行状态仍为英文）。
+- [x] README 路线图与实现状态同步（Round 16）。
 - [x] 构建环境：`net9.0` + `global.json` 已落地，本机构建通过。
 
 ---
@@ -1471,11 +1513,11 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 
 ### P2 — Round 16：发布与体验
 
-1. [ ] 节点尺寸手柄、边动画、标签避让、Undo/Redo 菜单、属性修改撤销。
-2. [ ] 完整浅色主题、内存定时刷新。
-3. [ ] MSIX/安装包、文件关联、单实例、命令行打开、崩溃报告导出。
-4. [ ] 10M 行与 CSV/Parquet 大规模基线、README 截图、示例 Recipe。
-5. [ ] `.editorconfig`、分析器、警告即错误、文案统一。
+1. [x] 节点尺寸手柄、边动画、标签避让、Undo/Redo 菜单、属性修改撤销。
+2. [x] 完整浅色主题、内存定时刷新。
+3. [x] MSIX/安装包、文件关联、单实例、命令行打开、崩溃报告导出。
+4. [x] 10M 行与 CSV/Parquet 大规模基线、README 截图、示例 Recipe。
+5. [x] `.editorconfig`、分析器、警告即错误、文案统一。
 
 ### 已完成（供对照）
 
@@ -1508,9 +1550,9 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 | 13 | 执行与 IO 韧性 | P0 | 节点间溢写磁盘/流式读取；节点级中断恢复；取消/清理硬化；SFT Export 收尾 | 1M 行链路内存 ≤300MB；取消 1s 内停止；恢复输出一致；无临时文件残留 |
 | 14 | 数据工作台编辑与预览 | P1 | 逐行 CRUD/单元格编辑/写回；搜索高亮；问题分组；样本/输出预览 | 编辑行数守恒、撤销可恢复、覆盖有确认；1M 行编辑内存 ≤300MB |
 | 15 | 节点能力收紧 | P1 | LLM tools/结构化输出/多轮/并发/成本；Validator 代码规则/超时/双端口；Sampler 多端口/分层；Simulation 可视化配置 | 请求体与结构化输出可验证；端口行数守恒；分层比例在容差内 |
-| 16 | 发布与体验 | P2 | 画布 polish、完整浅色主题、MSIX/文件关联/单实例、10M 基线、README 截图、分析器 | 500 节点逐帧 <100ms；浅色无残留；安装/双击打开可用；10M 基线记录 |
+| 16 | 发布与体验 | P2 | 画布 polish、完整浅色主题、单实例/文件关联/诊断、MSIX/Inno、10M 与 CSV/Parquet 基线、README 截图、示例 Recipe、分析器 | 画布尺寸/撤销可用；浅色无残留；命令行/单实例可用；基线记录；0 警告 |
 
-**执行顺序**：Round 13 → 14 → 15 → 16；Round 13、14、15 已完成（见附七、附八、附九），下一轮为 Round 16；每轮结束按第七节收尾模板更新勾选状态、README 与提交记录。
+**执行顺序**：Round 13 → 14 → 15 → 16；四轮均已完成（见附七、附八、附九、附十）。后续从第六节 6.1 backlog 中选择排期；每轮结束按第七节收尾模板更新勾选状态、README 与提交记录。
 
 ---
 

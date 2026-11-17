@@ -294,7 +294,7 @@ internal static class WindowsJobLimits
             if (limits.MaxMemoryMb > 0)
             {
                 information.BasicLimitInformation.LimitFlags |= JobObjectLimitProcessMemory;
-                information.ProcessMemoryLimit = (UIntPtr)((ulong)limits.MaxMemoryMb * 1024 * 1024);
+                information.ProcessMemoryLimit = new UIntPtr((ulong)limits.MaxMemoryMb * 1024 * 1024);
             }
 
             if (limits.MaxProcesses > 0)

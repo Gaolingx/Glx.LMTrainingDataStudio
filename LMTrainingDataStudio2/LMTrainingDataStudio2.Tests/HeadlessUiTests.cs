@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Headless.NUnit;
+using Avalonia.Media;
 using Avalonia.Threading;
 using LMTrainingDataStudio2.Controls;
 using LMTrainingDataStudio2.Localization;
@@ -178,5 +179,34 @@ public sealed class HeadlessUiTests
         ThemeManager.Apply(dark: true);
         Assert.That(global::Avalonia.Application.Current?.RequestedThemeVariant?.Key,
             Is.EqualTo("Dark"));
+    }
+
+    [AvaloniaTest]
+    public void ThemeSwitch_UpdatesWindowBackgroundDynamicResource()
+    {
+        var vm = new MainWindowViewModel(new SettingsStore(Path.Combine(_directory, "settings.json")));
+        var window = new MainWindow { DataContext = vm };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        try
+        {
+            ThemeManager.Apply(dark: false);
+            Dispatcher.UIThread.RunJobs();
+            var light = (window.Background as ISolidColorBrush)?.Color;
+
+            ThemeManager.Apply(dark: true);
+            Dispatcher.UIThread.RunJobs();
+            var dark = (window.Background as ISolidColorBrush)?.Color;
+
+            Assert.That(light, Is.Not.Null);
+            Assert.That(dark, Is.Not.Null);
+            Assert.That(light, Is.Not.EqualTo(dark));
+        }
+        finally
+        {
+            ThemeManager.Apply(dark: true);
+            window.Close();
+        }
     }
 }

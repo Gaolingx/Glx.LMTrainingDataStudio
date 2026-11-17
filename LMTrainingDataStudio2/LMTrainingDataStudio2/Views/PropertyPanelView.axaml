@@ -15,9 +15,9 @@
         <StackPanel IsVisible="{Binding SelectedBlock, Converter={x:Static ObjectConverters.IsNull}}"
                     Spacing="8" Margin="0,20">
             <TextBlock Text="{loc:Loc property.no_block_selected}" FontSize="13"
-                       Foreground="#888888" HorizontalAlignment="Center" />
+                       Foreground="{DynamicResource TextDimBrush}" HorizontalAlignment="Center" />
             <TextBlock Text="{loc:Loc property.click_a_block_on_the_canvas_to_view_its_properti}"
-                       FontSize="11" Foreground="#666666"
+                       FontSize="11" Foreground="{DynamicResource TextSubtleBrush}"
                        TextWrapping="Wrap" HorizontalAlignment="Center"
                        TextAlignment="Center" />
         </StackPanel>
@@ -27,14 +27,14 @@
                     Spacing="12">
 
             <!-- Block Info Header -->
-            <Border Background="#2A2A3E" CornerRadius="6" Padding="12,8">
+            <Border Background="{DynamicResource NodeBackgroundBrush}" CornerRadius="6" Padding="12,8">
                 <StackPanel Spacing="6">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <TextBlock Text="{Binding SelectedBlock.IconText}" FontSize="16" />
                         <TextBlock Text="{Binding SelectedBlock.DisplayName}"
-                                   FontSize="14" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                                   FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextBrightBrush}" />
                     </StackPanel>
-                    <TextBlock FontSize="11" Foreground="#AAAAAA">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource TextMutedBrush}">
                         <Run Text="{loc:Loc property.type_label}" />
                         <Run Text="{Binding SelectedBlock.Type}" />
                     </TextBlock>
@@ -42,52 +42,58 @@
             </Border>
 
             <!-- Node guide -->
-            <Border Background="#1E1E2E" BorderBrush="#3A3A4E" BorderThickness="1"
+            <Border Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1"
                     CornerRadius="6" Padding="10,8">
                 <StackPanel Spacing="4">
                     <TextBlock Text="{loc:Loc property.node_help}" FontSize="11"
-                               FontWeight="SemiBold" Foreground="#CCCCCC" />
+                               FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
                     <TextBlock Text="{Binding SelectedBlockHelp}" FontSize="10"
-                               Foreground="#AAAAAA" TextWrapping="Wrap" />
+                               Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap" />
                     <TextBlock Text="{Binding SelectedBlockPorts}" FontSize="10"
-                               Foreground="#888888" TextWrapping="Wrap" />
+                               Foreground="{DynamicResource TextDimBrush}" TextWrapping="Wrap" />
                 </StackPanel>
             </Border>
 
             <!-- Block-level validation error -->
             <TextBlock Text="{Binding SelectedBlock.ConfigError}"
-                       FontSize="11" Foreground="#FF6666" TextWrapping="Wrap"
+                       FontSize="11" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap"
                        IsVisible="{Binding SelectedBlock.ConfigError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
             <!-- Recipe validation message for this block -->
             <TextBlock Text="{Binding SelectedBlock.ValidationError}"
-                       FontSize="11" Foreground="#FF6666" TextWrapping="Wrap"
+                       FontSize="11" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap"
                        IsVisible="{Binding SelectedBlock.ValidationError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
             <!-- Jinja Reference Name -->
             <StackPanel Spacing="4">
-                <TextBlock Text="{loc:Loc property.jinja_reference_name}" FontSize="11" Foreground="#AAAAAA" />
-                <TextBox Text="{Binding SelectedBlock.Name, Mode=TwoWay}"
+                <TextBlock Text="{loc:Loc property.jinja_reference_name}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
+                <TextBox x:Name="BlockNameBox"
+                         Text="{Binding SelectedBlock.Name, Mode=TwoWay}"
                          FontSize="12" Padding="8,6"
-                         Watermark="e.g. seed_data" />
+                         Watermark="e.g. seed_data"
+                         GotFocus="OnBlockNameGotFocus"
+                         LostFocus="OnBlockNameLostFocus" />
             </StackPanel>
 
             <!-- Display Name -->
             <StackPanel Spacing="4">
-                <TextBlock Text="{loc:Loc property.display_name}" FontSize="11" Foreground="#AAAAAA" />
-                <TextBox Text="{Binding SelectedBlock.DisplayName, Mode=TwoWay}"
+                <TextBlock Text="{loc:Loc property.display_name}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
+                <TextBox x:Name="BlockDisplayNameBox"
+                         Text="{Binding SelectedBlock.DisplayName, Mode=TwoWay}"
                          FontSize="12" Padding="8,6"
-                         Watermark="{loc:Loc property.block_display_name}" />
+                         Watermark="{loc:Loc property.block_display_name}"
+                         GotFocus="OnBlockDisplayNameGotFocus"
+                         LostFocus="OnBlockDisplayNameLostFocus" />
             </StackPanel>
 
             <!-- Seed configuration -->
             <StackPanel Spacing="8"
                         IsVisible="{Binding SelectedBlock.SeedEditor, Converter={x:Static ObjectConverters.IsNotNull}}">
-                <Border Height="1" Background="#3A3A4E" />
-                <TextBlock Text="{loc:Loc property.seed_configuration}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                <Border Height="1" Background="{DynamicResource ButtonSurfaceBrush}" />
+                <TextBlock Text="{loc:Loc property.seed_configuration}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.data_source}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.data_source}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
                         <TextBox Grid.Column="0"
                                  Text="{Binding SelectedBlock.SeedEditor.SourcePath, Mode=TwoWay}"
@@ -96,30 +102,30 @@
                         <Button Grid.Column="1" Content="{loc:Loc property.browse}"
                                 Click="OnBrowseSeedSourceClick"
                                 Padding="10,6" FontSize="11"
-                                Background="#3A3A4E" Foreground="#FFFFFF" />
+                                Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
                     </Grid>
                 </StackPanel>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.file_type}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.file_type}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <ComboBox ItemsSource="{Binding SelectedBlock.SeedEditor.FileTypes}"
                               SelectedItem="{Binding SelectedBlock.SeedEditor.FileType, Mode=TwoWay}"
                               FontSize="11" HorizontalAlignment="Stretch" />
                 </StackPanel>
 
                 <CheckBox Content="{loc:Loc property.use_index_cache}"
-                          FontSize="11" Foreground="#CCCCCC"
+                          FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}"
                           IsChecked="{Binding SelectedBlock.SeedEditor.UseIndexCache, Mode=TwoWay}" />
             </StackPanel>
 
             <!-- LLM configuration -->
             <StackPanel Spacing="8"
                         IsVisible="{Binding SelectedBlock.LlmEditor, Converter={x:Static ObjectConverters.IsNotNull}}">
-                <Border Height="1" Background="#3A3A4E" />
-                <TextBlock Text="{loc:Loc property.llm_configuration}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                <Border Height="1" Background="{DynamicResource ButtonSurfaceBrush}" />
+                <TextBlock Text="{loc:Loc property.llm_configuration}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc common.provider}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc common.provider}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <ComboBox ItemsSource="{Binding SelectedBlock.LlmEditor.Providers}"
                               SelectedItem="{Binding SelectedBlock.LlmEditor.SelectedProvider, Mode=TwoWay}"
                               FontSize="11" HorizontalAlignment="Stretch">
@@ -132,7 +138,7 @@
                 </StackPanel>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc common.model}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc common.model}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.LlmEditor.ModelAlias, Mode=TwoWay}"
                              FontSize="11" Padding="8,6"
                              Watermark="gpt-4o / claude-sonnet-4-5" />
@@ -140,12 +146,12 @@
 
                 <Grid ColumnDefinitions="*,8,*">
                     <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="{loc:Loc common.temperature}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc common.temperature}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.LlmEditor.Temperature, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="0.7" />
                     </StackPanel>
                     <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="{loc:Loc common.max_tokens}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc common.max_tokens}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.LlmEditor.MaxTokens, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="2048" />
                     </StackPanel>
@@ -153,26 +159,26 @@
 
                 <Grid ColumnDefinitions="*,8,*">
                     <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="{loc:Loc common.timeout_seconds}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc common.timeout_seconds}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.LlmEditor.TimeoutSeconds, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="100" />
                     </StackPanel>
                     <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="{loc:Loc property.max_retries}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.max_retries}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.LlmEditor.MaxRetries, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="2" />
                     </StackPanel>
                 </Grid>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc common.endpoint_optional}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc common.endpoint_optional}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.LlmEditor.Endpoint, Mode=TwoWay}"
                              FontSize="11" Padding="8,6"
                              Watermark="https://api.openai.com/v1" />
                 </StackPanel>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.prompt}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.prompt}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.LlmEditor.Prompt, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Height="90"
                              AcceptsReturn="True" TextWrapping="Wrap"
@@ -180,38 +186,38 @@
                 </StackPanel>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc common.tool_profile_optional}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc common.tool_profile_optional}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.LlmEditor.ToolProfileName, Mode=TwoWay}"
                              FontSize="11" Padding="8,6"
                              Watermark="{loc:Loc property.tool_profile_block_name}" />
                 </StackPanel>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.system_prompt}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.system_prompt}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.LlmEditor.SystemPrompt, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Height="50"
                              AcceptsReturn="True" TextWrapping="Wrap" />
                 </StackPanel>
 
                 <CheckBox Content="{loc:Loc property.use_row_messages}"
-                          FontSize="11" Foreground="#CCCCCC"
+                          FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}"
                           IsChecked="{Binding SelectedBlock.LlmEditor.UseRowMessages, Mode=TwoWay}" />
 
                 <Grid ColumnDefinitions="*,8,*">
                     <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="{loc:Loc property.max_concurrency}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.max_concurrency}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.LlmEditor.MaxConcurrency, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="1" />
                     </StackPanel>
                     <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="{loc:Loc property.max_failure_samples}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.max_failure_samples}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.LlmEditor.MaxFailureSamples, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="100" />
                     </StackPanel>
                 </Grid>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.response_schema}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.response_schema}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.LlmEditor.ResponseSchema, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Height="80"
                              AcceptsReturn="True" TextWrapping="NoWrap"
@@ -219,68 +225,68 @@
                 </StackPanel>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.failure_output_path}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.failure_output_path}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.LlmEditor.FailureOutputPath, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Watermark="out/llm-failures.jsonl" />
                 </StackPanel>
 
                 <CheckBox Content="{loc:Loc property.continue_on_error}"
-                          FontSize="11" Foreground="#CCCCCC"
+                          FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}"
                           IsChecked="{Binding SelectedBlock.LlmEditor.ContinueOnError, Mode=TwoWay}" />
 
                 <Grid ColumnDefinitions="*,8,*">
                     <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="{loc:Loc property.input_cost}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.input_cost}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.LlmEditor.InputCostPerMillionTokens, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="0" />
                     </StackPanel>
                     <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="{loc:Loc property.output_cost}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.output_cost}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.LlmEditor.OutputCostPerMillionTokens, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="0" />
                     </StackPanel>
                 </Grid>
 
                 <TextBlock Text="{loc:Loc property.api_keys_are_read_from_openai_api_key_anthropic}"
-                           FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
+                           FontSize="10" Foreground="{DynamicResource TextFaintBrush}" TextWrapping="Wrap" />
             </StackPanel>
 
             <!-- Expression configuration -->
             <StackPanel Spacing="8"
                         IsVisible="{Binding SelectedBlock.ExpressionEditor, Converter={x:Static ObjectConverters.IsNotNull}}">
-                <Border Height="1" Background="#3A3A4E" />
-                <TextBlock Text="{loc:Loc property.expression_configuration}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                <Border Height="1" Background="{DynamicResource ButtonSurfaceBrush}" />
+                <TextBlock Text="{loc:Loc property.expression_configuration}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
                 <TextBlock Text="{loc:Loc property.fluid_template_variables_if_for_and_filters_use}"
-                           FontSize="10" Foreground="#888888" TextWrapping="Wrap" />
+                           FontSize="10" Foreground="{DynamicResource TextDimBrush}" TextWrapping="Wrap" />
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.template}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.template}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.ExpressionEditor.Template, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Height="120"
                              AcceptsReturn="True" TextWrapping="NoWrap"
                              FontFamily="Consolas"
                              Watermark="{}{&quot;text&quot;:{{ content | json }}}" />
                     <TextBlock Text="{Binding SelectedBlock.ExpressionEditor.TemplateError}"
-                               FontSize="10" Foreground="#FF6666" TextWrapping="Wrap"
+                               FontSize="10" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap"
                                IsVisible="{Binding SelectedBlock.ExpressionEditor.TemplateError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                 </StackPanel>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.field_aliases_json_alias_path}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.field_aliases_json_alias_path}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.ExpressionEditor.FieldsJson, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Height="70"
                              AcceptsReturn="True" TextWrapping="NoWrap"
                              FontFamily="Consolas" />
                     <TextBlock Text="{Binding SelectedBlock.ExpressionEditor.FieldsError}"
-                               FontSize="10" Foreground="#FF6666" TextWrapping="Wrap"
+                               FontSize="10" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap"
                                IsVisible="{Binding SelectedBlock.ExpressionEditor.FieldsError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                 </StackPanel>
 
-                <Border Height="1" Background="#2F2F42" />
-                <TextBlock Text="{loc:Loc common.preview}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                <Border Height="1" Background="{DynamicResource PanelBorderBrush}" />
+                <TextBlock Text="{loc:Loc common.preview}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.sample_row_json}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.sample_row_json}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.ExpressionEditor.SampleJson, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Height="80"
                              AcceptsReturn="True" TextWrapping="NoWrap"
@@ -289,13 +295,13 @@
 
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <Button Content="{loc:Loc common.validate}" Command="{Binding SelectedBlock.ExpressionEditor.ValidateTemplateCommand}"
-                            Padding="10,5" Background="#3A3A4E" Foreground="#FFFFFF" />
+                            Padding="10,5" Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
                     <Button Content="{loc:Loc property.render_preview}" Command="{Binding SelectedBlock.ExpressionEditor.RenderPreviewCommand}"
-                            Padding="10,5" Background="#4A90D9" Foreground="#FFFFFF" />
+                            Padding="10,5" Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource AccentForegroundBrush}" />
                 </StackPanel>
 
                 <TextBlock Text="{Binding SelectedBlock.ExpressionEditor.PreviewError}"
-                           FontSize="10" Foreground="#FF6666" TextWrapping="Wrap"
+                           FontSize="10" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap"
                            IsVisible="{Binding SelectedBlock.ExpressionEditor.PreviewError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
                 <TextBox Text="{Binding SelectedBlock.ExpressionEditor.PreviewOutput}"
@@ -303,17 +309,17 @@
                          FontSize="10" Padding="8,6" Height="110"
                          AcceptsReturn="True" TextWrapping="NoWrap"
                          FontFamily="Consolas"
-                         Background="#1A1A2A" />
+                         Background="{DynamicResource InputBackgroundBrush}" />
             </StackPanel>
 
             <!-- Validator configuration -->
             <StackPanel Spacing="8"
                         IsVisible="{Binding SelectedBlock.ValidatorEditor, Converter={x:Static ObjectConverters.IsNotNull}}">
-                <Border Height="1" Background="#3A3A4E" />
-                <TextBlock Text="{loc:Loc property.validator_configuration}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                <Border Height="1" Background="{DynamicResource ButtonSurfaceBrush}" />
+                <TextBlock Text="{loc:Loc property.validator_configuration}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.rule_kind}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.rule_kind}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <ComboBox ItemsSource="{Binding SelectedBlock.ValidatorEditor.RuleKinds}"
                               SelectedItem="{Binding SelectedBlock.ValidatorEditor.SelectedRuleKind, Mode=TwoWay}"
                               FontSize="11" HorizontalAlignment="Stretch">
@@ -326,37 +332,37 @@
                 </StackPanel>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.rule_schema}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.rule_schema}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.ValidatorEditor.Rule, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Height="130"
                              AcceptsReturn="True" TextWrapping="NoWrap"
                              FontFamily="Consolas"
                              Watermark="messages.length > 0  |  JSON Schema" />
                     <TextBlock Text="{Binding SelectedBlock.ValidatorEditor.RuleError}"
-                               FontSize="10" Foreground="#FF6666" TextWrapping="Wrap"
+                               FontSize="10" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap"
                                IsVisible="{Binding SelectedBlock.ValidatorEditor.RuleError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                     <Button Content="{loc:Loc property.validate_rule}" Command="{Binding SelectedBlock.ValidatorEditor.ValidateRuleCommand}"
                             HorizontalAlignment="Left" Padding="10,5"
-                            Background="#3A3A4E" Foreground="#FFFFFF" />
+                            Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
                 </StackPanel>
 
                 <Grid ColumnDefinitions="*,8,*">
                     <CheckBox Grid.Column="0" Content="{loc:Loc property.match_all_rules}"
-                              FontSize="11" Foreground="#CCCCCC"
+                              FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}"
                               IsChecked="{Binding SelectedBlock.ValidatorEditor.MatchAllRules, Mode=TwoWay}" />
                     <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="{loc:Loc property.validator_timeout_ms}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.validator_timeout_ms}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.ValidatorEditor.TimeoutMs, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="0" />
                     </StackPanel>
                 </Grid>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.additional_rules}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.additional_rules}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <ItemsControl ItemsSource="{Binding SelectedBlock.ValidatorEditor.AdditionalRules}" x:CompileBindings="False">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:ValidatorRuleEditorViewModel">
-                                <Border Background="#1E1E2E" CornerRadius="4" Padding="6" Margin="0,2">
+                                <Border Background="{DynamicResource InputBackgroundBrush}" CornerRadius="4" Padding="6" Margin="0,2">
                                     <StackPanel Spacing="4">
                                         <Grid ColumnDefinitions="*,Auto">
                                             <ComboBox Grid.Column="0"
@@ -367,13 +373,13 @@
                                                     Command="{Binding $parent[ItemsControl].DataContext.RemoveRuleCommand}"
                                                     CommandParameter="{Binding}"
                                                     Margin="4,0,0,0" Padding="6,2"
-                                                    Background="#3A3A4E" Foreground="#FFFFFF" />
+                                                    Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
                                         </Grid>
                                         <TextBox Text="{Binding Rule, Mode=TwoWay}"
                                                  FontSize="10" Padding="6,4"
                                                  AcceptsReturn="True" TextWrapping="Wrap" />
                                         <CheckBox Content="{loc:Loc property.rule_negate}"
-                                                  FontSize="10" Foreground="#AAAAAA"
+                                                  FontSize="10" Foreground="{DynamicResource TextMutedBrush}"
                                                   IsChecked="{Binding Negate, Mode=TwoWay}" />
                                     </StackPanel>
                                 </Border>
@@ -383,57 +389,57 @@
                     <Button Content="{loc:Loc property.add_rule}"
                             Command="{Binding SelectedBlock.ValidatorEditor.AddRuleCommand}"
                             HorizontalAlignment="Left" Padding="10,5"
-                            Background="#3A3A4E" Foreground="#FFFFFF" />
+                            Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
                 </StackPanel>
 
                 <CheckBox Content="{loc:Loc property.reject_invalid_rows}"
-                          FontSize="11" Foreground="#CCCCCC"
+                          FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}"
                           IsChecked="{Binding SelectedBlock.ValidatorEditor.RejectOnFailure, Mode=TwoWay}" />
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.reject_output_path_optional}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.reject_output_path_optional}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.ValidatorEditor.RejectOutputPath, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Watermark="out/rejected.jsonl" />
                     <TextBlock Text="{loc:Loc property.rejected_rows_are_written_as_linenumber_reason_d}"
-                               FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
+                               FontSize="10" Foreground="{DynamicResource TextFaintBrush}" TextWrapping="Wrap" />
                     <Button Content="{loc:Loc property.preview_reject}"
                             Click="OnPreviewRejectClick"
                             HorizontalAlignment="Left" Padding="10,5" FontSize="10"
-                            Background="#3A3A4E" Foreground="#FFFFFF" />
+                            Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
                 </StackPanel>
 
                 <TextBlock Text="{loc:Loc property.cleanup_rules_remain_in_config_json_below}"
-                           FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
+                           FontSize="10" Foreground="{DynamicResource TextFaintBrush}" TextWrapping="Wrap" />
             </StackPanel>
 
             <!-- Sampler configuration -->
             <StackPanel Spacing="8"
                         IsVisible="{Binding SelectedBlock.SamplerEditor, Converter={x:Static ObjectConverters.IsNotNull}}">
-                <Border Height="1" Background="#3A3A4E" />
-                <TextBlock Text="{loc:Loc property.sampler_configuration}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                <Border Height="1" Background="{DynamicResource ButtonSurfaceBrush}" />
+                <TextBlock Text="{loc:Loc property.sampler_configuration}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
 
                 <Grid ColumnDefinitions="*,8,*">
                     <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="{loc:Loc property.count}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.count}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.SamplerEditor.CountText, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="100" />
                     </StackPanel>
                     <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="{loc:Loc property.ratio_0_1}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.ratio_0_1}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.SamplerEditor.RatioText, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="0.1" />
                     </StackPanel>
                 </Grid>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.sampler_seed}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.sampler_seed}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.SamplerEditor.Seed, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Watermark="42" />
                 </StackPanel>
 
-                <Border Height="1" Background="#2F2F42" />
+                <Border Height="1" Background="{DynamicResource PanelBorderBrush}" />
                 <TextBlock Text="{loc:Loc property.splits_one_per_line_train_0_8_or_valid_100}"
-                           FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                           FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
                 <TextBox Text="{Binding SelectedBlock.SamplerEditor.SplitsText, Mode=TwoWay}"
                          FontSize="11" Padding="8,6" Height="90"
                          AcceptsReturn="True" TextWrapping="NoWrap"
@@ -441,44 +447,44 @@
                          Watermark="train:0.8&#10;valid:0.1&#10;test:0.1" />
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.split_output_directory}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.split_output_directory}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.SamplerEditor.OutputDirectory, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Watermark="out/splits" />
                 </StackPanel>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.stratify_field}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.stratify_field}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.SamplerEditor.StratifyField, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Watermark="category" />
                 </StackPanel>
 
                 <Grid ColumnDefinitions="*,8,Auto">
                     <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="{loc:Loc property.preview_rows}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.preview_rows}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.SamplerEditor.PreviewRowsText, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="1000" />
                     </StackPanel>
                     <TextBlock Grid.Column="2" Text="{Binding SelectedBlock.SamplerEditor.StatsPreview}"
-                               FontSize="10" Foreground="#AAAAAA" TextWrapping="Wrap"
+                               FontSize="10" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"
                                VerticalAlignment="Bottom" MaxWidth="220" />
                 </Grid>
 
                 <TextBlock Text="{Binding SelectedBlock.SamplerEditor.ValidationError}"
-                           FontSize="10" Foreground="#FF6666" TextWrapping="Wrap"
+                           FontSize="10" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap"
                            IsVisible="{Binding SelectedBlock.SamplerEditor.ValidationError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
                 <TextBlock Text="{loc:Loc property.splits_pass_all_rows_downstream_and_write_one_js}"
-                           FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
+                           FontSize="10" Foreground="{DynamicResource TextFaintBrush}" TextWrapping="Wrap" />
             </StackPanel>
 
             <!-- Query source configuration -->
             <StackPanel Spacing="8"
                         IsVisible="{Binding SelectedBlock.QuerySourceEditor, Converter={x:Static ObjectConverters.IsNotNull}}">
-                <Border Height="1" Background="#3A3A4E" />
-                <TextBlock Text="{loc:Loc property.query_source_configuration}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                <Border Height="1" Background="{DynamicResource ButtonSurfaceBrush}" />
+                <TextBlock Text="{loc:Loc property.query_source_configuration}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.queries_one_per_line}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.queries_one_per_line}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.QuerySourceEditor.QueriesText, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Height="100"
                              AcceptsReturn="True" TextWrapping="Wrap"
@@ -487,7 +493,7 @@
 
                 <Grid ColumnDefinitions="*,8,*">
                     <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="{loc:Loc property.expansion_mode}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.expansion_mode}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <ComboBox ItemsSource="{Binding SelectedBlock.QuerySourceEditor.Modes}"
                                   SelectedItem="{Binding SelectedBlock.QuerySourceEditor.SelectedMode, Mode=TwoWay}"
                                   FontSize="11" HorizontalAlignment="Stretch">
@@ -499,46 +505,46 @@
                         </ComboBox>
                     </StackPanel>
                     <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="{loc:Loc property.repeat}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.repeat}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.QuerySourceEditor.Repeat, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="1" />
                     </StackPanel>
                 </Grid>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc common.system_prompt_optional}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc common.system_prompt_optional}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.QuerySourceEditor.SystemPrompt, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Height="60"
                              AcceptsReturn="True" TextWrapping="Wrap" />
                 </StackPanel>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.query_source_path}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.query_source_path}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.QuerySourceEditor.SourcePath, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Watermark="queries.jsonl" />
                 </StackPanel>
 
                 <Grid ColumnDefinitions="*,8,*">
                     <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="{loc:Loc property.query_field}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.query_field}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.QuerySourceEditor.QueryField, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="query" />
                     </StackPanel>
                     <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="{loc:Loc property.system_field}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.system_field}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.QuerySourceEditor.SystemField, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="system" />
                     </StackPanel>
                 </Grid>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.template_variables_json}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.template_variables_json}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.QuerySourceEditor.TemplateVariablesJson, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Height="60"
                              AcceptsReturn="True" TextWrapping="NoWrap"
                              FontFamily="Consolas" Watermark="{}{'topic':'TCP'}" />
                     <TextBlock Text="{Binding SelectedBlock.QuerySourceEditor.TemplateVariablesError}"
-                               FontSize="10" Foreground="#FF6666" TextWrapping="Wrap"
+                               FontSize="10" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap"
                                IsVisible="{Binding SelectedBlock.QuerySourceEditor.TemplateVariablesError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                 </StackPanel>
             </StackPanel>
@@ -546,11 +552,11 @@
             <!-- Simulation configuration -->
             <StackPanel Spacing="8"
                         IsVisible="{Binding SelectedBlock.SimulationEditor, Converter={x:Static ObjectConverters.IsNotNull}}">
-                <Border Height="1" Background="#3A3A4E" />
-                <TextBlock Text="{loc:Loc property.simulation_configuration}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                <Border Height="1" Background="{DynamicResource ButtonSurfaceBrush}" />
+                <TextBlock Text="{loc:Loc property.simulation_configuration}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.model_transport}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.model_transport}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <ComboBox ItemsSource="{Binding SelectedBlock.SimulationEditor.ModelModes}"
                               SelectedItem="{Binding SelectedBlock.SimulationEditor.SelectedModelMode, Mode=TwoWay}"
                               FontSize="11" HorizontalAlignment="Stretch">
@@ -563,7 +569,7 @@
                 </StackPanel>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc common.provider}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc common.provider}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <ComboBox ItemsSource="{Binding SelectedBlock.SimulationEditor.Providers}"
                               SelectedItem="{Binding SelectedBlock.SimulationEditor.SelectedProvider, Mode=TwoWay}"
                               FontSize="11" HorizontalAlignment="Stretch">
@@ -576,7 +582,7 @@
                 </StackPanel>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.tool_execution}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.tool_execution}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <ComboBox ItemsSource="{Binding SelectedBlock.SimulationEditor.ToolModes}"
                               SelectedItem="{Binding SelectedBlock.SimulationEditor.SelectedToolMode, Mode=TwoWay}"
                               FontSize="11" HorizontalAlignment="Stretch">
@@ -589,19 +595,19 @@
                 </StackPanel>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc common.model}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc common.model}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.SimulationEditor.ModelAlias, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Watermark="gpt-4o / claude-sonnet-4-5" />
                 </StackPanel>
 
                 <Grid ColumnDefinitions="*,8,*">
                     <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="{loc:Loc property.max_rounds}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.max_rounds}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.SimulationEditor.MaxRounds, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="8" />
                     </StackPanel>
                     <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="{loc:Loc property.concurrency}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.concurrency}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.SimulationEditor.MaxConcurrency, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="1" />
                     </StackPanel>
@@ -609,12 +615,12 @@
 
                 <Grid ColumnDefinitions="*,8,*">
                     <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="{loc:Loc common.temperature}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc common.temperature}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.SimulationEditor.Temperature, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="0.7" />
                     </StackPanel>
                     <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="{loc:Loc common.max_tokens}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc common.max_tokens}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.SimulationEditor.MaxTokens, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="2048" />
                     </StackPanel>
@@ -622,75 +628,75 @@
 
                 <Grid ColumnDefinitions="*,8,*">
                     <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="{loc:Loc common.timeout_seconds}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc common.timeout_seconds}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.SimulationEditor.TimeoutSeconds, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="100" />
                     </StackPanel>
                     <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="{loc:Loc property.model_retries}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.model_retries}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.SimulationEditor.ModelMaxRetries, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="0" />
                     </StackPanel>
                 </Grid>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc common.endpoint_optional}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc common.endpoint_optional}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.SimulationEditor.Endpoint, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Watermark="https://api.openai.com/v1" />
                 </StackPanel>
 
                 <CheckBox Content="{loc:Loc property.emit_incomplete_trajectories}"
-                          FontSize="11" Foreground="#CCCCCC"
+                          FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}"
                           IsChecked="{Binding SelectedBlock.SimulationEditor.EmitIncompleteTrajectories, Mode=TwoWay}" />
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc common.system_prompt_optional}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc common.system_prompt_optional}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.SimulationEditor.SystemPrompt, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Height="60"
                              AcceptsReturn="True" TextWrapping="Wrap" />
                 </StackPanel>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.final_content_scripted_mode}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.final_content_scripted_mode}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.SimulationEditor.FinalContent, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Height="50"
                              AcceptsReturn="True" TextWrapping="Wrap" />
                 </StackPanel>
 
-                <Border Height="1" Background="#2F2F42" />
-                <TextBlock Text="{loc:Loc property.failure_samples}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                <Border Height="1" Background="{DynamicResource PanelBorderBrush}" />
+                <TextBlock Text="{loc:Loc property.failure_samples}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.failure_jsonl_path_optional}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.failure_jsonl_path_optional}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.SimulationEditor.FailureOutputPath, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Watermark="out/failed.jsonl" />
                     <Button Content="{loc:Loc property.preview_failures}"
                             Click="OnPreviewFailuresClick"
                             HorizontalAlignment="Left" Padding="10,5" FontSize="10"
-                            Background="#3A3A4E" Foreground="#FFFFFF" />
+                            Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
                 </StackPanel>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.max_failure_samples_0_unlimited}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.max_failure_samples_0_unlimited}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.SimulationEditor.MaxFailureSamples, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Watermark="100" />
                 </StackPanel>
 
                 <Grid ColumnDefinitions="*,8,*">
                     <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="{loc:Loc property.input_cost_1m}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.input_cost_1m}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.SimulationEditor.InputCostPerMillionTokens, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="0" />
                     </StackPanel>
                     <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="{loc:Loc property.output_cost_1m}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.output_cost_1m}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.SimulationEditor.OutputCostPerMillionTokens, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="0" />
                     </StackPanel>
                 </Grid>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.price_preset}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.price_preset}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <ComboBox ItemsSource="{Binding SelectedBlock.SimulationEditor.PricePresets}"
                               SelectedItem="{Binding SelectedBlock.SimulationEditor.SelectedPricePreset, Mode=TwoWay}"
                               FontSize="11" HorizontalAlignment="Stretch">
@@ -704,26 +710,26 @@
 
                 <Grid ColumnDefinitions="*,8,*">
                     <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="{loc:Loc property.requests_per_minute}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.requests_per_minute}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.SimulationEditor.RequestsPerMinute, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="0" />
                     </StackPanel>
                     <CheckBox Grid.Column="2" Content="{loc:Loc property.stream_deltas}"
-                              FontSize="11" Foreground="#CCCCCC" VerticalAlignment="Bottom"
+                              FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Bottom"
                               IsChecked="{Binding SelectedBlock.SimulationEditor.StreamDeltas, Mode=TwoWay}" />
                 </Grid>
 
-                <Border Height="1" Background="#2F2F42" />
-                <TextBlock Text="{loc:Loc property.real_sandbox}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                <Border Height="1" Background="{DynamicResource PanelBorderBrush}" />
+                <TextBlock Text="{loc:Loc property.real_sandbox}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
 
                 <Grid ColumnDefinitions="*,8,*">
                     <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="{loc:Loc property.process_timeout_ms}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.process_timeout_ms}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.SimulationEditor.SandboxTimeoutMs, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="30000" />
                     </StackPanel>
                     <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="{loc:Loc property.max_output_bytes}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.max_output_bytes}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.SimulationEditor.SandboxMaxOutputBytes, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="65536" />
                     </StackPanel>
@@ -731,66 +737,66 @@
 
                 <Grid ColumnDefinitions="*,8,*">
                     <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="{loc:Loc property.memory_limit_mb}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.memory_limit_mb}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.SimulationEditor.SandboxMaxMemoryMb, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="512" />
                     </StackPanel>
                     <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="{loc:Loc property.max_processes}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.max_processes}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.SimulationEditor.SandboxMaxProcesses, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="8" />
                     </StackPanel>
                 </Grid>
 
                 <CheckBox Content="{loc:Loc property.allow_web_fetch_network_access}"
-                          FontSize="11" Foreground="#CCCCCC"
+                          FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}"
                           IsChecked="{Binding SelectedBlock.SimulationEditor.SandboxAllowNetwork, Mode=TwoWay}" />
                 <CheckBox Content="{loc:Loc property.allow_private_network_addresses}"
-                          FontSize="11" Foreground="#CCCCCC"
+                          FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}"
                           IsChecked="{Binding SelectedBlock.SimulationEditor.SandboxAllowPrivateNetwork, Mode=TwoWay}" />
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.python_executable}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.python_executable}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.SimulationEditor.PythonExecutable, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Watermark="python" />
                 </StackPanel>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.powershell_executable}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.powershell_executable}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.SimulationEditor.PowerShellExecutable, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Watermark="powershell / pwsh" />
                 </StackPanel>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.bash_executable}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.bash_executable}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.SimulationEditor.BashExecutable, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Watermark="bash" />
                 </StackPanel>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc common.tool_profile_optional}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc common.tool_profile_optional}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.SimulationEditor.ToolProfileName, Mode=TwoWay}"
                              FontSize="11" Padding="8,6"
                              Watermark="{loc:Loc property.tool_profile_block_name}" />
                 </StackPanel>
 
-                <Border Height="1" Background="#2F2F42" />
-                <TextBlock Text="{loc:Loc property.tool_rules}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                <Border Height="1" Background="{DynamicResource PanelBorderBrush}" />
+                <TextBlock Text="{loc:Loc property.tool_rules}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.allowed_tools}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.allowed_tools}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.SimulationEditor.AllowedToolsText, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Watermark="python, web_fetch" />
                 </StackPanel>
 
                 <Grid ColumnDefinitions="*,8,*">
                     <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="{loc:Loc property.tool_timeout_ms}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.tool_timeout_ms}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.SimulationEditor.ToolTimeoutMs, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="30000" />
                     </StackPanel>
                     <StackPanel Grid.Column="2" Spacing="4">
-                        <TextBlock Text="{loc:Loc property.tool_max_retries}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.tool_max_retries}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.SimulationEditor.ToolMaxRetries, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="1" />
                     </StackPanel>
@@ -798,21 +804,21 @@
 
                 <Grid ColumnDefinitions="*,8,*">
                     <StackPanel Grid.Column="0" Spacing="4">
-                        <TextBlock Text="{loc:Loc property.tool_retry_delay}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.tool_retry_delay}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.SimulationEditor.ToolRetryDelayMs, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="0" />
                     </StackPanel>
                     <CheckBox Grid.Column="2" Content="{loc:Loc property.abort_on_tool_failure}"
-                              FontSize="11" Foreground="#CCCCCC" VerticalAlignment="Bottom"
+                              FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Bottom"
                               IsChecked="{Binding SelectedBlock.SimulationEditor.AbortOnToolFailure, Mode=TwoWay}" />
                 </Grid>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.simulated_tools}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                    <TextBlock Text="{loc:Loc property.simulated_tools}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
                     <ItemsControl ItemsSource="{Binding SelectedBlock.SimulationEditor.Tools}" x:CompileBindings="False">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:SimulationToolEditorViewModel">
-                                <Border Background="#1E1E2E" CornerRadius="4" Padding="6" Margin="0,2">
+                                <Border Background="{DynamicResource InputBackgroundBrush}" CornerRadius="4" Padding="6" Margin="0,2">
                                     <StackPanel Spacing="4">
                                         <Grid ColumnDefinitions="*,Auto">
                                             <TextBox Grid.Column="0" Text="{Binding Name, Mode=TwoWay}"
@@ -821,7 +827,7 @@
                                                     Command="{Binding $parent[ItemsControl].DataContext.RemoveToolCommand}"
                                                     CommandParameter="{Binding}"
                                                     Margin="4,0,0,0" Padding="6,2"
-                                                    Background="#3A3A4E" Foreground="#FFFFFF" />
+                                                    Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
                                         </Grid>
                                         <TextBox Text="{Binding Description, Mode=TwoWay}"
                                                  FontSize="10" Padding="6,4" Watermark="description" />
@@ -853,15 +859,15 @@
                     <Button Content="{loc:Loc property.add_tool}"
                             Command="{Binding SelectedBlock.SimulationEditor.AddToolCommand}"
                             HorizontalAlignment="Left" Padding="10,5"
-                            Background="#3A3A4E" Foreground="#FFFFFF" />
+                            Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
                 </StackPanel>
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.script_turns}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                    <TextBlock Text="{loc:Loc property.script_turns}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
                     <ItemsControl ItemsSource="{Binding SelectedBlock.SimulationEditor.ScriptTurns}" x:CompileBindings="False">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:SimulationScriptTurnEditorViewModel">
-                                <Border Background="#1E1E2E" CornerRadius="4" Padding="6" Margin="0,2">
+                                <Border Background="{DynamicResource InputBackgroundBrush}" CornerRadius="4" Padding="6" Margin="0,2">
                                     <StackPanel Spacing="4">
                                         <Grid ColumnDefinitions="*,Auto">
                                             <TextBox Grid.Column="0" Text="{Binding Content, Mode=TwoWay}"
@@ -870,7 +876,7 @@
                                                     Command="{Binding $parent[ItemsControl].DataContext.RemoveScriptTurnCommand}"
                                                     CommandParameter="{Binding}"
                                                     Margin="4,0,0,0" Padding="6,2"
-                                                    Background="#3A3A4E" Foreground="#FFFFFF" />
+                                                    Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
                                         </Grid>
                                         <TextBox Text="{Binding ToolCallsJson, Mode=TwoWay}"
                                                  FontSize="10" Padding="6,4" Height="56"
@@ -878,7 +884,7 @@
                                                  FontFamily="Consolas"
                                                  Watermark='[{"Name":"python","ArgumentsJson":"{}"}]' />
                                         <TextBlock Text="{Binding ToolCallsError}"
-                                                   FontSize="10" Foreground="#FF6666" TextWrapping="Wrap"
+                                                   FontSize="10" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap"
                                                    IsVisible="{Binding ToolCallsError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                                     </StackPanel>
                                 </Border>
@@ -888,129 +894,129 @@
                     <Button Content="{loc:Loc property.add_turn}"
                             Command="{Binding SelectedBlock.SimulationEditor.AddScriptTurnCommand}"
                             HorizontalAlignment="Left" Padding="10,5"
-                            Background="#3A3A4E" Foreground="#FFFFFF" />
+                            Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
                 </StackPanel>
             </StackPanel>
 
             <!-- Cleaner configuration -->
             <StackPanel Spacing="6"
                         IsVisible="{Binding SelectedBlock.CleanerEditor, Converter={x:Static ObjectConverters.IsNotNull}}">
-                <Border Height="1" Background="#3A3A4E" />
-                <TextBlock Text="{loc:Loc property.cleaner_configuration}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                <Border Height="1" Background="{DynamicResource ButtonSurfaceBrush}" />
+                <TextBlock Text="{loc:Loc property.cleaner_configuration}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
 
-                <CheckBox Content="{loc:Loc property.normalize_whitespace}" FontSize="11" Foreground="#CCCCCC"
+                <CheckBox Content="{loc:Loc property.normalize_whitespace}" FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}"
                           IsChecked="{Binding SelectedBlock.CleanerEditor.NormalizeWhitespace, Mode=TwoWay}" />
-                <CheckBox Content="{loc:Loc property.normalize_newlines}" FontSize="11" Foreground="#CCCCCC"
+                <CheckBox Content="{loc:Loc property.normalize_newlines}" FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}"
                           IsChecked="{Binding SelectedBlock.CleanerEditor.NormalizeNewlines, Mode=TwoWay}" />
-                <CheckBox Content="{loc:Loc property.strip_ansi_escapes}" FontSize="11" Foreground="#CCCCCC"
+                <CheckBox Content="{loc:Loc property.strip_ansi_escapes}" FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}"
                           IsChecked="{Binding SelectedBlock.CleanerEditor.StripAnsi, Mode=TwoWay}" />
-                <CheckBox Content="{loc:Loc property.remove_reasoning_content}" FontSize="11" Foreground="#CCCCCC"
+                <CheckBox Content="{loc:Loc property.remove_reasoning_content}" FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}"
                           IsChecked="{Binding SelectedBlock.CleanerEditor.RemoveReasoningContent, Mode=TwoWay}" />
-                <CheckBox Content="{loc:Loc property.drop_empty_messages}" FontSize="11" Foreground="#CCCCCC"
+                <CheckBox Content="{loc:Loc property.drop_empty_messages}" FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}"
                           IsChecked="{Binding SelectedBlock.CleanerEditor.DropEmptyMessages, Mode=TwoWay}" />
 
                 <TextBlock Text="{loc:Loc property.regex_replacements_remain_in_config_json_below}"
-                           FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
+                           FontSize="10" Foreground="{DynamicResource TextFaintBrush}" TextWrapping="Wrap" />
                 <Button Content="{loc:Loc property.preview_cleaner_diff}"
                         Click="OnPreviewCleanerDiffClick"
                         HorizontalAlignment="Left" Padding="10,5" FontSize="10"
-                        Background="#3A3A4E" Foreground="#FFFFFF" />
+                        Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
             </StackPanel>
 
             <!-- SFT export configuration -->
             <StackPanel Spacing="6"
                         IsVisible="{Binding SelectedBlock.SftExportEditor, Converter={x:Static ObjectConverters.IsNotNull}}">
-                <Border Height="1" Background="#3A3A4E" />
-                <TextBlock Text="{loc:Loc property.sft_export_configuration}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                <Border Height="1" Background="{DynamicResource ButtonSurfaceBrush}" />
+                <TextBlock Text="{loc:Loc property.sft_export_configuration}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.output_jsonl_path}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.output_jsonl_path}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
                         <TextBox Text="{Binding SelectedBlock.SftExportEditor.OutputPath, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Watermark="out/sft.jsonl" />
                         <Button Grid.Column="1" Content="{loc:Loc property.browse}"
                                 Click="OnBrowseSftOutputClick"
                                 FontSize="11" Padding="10,6"
-                                Background="#3A3A4E" Foreground="#FFFFFF" />
+                                Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
                     </Grid>
                 </StackPanel>
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.sft_export_fields}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.sft_export_fields}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.SftExportEditor.FieldsText, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Watermark="messages, tools" />
                     <TextBlock Text="{loc:Loc property.sft_export_fields_hint}"
-                               FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
+                               FontSize="10" Foreground="{DynamicResource TextFaintBrush}" TextWrapping="Wrap" />
                     <Button Content="{loc:Loc property.preview_output}"
                             Click="OnPreviewSftOutputClick"
                             HorizontalAlignment="Left" Padding="10,5" FontSize="10"
-                            Background="#3A3A4E" Foreground="#FFFFFF" />
+                            Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
                 </StackPanel>
             </StackPanel>
 
             <!-- Tool profile configuration -->
             <StackPanel Spacing="8"
                         IsVisible="{Binding SelectedBlock.ToolProfileEditor, Converter={x:Static ObjectConverters.IsNotNull}}">
-                <Border Height="1" Background="#3A3A4E" />
-                <TextBlock Text="{loc:Loc property.tool_profile}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                <Border Height="1" Background="{DynamicResource ButtonSurfaceBrush}" />
+                <TextBlock Text="{loc:Loc property.tool_profile}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
 
                 <StackPanel Spacing="4">
-                    <TextBlock Text="{loc:Loc property.profile_name}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBlock Text="{loc:Loc property.profile_name}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.ToolProfileEditor.Name, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Watermark="agent_tools" />
                 </StackPanel>
 
-                <TextBlock Text="{loc:Loc common.tools}" FontSize="11" Foreground="#AAAAAA" />
+                <TextBlock Text="{loc:Loc common.tools}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                 <ListBox ItemsSource="{Binding SelectedBlock.ToolProfileEditor.Tools}"
                          SelectedItem="{Binding SelectedBlock.ToolProfileEditor.SelectedTool, Mode=TwoWay}"
-                         Height="100" Background="#1E1E2E">
+                         Height="100" Background="{DynamicResource InputBackgroundBrush}">
                     <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="vm:ToolEditorViewModel">
-                            <TextBlock Text="{Binding DisplayName}" FontSize="11" Foreground="#CCCCCC" />
+                            <TextBlock Text="{Binding DisplayName}" FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}" />
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
 
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <Button Content="{loc:Loc property.add_tool}" Command="{Binding SelectedBlock.ToolProfileEditor.AddToolCommand}"
-                            Padding="10,5" Background="#3A3A4E" Foreground="#FFFFFF" />
+                            Padding="10,5" Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
                     <Button Content="{loc:Loc property.remove_tool}" Command="{Binding SelectedBlock.ToolProfileEditor.RemoveSelectedToolCommand}"
-                            Padding="10,5" Background="#3A2020" Foreground="#FF6666" />
+                            Padding="10,5" Background="{DynamicResource DangerSurfaceBrush}" Foreground="{DynamicResource DangerBrush}" />
                 </StackPanel>
 
                 <StackPanel Spacing="6"
                             IsVisible="{Binding SelectedBlock.ToolProfileEditor.SelectedTool, Converter={x:Static ObjectConverters.IsNotNull}}">
                     <StackPanel Spacing="4">
-                        <TextBlock Text="{loc:Loc property.tool_name}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.tool_name}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.ToolProfileEditor.SelectedTool.Name, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" />
                     </StackPanel>
 
                     <StackPanel Spacing="4">
-                        <TextBlock Text="{loc:Loc common.description}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc common.description}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.ToolProfileEditor.SelectedTool.Description, Mode=TwoWay}"
                                  FontSize="11" Padding="8,6" Height="50"
                                  AcceptsReturn="True" TextWrapping="Wrap" />
                     </StackPanel>
 
                     <StackPanel Spacing="4">
-                        <TextBlock Text="{loc:Loc property.parameters_json_schema}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBlock Text="{loc:Loc property.parameters_json_schema}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                         <TextBox Text="{Binding SelectedBlock.ToolProfileEditor.SelectedTool.ParametersJson, Mode=TwoWay}"
                                  FontSize="10" Padding="8,6" Height="100"
                                  AcceptsReturn="True" TextWrapping="NoWrap"
                                  FontFamily="Consolas" />
                         <TextBlock Text="{Binding SelectedBlock.ToolProfileEditor.SelectedTool.ParametersError}"
-                                   FontSize="10" Foreground="#FF6666" TextWrapping="Wrap"
+                                   FontSize="10" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap"
                                    IsVisible="{Binding SelectedBlock.ToolProfileEditor.SelectedTool.ParametersError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <TextBlock Text="{loc:Loc property.parameter_tree}" FontSize="11" Foreground="#AAAAAA" VerticalAlignment="Center" />
+                        <TextBlock Text="{loc:Loc property.parameter_tree}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" />
                         <Button Content="{loc:Loc property.add_parameter}"
                                 Command="{Binding SelectedBlock.ToolProfileEditor.SelectedTool.AddParameterCommand}"
-                                Padding="8,4" Background="#3A3A4E" Foreground="#FFFFFF" />
+                                Padding="8,4" Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
                     </StackPanel>
 
                     <TreeView ItemsSource="{Binding SelectedBlock.ToolProfileEditor.SelectedTool.Parameters}"
-                              Height="220" Background="#1A1A2A">
+                              Height="220" Background="{DynamicResource InputBackgroundBrush}">
                         <TreeView.ItemTemplate>
                             <TreeDataTemplate x:DataType="vm:ToolParameterNodeViewModel"
                                               ItemsSource="{Binding Children}">
@@ -1021,62 +1027,62 @@
                                               SelectedItem="{Binding Type, Mode=TwoWay}"
                                               Width="90" FontSize="10" />
                                     <CheckBox Content="{loc:Loc property.req}" IsChecked="{Binding IsRequired, Mode=TwoWay}"
-                                              FontSize="10" Foreground="#CCCCCC" />
+                                              FontSize="10" Foreground="{DynamicResource TextPrimaryBrush}" />
                                     <TextBox Text="{Binding Description, Mode=TwoWay}" Width="120"
                                              FontSize="10" Padding="4,2" Watermark="{loc:Loc property.description}" />
                                     <Button Content="+" Command="{Binding AddChildCommand}"
-                                            Padding="5,2" Background="#3A3A4E" Foreground="#FFFFFF" />
+                                            Padding="5,2" Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
                                     <Button Content="×" Command="{Binding RemoveCommand}"
-                                            Padding="5,2" Background="#3A2020" Foreground="#FF6666" />
+                                            Padding="5,2" Background="{DynamicResource DangerSurfaceBrush}" Foreground="{DynamicResource DangerBrush}" />
                                 </StackPanel>
                             </TreeDataTemplate>
                         </TreeView.ItemTemplate>
                     </TreeView>
                 </StackPanel>
 
-                <Border Height="1" Background="#2F2F42" />
-                <TextBlock Text="{loc:Loc property.profile_json_import_export}" FontSize="11" Foreground="#AAAAAA" />
+                <Border Height="1" Background="{DynamicResource PanelBorderBrush}" />
+                <TextBlock Text="{loc:Loc property.profile_json_import_export}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                 <TextBox Text="{Binding SelectedBlock.ToolProfileEditor.ProfileJson, Mode=TwoWay}"
                          FontSize="10" Padding="8,6" Height="130"
                          AcceptsReturn="True" TextWrapping="NoWrap"
                          FontFamily="Consolas" />
                 <TextBlock Text="{Binding SelectedBlock.ToolProfileEditor.ProfileJsonError}"
-                           FontSize="10" Foreground="#FF6666" TextWrapping="Wrap"
+                           FontSize="10" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap"
                            IsVisible="{Binding SelectedBlock.ToolProfileEditor.ProfileJsonError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <Button Content="{loc:Loc property.import_json}" Command="{Binding SelectedBlock.ToolProfileEditor.ImportJsonCommand}"
-                            Padding="10,5" Background="#4A90D9" Foreground="#FFFFFF" />
+                            Padding="10,5" Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource AccentForegroundBrush}" />
                     <Button Content="{loc:Loc property.export_json}" Command="{Binding SelectedBlock.ToolProfileEditor.ExportJsonCommand}"
-                            Padding="10,5" Background="#3A3A4E" Foreground="#FFFFFF" />
+                            Padding="10,5" Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
                 </StackPanel>
 
                 <TextBlock Text="{loc:Loc property.simulation_llm_blocks_reference_this_profile_by}"
-                           FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
+                           FontSize="10" Foreground="{DynamicResource TextFaintBrush}" TextWrapping="Wrap" />
             </StackPanel>
 
             <!-- Generic JSON configuration editor -->
             <StackPanel Spacing="8">
-                <Border Height="1" Background="#3A3A4E" />
-                <TextBlock Text="{loc:Loc property.config_json_advanced}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                <Border Height="1" Background="{DynamicResource ButtonSurfaceBrush}" />
+                <TextBlock Text="{loc:Loc property.config_json_advanced}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
                 <TextBox Text="{Binding SelectedBlock.ConfigJson, Mode=TwoWay}"
                          FontSize="11" Padding="8,6" Height="150"
                          AcceptsReturn="True" TextWrapping="NoWrap"
                          FontFamily="Consolas"
                          Watermark="{loc:Loc property.edit_the_block_config_as_json_and_press_apply}" />
                 <TextBlock Text="{Binding SelectedBlock.ConfigJsonError}"
-                           FontSize="11" Foreground="#FF6666" TextWrapping="Wrap"
+                           FontSize="11" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap"
                            IsVisible="{Binding SelectedBlock.ConfigJsonError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                 <Button Content="{loc:Loc property.apply_config_json}"
                         Command="{Binding ApplyBlockConfigJsonCommand}"
                         HorizontalAlignment="Stretch"
                         Padding="10,6" FontSize="11"
-                        Background="#3A3A4E" Foreground="#FFFFFF"
+                        Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}"
                         HorizontalContentAlignment="Center" />
             </StackPanel>
 
             <!-- Position -->
             <StackPanel Spacing="4">
-                <TextBlock Text="{loc:Loc property.position}" FontSize="11" Foreground="#AAAAAA" />
+                <TextBlock Text="{loc:Loc property.position}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                 <Grid ColumnDefinitions="*,8,*">
                     <TextBox Grid.Column="0" Text="{Binding SelectedBlock.X, Mode=TwoWay}"
                              FontSize="11" Padding="6,4" Watermark="X" />
@@ -1086,19 +1092,19 @@
             </StackPanel>
 
             <!-- Separator -->
-            <Border Height="1" Background="#3A3A4E" />
+            <Border Height="1" Background="{DynamicResource ButtonSurfaceBrush}" />
 
             <!-- Output Ports -->
             <StackPanel Spacing="4">
-                <TextBlock Text="{loc:Loc property.output_ports}" FontSize="11" Foreground="#AAAAAA" FontWeight="SemiBold" />
+                <TextBlock Text="{loc:Loc property.output_ports}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" FontWeight="SemiBold" />
                 <ItemsControl ItemsSource="{Binding SelectedBlock.OutputPorts}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:PortViewModel">
-                            <Border Background="#2A2A3E" CornerRadius="4" Padding="8,4" Margin="0,2">
+                            <Border Background="{DynamicResource NodeBackgroundBrush}" CornerRadius="4" Padding="8,4" Margin="0,2">
                                 <Grid ColumnDefinitions="*,Auto">
-                                    <TextBlock Text="{Binding Name}" FontSize="11" Foreground="#CCCCCC" />
+                                    <TextBlock Text="{Binding Name}" FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}" />
                                     <TextBlock Grid.Column="1" Text="{Binding DataType}" FontSize="10"
-                                               Foreground="#888888" />
+                                               Foreground="{DynamicResource TextDimBrush}" />
                                 </Grid>
                             </Border>
                         </DataTemplate>
@@ -1108,15 +1114,15 @@
 
             <!-- Input Ports -->
             <StackPanel Spacing="4">
-                <TextBlock Text="{loc:Loc property.input_ports}" FontSize="11" Foreground="#AAAAAA" FontWeight="SemiBold" />
+                <TextBlock Text="{loc:Loc property.input_ports}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" FontWeight="SemiBold" />
                 <ItemsControl ItemsSource="{Binding SelectedBlock.InputPorts}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:PortViewModel">
-                            <Border Background="#2A2A3E" CornerRadius="4" Padding="8,4" Margin="0,2">
+                            <Border Background="{DynamicResource NodeBackgroundBrush}" CornerRadius="4" Padding="8,4" Margin="0,2">
                                 <Grid ColumnDefinitions="*,Auto">
-                                    <TextBlock Text="{Binding Name}" FontSize="11" Foreground="#CCCCCC" />
+                                    <TextBlock Text="{Binding Name}" FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}" />
                                     <TextBlock Grid.Column="1" Text="{Binding DataType}" FontSize="10"
-                                               Foreground="#888888" />
+                                               Foreground="{DynamicResource TextDimBrush}" />
                                 </Grid>
                             </Border>
                         </DataTemplate>
@@ -1125,24 +1131,24 @@
             </StackPanel>
 
             <!-- Separator -->
-            <Border Height="1" Background="#3A3A4E" />
+            <Border Height="1" Background="{DynamicResource ButtonSurfaceBrush}" />
 
             <!-- Actions -->
             <StackPanel Spacing="6">
                 <Button Content="{loc:Loc property.delete_block}" Command="{Binding DeleteSelectedBlockCommand}"
                         HorizontalAlignment="Stretch"
                         Padding="8,6" FontSize="11"
-                        Background="#3A2020" Foreground="#FF6666"
+                        Background="{DynamicResource DangerSurfaceBrush}" Foreground="{DynamicResource DangerBrush}"
                         HorizontalContentAlignment="Center" />
             </StackPanel>
         </StackPanel>
 
         <!-- Separator -->
-        <Border Height="1" Background="#3A3A4E" Margin="0,8" />
+        <Border Height="1" Background="{DynamicResource ButtonSurfaceBrush}" Margin="0,8" />
 
         <!-- Recipe validation issues -->
         <StackPanel Spacing="4" IsVisible="{Binding HasValidationIssues}">
-            <TextBlock Text="{loc:Loc property.validation_issues}" FontSize="11" Foreground="#AAAAAA" FontWeight="SemiBold" />
+            <TextBlock Text="{loc:Loc property.validation_issues}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" FontWeight="SemiBold" />
             <ItemsControl ItemsSource="{Binding ValidationIssues}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:ValidationIssueViewModel">
@@ -1150,19 +1156,19 @@
                                 HorizontalAlignment="Stretch"
                                 HorizontalContentAlignment="Stretch"
                                 Padding="8,5" Margin="0,2"
-                                Background="#1E1E2E"
-                                BorderBrush="#3A3A4E" BorderThickness="1"
+                                Background="{DynamicResource InputBackgroundBrush}"
+                                BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1"
                                 CornerRadius="4"
                                 ToolTip.Tip="{loc:Loc property.select_the_block_that_owns_this_issue}">
                             <StackPanel Spacing="2">
                                 <TextBlock Text="{Binding SeverityText}" FontSize="9" FontWeight="SemiBold"
-                                           Foreground="#FF6666" IsVisible="{Binding IsError}" />
+                                           Foreground="{DynamicResource DangerBrush}" IsVisible="{Binding IsError}" />
                                 <TextBlock Text="{Binding SeverityText}" FontSize="9" FontWeight="SemiBold"
-                                           Foreground="#F5A623" IsVisible="{Binding IsWarning}" />
+                                           Foreground="{DynamicResource WarningBrush}" IsVisible="{Binding IsWarning}" />
                                 <TextBlock Text="{Binding SeverityText}" FontSize="9" FontWeight="SemiBold"
-                                           Foreground="#888888" IsVisible="{Binding IsInfo}" />
+                                           Foreground="{DynamicResource TextDimBrush}" IsVisible="{Binding IsInfo}" />
                                 <TextBlock Text="{Binding Message}" FontSize="10"
-                                           Foreground="#DDDDDD" TextWrapping="Wrap" />
+                                           Foreground="{DynamicResource TextBrightBrush}" TextWrapping="Wrap" />
                             </StackPanel>
                         </Button>
                     </DataTemplate>
@@ -1171,18 +1177,18 @@
         </StackPanel>
 
         <!-- Separator -->
-        <Border Height="1" Background="#3A3A4E" Margin="0,8" />
+        <Border Height="1" Background="{DynamicResource ButtonSurfaceBrush}" Margin="0,8" />
 
         <!-- Log Messages -->
         <StackPanel Spacing="4">
-            <TextBlock Text="{loc:Loc common.logs}" FontSize="11" Foreground="#AAAAAA" FontWeight="SemiBold" />
-            <Border Background="#1A1A2A" CornerRadius="4" Padding="8" MinHeight="80" MaxHeight="200">
+            <TextBlock Text="{loc:Loc common.logs}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" FontWeight="SemiBold" />
+            <Border Background="{DynamicResource InputBackgroundBrush}" CornerRadius="4" Padding="8" MinHeight="80" MaxHeight="200">
                 <ScrollViewer>
                     <ItemsControl ItemsSource="{Binding LogMessages}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <TextBlock Text="{Binding}" FontSize="10"
-                                           Foreground="#AAAAAA" TextWrapping="Wrap"
+                                           Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"
                                            Margin="0,1" />
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>

@@ -7,31 +7,31 @@
         WindowStartupLocation="CenterOwner"
         CanResize="False"
         ShowInTaskbar="False"
-        Background="#252538">
-    <Border Background="#252538"
-            BorderBrush="#4A90D9"
+        Background="{DynamicResource PanelBackgroundBrush}">
+    <Border Background="{DynamicResource PanelBackgroundBrush}"
+            BorderBrush="{DynamicResource AccentBrush}"
             BorderThickness="1"
             CornerRadius="12"
             Padding="22">
         <StackPanel Spacing="16">
             <TextBlock x:Name="HeadingText"
                        FontSize="16" FontWeight="SemiBold"
-                       Foreground="#FFFFFF" TextWrapping="Wrap" />
+                       Foreground="{DynamicResource TextBrightBrush}" TextWrapping="Wrap" />
             <TextBlock x:Name="MessageText"
-                       FontSize="12" Foreground="#CCCCCC" TextWrapping="Wrap" />
+                       FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap" />
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
                 <Button x:Name="SaveButton" Content="{loc:Loc common.save}"
                         Click="OnSaveClick"
-                        Padding="14,7" Background="#4A90D9" Foreground="#FFFFFF" />
+                        Padding="14,7" Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource AccentForegroundBrush}" />
                 <Button x:Name="DiscardButton" Content="{loc:Loc common.dont_save}"
                         Click="OnDiscardClick"
-                        Padding="14,7" Background="#3A3A4E" Foreground="#FFFFFF" />
+                        Padding="14,7" Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
                 <Button x:Name="CancelButton" Content="{loc:Loc common.cancel}"
                         Click="OnCancelClick"
-                        Padding="14,7" Background="#3A3A4E" Foreground="#FFFFFF" />
+                        Padding="14,7" Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
                 <Button x:Name="OkButton" Content="{loc:Loc common.ok}"
                         Click="OnOkClick"
-                        Padding="16,7" Background="#4A90D9" Foreground="#FFFFFF" />
+                        Padding="16,7" Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource AccentForegroundBrush}" />
             </StackPanel>
         </StackPanel>
     </Border>
