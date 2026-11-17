@@ -113,6 +113,9 @@ public sealed class SimulationBlockExecutor : IBlockExecutor
             }
         }
 
+        var limiter = config.RequestsPerMinute > 0
+            ? new RequestRateLimiter(config.RequestsPerMinute, _delay)
+            : null;
         var pending = new Queue<Task<RowOutcome>>();
         var failures = new List<FailureSample>();
         var inputIndex = 0L;
@@ -135,6 +138,11 @@ public sealed class SimulationBlockExecutor : IBlockExecutor
             {
                 ct.ThrowIfCancellationRequested();
                 var index = inputIndex++;
+                if (limiter is not null)
+                {
+                    await limiter.WaitAsync(ct);
+                }
+
                 pending.Enqueue(ProcessRowAsync(
                     index, row, blockName, config, Log, pipelineCts.Token));
 
@@ -503,6 +511,42 @@ public sealed class SimulationBlockExecutor : IBlockExecutor
 
     private static string Truncate(string value) =>
         value.Length <= 60 ? value : value[..57] + "...";
+
+    /// <summary>
+    /// Space query starts evenly to respect a requests-per-minute budget.
+    /// </summary>
+    private sealed class RequestRateLimiter
+    {
+        private readonly TimeSpan _interval;
+        private readonly Func<TimeSpan, CancellationToken, Task> _delay;
+        private readonly SemaphoreSlim _gate = new(1, 1);
+        private DateTimeOffset _nextSlot = DateTimeOffset.MinValue;
+
+        public RequestRateLimiter(int requestsPerMinute, Func<TimeSpan, CancellationToken, Task> delay)
+        {
+            _interval = TimeSpan.FromSeconds(60d / requestsPerMinute);
+            _delay = delay;
+        }
+
+        public async Task WaitAsync(CancellationToken ct)
+        {
+            await _gate.WaitAsync(ct);
+            try
+            {
+                var now = DateTimeOffset.UtcNow;
+                if (_nextSlot > now)
+                {
+                    await _delay(_nextSlot - now, ct);
+                }
+
+                _nextSlot = DateTimeOffset.UtcNow + _interval;
+            }
+            finally
+            {
+                _gate.Release();
+            }
+        }
+    }
 
     private sealed record RowOutcome(
         long InputIndex,

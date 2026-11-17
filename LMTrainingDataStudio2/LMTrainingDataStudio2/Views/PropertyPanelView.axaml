@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:loc="using:LMTrainingDataStudio2.Localization"
+             xmlns:m="using:LMTrainingDataStudio2.Models"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:LMTrainingDataStudio2.ViewModels"
@@ -185,6 +186,61 @@
                              Watermark="{loc:Loc property.tool_profile_block_name}" />
                 </StackPanel>
 
+                <StackPanel Spacing="4">
+                    <TextBlock Text="{loc:Loc property.system_prompt}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBox Text="{Binding SelectedBlock.LlmEditor.SystemPrompt, Mode=TwoWay}"
+                             FontSize="11" Padding="8,6" Height="50"
+                             AcceptsReturn="True" TextWrapping="Wrap" />
+                </StackPanel>
+
+                <CheckBox Content="{loc:Loc property.use_row_messages}"
+                          FontSize="11" Foreground="#CCCCCC"
+                          IsChecked="{Binding SelectedBlock.LlmEditor.UseRowMessages, Mode=TwoWay}" />
+
+                <Grid ColumnDefinitions="*,8,*">
+                    <StackPanel Grid.Column="0" Spacing="4">
+                        <TextBlock Text="{loc:Loc property.max_concurrency}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBox Text="{Binding SelectedBlock.LlmEditor.MaxConcurrency, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="1" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Spacing="4">
+                        <TextBlock Text="{loc:Loc property.max_failure_samples}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBox Text="{Binding SelectedBlock.LlmEditor.MaxFailureSamples, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="100" />
+                    </StackPanel>
+                </Grid>
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="{loc:Loc property.response_schema}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBox Text="{Binding SelectedBlock.LlmEditor.ResponseSchema, Mode=TwoWay}"
+                             FontSize="11" Padding="8,6" Height="80"
+                             AcceptsReturn="True" TextWrapping="NoWrap"
+                             FontFamily="Consolas" />
+                </StackPanel>
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="{loc:Loc property.failure_output_path}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBox Text="{Binding SelectedBlock.LlmEditor.FailureOutputPath, Mode=TwoWay}"
+                             FontSize="11" Padding="8,6" Watermark="out/llm-failures.jsonl" />
+                </StackPanel>
+
+                <CheckBox Content="{loc:Loc property.continue_on_error}"
+                          FontSize="11" Foreground="#CCCCCC"
+                          IsChecked="{Binding SelectedBlock.LlmEditor.ContinueOnError, Mode=TwoWay}" />
+
+                <Grid ColumnDefinitions="*,8,*">
+                    <StackPanel Grid.Column="0" Spacing="4">
+                        <TextBlock Text="{loc:Loc property.input_cost}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBox Text="{Binding SelectedBlock.LlmEditor.InputCostPerMillionTokens, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="0" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Spacing="4">
+                        <TextBlock Text="{loc:Loc property.output_cost}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBox Text="{Binding SelectedBlock.LlmEditor.OutputCostPerMillionTokens, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="0" />
+                    </StackPanel>
+                </Grid>
+
                 <TextBlock Text="{loc:Loc property.api_keys_are_read_from_openai_api_key_anthropic}"
                            FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
             </StackPanel>
@@ -284,6 +340,52 @@
                             Background="#3A3A4E" Foreground="#FFFFFF" />
                 </StackPanel>
 
+                <Grid ColumnDefinitions="*,8,*">
+                    <CheckBox Grid.Column="0" Content="{loc:Loc property.match_all_rules}"
+                              FontSize="11" Foreground="#CCCCCC"
+                              IsChecked="{Binding SelectedBlock.ValidatorEditor.MatchAllRules, Mode=TwoWay}" />
+                    <StackPanel Grid.Column="2" Spacing="4">
+                        <TextBlock Text="{loc:Loc property.validator_timeout_ms}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBox Text="{Binding SelectedBlock.ValidatorEditor.TimeoutMs, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="0" />
+                    </StackPanel>
+                </Grid>
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="{loc:Loc property.additional_rules}" FontSize="11" Foreground="#AAAAAA" />
+                    <ItemsControl ItemsSource="{Binding SelectedBlock.ValidatorEditor.AdditionalRules}" x:CompileBindings="False">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ValidatorRuleEditorViewModel">
+                                <Border Background="#1E1E2E" CornerRadius="4" Padding="6" Margin="0,2">
+                                    <StackPanel Spacing="4">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <ComboBox Grid.Column="0"
+                                                      ItemsSource="{Binding $parent[ItemsControl].DataContext.RuleKinds}"
+                                                      SelectedItem="{Binding SelectedKind, Mode=TwoWay}"
+                                                      FontSize="10" HorizontalAlignment="Stretch" />
+                                            <Button Grid.Column="1" Content="×"
+                                                    Command="{Binding $parent[ItemsControl].DataContext.RemoveRuleCommand}"
+                                                    CommandParameter="{Binding}"
+                                                    Margin="4,0,0,0" Padding="6,2"
+                                                    Background="#3A3A4E" Foreground="#FFFFFF" />
+                                        </Grid>
+                                        <TextBox Text="{Binding Rule, Mode=TwoWay}"
+                                                 FontSize="10" Padding="6,4"
+                                                 AcceptsReturn="True" TextWrapping="Wrap" />
+                                        <CheckBox Content="{loc:Loc property.rule_negate}"
+                                                  FontSize="10" Foreground="#AAAAAA"
+                                                  IsChecked="{Binding Negate, Mode=TwoWay}" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Button Content="{loc:Loc property.add_rule}"
+                            Command="{Binding SelectedBlock.ValidatorEditor.AddRuleCommand}"
+                            HorizontalAlignment="Left" Padding="10,5"
+                            Background="#3A3A4E" Foreground="#FFFFFF" />
+                </StackPanel>
+
                 <CheckBox Content="{loc:Loc property.reject_invalid_rows}"
                           FontSize="11" Foreground="#CCCCCC"
                           IsChecked="{Binding SelectedBlock.ValidatorEditor.RejectOnFailure, Mode=TwoWay}" />
@@ -344,6 +446,23 @@
                              FontSize="11" Padding="8,6" Watermark="out/splits" />
                 </StackPanel>
 
+                <StackPanel Spacing="4">
+                    <TextBlock Text="{loc:Loc property.stratify_field}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBox Text="{Binding SelectedBlock.SamplerEditor.StratifyField, Mode=TwoWay}"
+                             FontSize="11" Padding="8,6" Watermark="category" />
+                </StackPanel>
+
+                <Grid ColumnDefinitions="*,8,Auto">
+                    <StackPanel Grid.Column="0" Spacing="4">
+                        <TextBlock Text="{loc:Loc property.preview_rows}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBox Text="{Binding SelectedBlock.SamplerEditor.PreviewRowsText, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="1000" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="2" Text="{Binding SelectedBlock.SamplerEditor.StatsPreview}"
+                               FontSize="10" Foreground="#AAAAAA" TextWrapping="Wrap"
+                               VerticalAlignment="Bottom" MaxWidth="220" />
+                </Grid>
+
                 <TextBlock Text="{Binding SelectedBlock.SamplerEditor.ValidationError}"
                            FontSize="10" Foreground="#FF6666" TextWrapping="Wrap"
                            IsVisible="{Binding SelectedBlock.SamplerEditor.ValidationError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
@@ -391,6 +510,36 @@
                     <TextBox Text="{Binding SelectedBlock.QuerySourceEditor.SystemPrompt, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Height="60"
                              AcceptsReturn="True" TextWrapping="Wrap" />
+                </StackPanel>
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="{loc:Loc property.query_source_path}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBox Text="{Binding SelectedBlock.QuerySourceEditor.SourcePath, Mode=TwoWay}"
+                             FontSize="11" Padding="8,6" Watermark="queries.jsonl" />
+                </StackPanel>
+
+                <Grid ColumnDefinitions="*,8,*">
+                    <StackPanel Grid.Column="0" Spacing="4">
+                        <TextBlock Text="{loc:Loc property.query_field}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBox Text="{Binding SelectedBlock.QuerySourceEditor.QueryField, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="query" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Spacing="4">
+                        <TextBlock Text="{loc:Loc property.system_field}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBox Text="{Binding SelectedBlock.QuerySourceEditor.SystemField, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="system" />
+                    </StackPanel>
+                </Grid>
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="{loc:Loc property.template_variables_json}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBox Text="{Binding SelectedBlock.QuerySourceEditor.TemplateVariablesJson, Mode=TwoWay}"
+                             FontSize="11" Padding="8,6" Height="60"
+                             AcceptsReturn="True" TextWrapping="NoWrap"
+                             FontFamily="Consolas" Watermark="{}{'topic':'TCP'}" />
+                    <TextBlock Text="{Binding SelectedBlock.QuerySourceEditor.TemplateVariablesError}"
+                               FontSize="10" Foreground="#FF6666" TextWrapping="Wrap"
+                               IsVisible="{Binding SelectedBlock.QuerySourceEditor.TemplateVariablesError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                 </StackPanel>
             </StackPanel>
 
@@ -540,6 +689,30 @@
                     </StackPanel>
                 </Grid>
 
+                <StackPanel Spacing="4">
+                    <TextBlock Text="{loc:Loc property.price_preset}" FontSize="11" Foreground="#AAAAAA" />
+                    <ComboBox ItemsSource="{Binding SelectedBlock.SimulationEditor.PricePresets}"
+                              SelectedItem="{Binding SelectedBlock.SimulationEditor.SelectedPricePreset, Mode=TwoWay}"
+                              FontSize="11" HorizontalAlignment="Stretch">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="m:ModelPricePreset">
+                                <TextBlock Text="{Binding DisplayName}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </StackPanel>
+
+                <Grid ColumnDefinitions="*,8,*">
+                    <StackPanel Grid.Column="0" Spacing="4">
+                        <TextBlock Text="{loc:Loc property.requests_per_minute}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBox Text="{Binding SelectedBlock.SimulationEditor.RequestsPerMinute, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="0" />
+                    </StackPanel>
+                    <CheckBox Grid.Column="2" Content="{loc:Loc property.stream_deltas}"
+                              FontSize="11" Foreground="#CCCCCC" VerticalAlignment="Bottom"
+                              IsChecked="{Binding SelectedBlock.SimulationEditor.StreamDeltas, Mode=TwoWay}" />
+                </Grid>
+
                 <Border Height="1" Background="#2F2F42" />
                 <TextBlock Text="{loc:Loc property.real_sandbox}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
 
@@ -601,8 +774,122 @@
                              Watermark="{loc:Loc property.tool_profile_block_name}" />
                 </StackPanel>
 
-                <TextBlock Text="{loc:Loc property.tools_harness_rules_and_scripts_are_edited_in_co}"
-                           FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
+                <Border Height="1" Background="#2F2F42" />
+                <TextBlock Text="{loc:Loc property.tool_rules}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="{loc:Loc property.allowed_tools}" FontSize="11" Foreground="#AAAAAA" />
+                    <TextBox Text="{Binding SelectedBlock.SimulationEditor.AllowedToolsText, Mode=TwoWay}"
+                             FontSize="11" Padding="8,6" Watermark="python, web_fetch" />
+                </StackPanel>
+
+                <Grid ColumnDefinitions="*,8,*">
+                    <StackPanel Grid.Column="0" Spacing="4">
+                        <TextBlock Text="{loc:Loc property.tool_timeout_ms}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBox Text="{Binding SelectedBlock.SimulationEditor.ToolTimeoutMs, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="30000" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Spacing="4">
+                        <TextBlock Text="{loc:Loc property.tool_max_retries}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBox Text="{Binding SelectedBlock.SimulationEditor.ToolMaxRetries, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="1" />
+                    </StackPanel>
+                </Grid>
+
+                <Grid ColumnDefinitions="*,8,*">
+                    <StackPanel Grid.Column="0" Spacing="4">
+                        <TextBlock Text="{loc:Loc property.tool_retry_delay}" FontSize="11" Foreground="#AAAAAA" />
+                        <TextBox Text="{Binding SelectedBlock.SimulationEditor.ToolRetryDelayMs, Mode=TwoWay}"
+                                 FontSize="11" Padding="8,6" Watermark="0" />
+                    </StackPanel>
+                    <CheckBox Grid.Column="2" Content="{loc:Loc property.abort_on_tool_failure}"
+                              FontSize="11" Foreground="#CCCCCC" VerticalAlignment="Bottom"
+                              IsChecked="{Binding SelectedBlock.SimulationEditor.AbortOnToolFailure, Mode=TwoWay}" />
+                </Grid>
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="{loc:Loc property.simulated_tools}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                    <ItemsControl ItemsSource="{Binding SelectedBlock.SimulationEditor.Tools}" x:CompileBindings="False">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:SimulationToolEditorViewModel">
+                                <Border Background="#1E1E2E" CornerRadius="4" Padding="6" Margin="0,2">
+                                    <StackPanel Spacing="4">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBox Grid.Column="0" Text="{Binding Name, Mode=TwoWay}"
+                                                     FontSize="10" Padding="6,4" Watermark="tool_name" />
+                                            <Button Grid.Column="1" Content="×"
+                                                    Command="{Binding $parent[ItemsControl].DataContext.RemoveToolCommand}"
+                                                    CommandParameter="{Binding}"
+                                                    Margin="4,0,0,0" Padding="6,2"
+                                                    Background="#3A3A4E" Foreground="#FFFFFF" />
+                                        </Grid>
+                                        <TextBox Text="{Binding Description, Mode=TwoWay}"
+                                                 FontSize="10" Padding="6,4" Watermark="description" />
+                                        <Grid ColumnDefinitions="*,8,*">
+                                            <ComboBox Grid.Column="0" ItemsSource="{Binding Behaviors}"
+                                                      SelectedItem="{Binding Behavior, Mode=TwoWay}"
+                                                      FontSize="10" HorizontalAlignment="Stretch" />
+                                            <TextBox Grid.Column="2" Text="{Binding TimeoutMs, Mode=TwoWay}"
+                                                     FontSize="10" Padding="6,4" Watermark="timeout ms" />
+                                        </Grid>
+                                        <TextBox Text="{Binding ParametersJson, Mode=TwoWay}"
+                                                 FontSize="10" Padding="6,4" Height="48"
+                                                 AcceptsReturn="True" TextWrapping="NoWrap" FontFamily="Consolas" />
+                                        <TextBox Text="{Binding ResponseTemplate, Mode=TwoWay}"
+                                                 FontSize="10" Padding="6,4" Watermark="response {{arguments}}" />
+                                        <Grid ColumnDefinitions="*,8,*">
+                                            <TextBox Grid.Column="0" Text="{Binding DelayMs, Mode=TwoWay}"
+                                                     FontSize="10" Padding="6,4" Watermark="delay ms" />
+                                            <TextBox Grid.Column="2" Text="{Binding FailuresBeforeSuccess, Mode=TwoWay}"
+                                                     FontSize="10" Padding="6,4" Watermark="fail first N" />
+                                        </Grid>
+                                        <TextBox Text="{Binding ErrorMessage, Mode=TwoWay}"
+                                                 FontSize="10" Padding="6,4" Watermark="error message" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Button Content="{loc:Loc property.add_tool}"
+                            Command="{Binding SelectedBlock.SimulationEditor.AddToolCommand}"
+                            HorizontalAlignment="Left" Padding="10,5"
+                            Background="#3A3A4E" Foreground="#FFFFFF" />
+                </StackPanel>
+
+                <StackPanel Spacing="4">
+                    <TextBlock Text="{loc:Loc property.script_turns}" FontSize="11" FontWeight="SemiBold" Foreground="#CCCCCC" />
+                    <ItemsControl ItemsSource="{Binding SelectedBlock.SimulationEditor.ScriptTurns}" x:CompileBindings="False">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:SimulationScriptTurnEditorViewModel">
+                                <Border Background="#1E1E2E" CornerRadius="4" Padding="6" Margin="0,2">
+                                    <StackPanel Spacing="4">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBox Grid.Column="0" Text="{Binding Content, Mode=TwoWay}"
+                                                     FontSize="10" Padding="6,4" Watermark="assistant content" />
+                                            <Button Grid.Column="1" Content="×"
+                                                    Command="{Binding $parent[ItemsControl].DataContext.RemoveScriptTurnCommand}"
+                                                    CommandParameter="{Binding}"
+                                                    Margin="4,0,0,0" Padding="6,2"
+                                                    Background="#3A3A4E" Foreground="#FFFFFF" />
+                                        </Grid>
+                                        <TextBox Text="{Binding ToolCallsJson, Mode=TwoWay}"
+                                                 FontSize="10" Padding="6,4" Height="56"
+                                                 AcceptsReturn="True" TextWrapping="NoWrap"
+                                                 FontFamily="Consolas"
+                                                 Watermark='[{"Name":"python","ArgumentsJson":"{}"}]' />
+                                        <TextBlock Text="{Binding ToolCallsError}"
+                                                   FontSize="10" Foreground="#FF6666" TextWrapping="Wrap"
+                                                   IsVisible="{Binding ToolCallsError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Button Content="{loc:Loc property.add_turn}"
+                            Command="{Binding SelectedBlock.SimulationEditor.AddScriptTurnCommand}"
+                            HorizontalAlignment="Left" Padding="10,5"
+                            Background="#3A3A4E" Foreground="#FFFFFF" />
+                </StackPanel>
             </StackPanel>
 
             <!-- Cleaner configuration -->

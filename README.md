@@ -13,7 +13,8 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - Recipe 文件生命周期：新建（空白/示例）、打开、保存、另存为、最近文件、脏标记、关闭确认与重启恢复
 - 按 BlockType 的端口契约与连接守卫：方向/类型/单输入/重复/环校验；校验问题列表与画布错误/警告徽标
 - Expression：Fluid 模板引擎（条件/循环/过滤器）、输出 JSON 校验、专属面板与样本预览
-- Validator：表达式 / JSON Schema 规则、reject JSONL、失败率日志；Sampler：确定性多文件切分
+- Validator：表达式 / JSON Schema / 正则 / Fluid 脚本多规则、超时、pass/reject 双端口、reject JSONL 与失败率日志
+- Sampler：确定性多文件切分、按 splits 生成多输出端口、分层采样与统计预览
 - Tool Profile：参数树编辑、JSON 导入导出，并被 Simulation/LLM 引用复用
 - 统一数据集 IO：JSONL / CSV / Parquet 分页读取与原子写出；Seed 支持三种格式
 - 数据工作台（Data 视图）：分页预览、行号跳转、页面大小切换、逐行 CRUD（插入/复制/删除/恢复）、字段级单元格编辑与整行 JSON 编辑、撤销/重做、编辑另存或覆盖源文件
@@ -31,6 +32,9 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - OpenAI / ShareGPT / Alpaca 数据格式转换服务
 - 真实 RecipeRunner：Seed / Expression / Validator / Sampler / LLM 执行器，执行记录与 Executions UI
 - OpenAI Chat Completions / Responses、Anthropic Messages 客户端；密钥从设置或环境变量读取，支持节点级超时与指数退避重试
+- LLM 请求侧 tools（Tool Profile）、多轮行内 messages、`response_format` JSON Schema、并发与输出保序、token/成本日志、失败样本 JSONL
+- Simulation Tools / Harness Rules / Script 回合可视化编辑器；OpenAI Chat SSE 流式 delta、requests-per-minute 限速与价格预设
+- Query Source 支持 Fluid 模板变量（含 `index`）与外部 JSONL/CSV/Parquet query 源、查询/系统字段映射
 - 模拟 API 测试：Query Source → Simulation（mini harness）→ Cleaner → SFT Export，多轮 tool 轨迹与 OpenAI messages JSONL 导出
 - 真实 provider tool-calling：OpenAI Chat function calling、OpenAI Responses `function_call`、Anthropic Messages `tool_use`，含 token usage / 延迟 / 成本统计；已通过真实 OpenAI 兼容端点冒烟（tool_calls + usage + 两轮 harness 往返）
 - 真实沙箱工具：python / PowerShell / bash / web_fetch；环境白名单、临时目录、超时杀进程树、输出上限，Windows 额外限制内存与进程数
@@ -41,7 +45,7 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - 中英文界面本地化（zh-CN / en-US，可在设置中切换），节点库、属性面板与画布悬停提示包含完整节点说明
 - 通用 Block Config JSON 编辑器，可直接配置所有节点类型
 
-> 注意：当前仍是开发版。**10M 实测、节点尺寸手柄/边过渡动画、MSIX 安装包、README 截图、完整浅色主题、LLM 请求侧 tools/结构化输出、Validator 代码规则/超时、Sampler 多输出端口、MCP 适配尚未实现**；应用默认启动空白 Recipe，可通过 File → New from Sample 加载 4 节点示例，或恢复上次打开的文件。
+> 注意：当前仍是开发版。**10M 实测、节点尺寸手柄/边过渡动画、MSIX 安装包、README 截图、完整浅色主题、LLM tool_calls 回填、Anthropic 结构化输出、Sampler count 模式分层、MCP 适配尚未实现**；应用默认启动空白 Recipe，可通过 File → New from Sample 加载 4 节点示例，或恢复上次打开的文件。
 >
 > - 完整功能清单与节点能力矩阵：[PLAN/STATUS.md](PLAN/STATUS.md)
 > - 分阶段实施计划、阶段目标与验收标准：[PLAN/TODO.md](PLAN/TODO.md)
@@ -206,13 +210,13 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 | 节点 | 执行状态 | 专属面板 | 主要缺口 |
 | --- | --- | --- | --- |
 | Seed | JSONL / CSV / Parquet 可用 | 有 | Streaming 开关、节点内过滤/列映射 |
-| LLM | 三种 provider 可用 | 有 | 多轮/tools/结构化输出、并发、成本统计 |
+| LLM | 三种 provider + tools/多轮/结构化输出/并发/成本 | 有 | tool_calls 回填、Anthropic structured output |
 | Expression | Fluid 模板 + JSON 校验 | 有 | 沙箱/超时、外部函数 |
-| Validator | 表达式 / JSON Schema + reject 文件 | 有 | 代码规则、超时、失败样本 UI |
-| Sampler | 数量/比例 + 多文件 splits | 有 | 多输出端口、分层采样、统计预览 |
-| Tool Profile | 参数树 + JSON 导入导出 + 复用 | 有 | MCP 适配、LLM 请求侧 tools |
-| Query Source | 单组/多组 query | 有 | 模板、外部来源 |
-| Simulation | 脚本/真实 provider + 模拟/真实工具 | 有 | Tools/Rules/Script UI、流式、容器隔离 |
+| Validator | 多规则（表达式/Schema/正则/脚本）+ 超时 + pass/reject | 有 | 独立失败摘要 UI、任意代码沙箱 |
+| Sampler | 数量/比例 + 多文件 splits + 多端口 + 分层 + 统计预览 | 有 | count 模式分层、再混洗 |
+| Tool Profile | 参数树 + JSON 导入导出 + 复用 | 有 | MCP 适配 |
+| Query Source | 单组/多组 + 模板变量 + 外部 JSONL/CSV/Parquet | 有 | 随机/模型生成 query、去重/权重 |
+| Simulation | 脚本/真实 provider + 模拟/真实工具 + 可视化 Tools/Rules/Script | 有 | 非 OpenAI 流式、严格限速、容器隔离 |
 | Cleaner | 正则/格式/ANSI/reasoning/空消息 | 部分 | 正则规则 UI、预览、坏行报告 |
 | SFT Export | 流式 + 原子替换 + 行透传 | 有 | 文件选择器、字段裁剪、预览、拆分、DPO/Pretrain |
 
@@ -583,7 +587,7 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 - [x] SFT Export 文件选择器、覆盖确认、字段白名单、行数与预览日志
 - [x] 1M 行 Seed → Expression → SFT Export 基线（17.2s，托管内存增量 1MB）
 - [x] 滚动日志、全局异常、CI、win-x64 单文件发布、Headless UI 测试、MIT LICENSE、应用图标
-- [x] 单元测试与集成测试（486 个：480 自动化通过 + 6 个 gated：2 个真实 provider 冒烟 + 4 个性能）
+- [x] 单元测试与集成测试（501 个：495 自动化通过 + 6 个 gated：2 个真实 provider 冒烟 + 4 个性能）
 - [x] Round 8：Recipe 新建/打开/保存、脏标记、最近文件、按类型端口契约
 - [x] Round 9：Expression/Validator/Sampler/Tool Profile 节点能力补齐
 - [x] Round 10：数据预览、CSV/Parquet、格式转换、DPO/Pretrain
@@ -591,7 +595,7 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 - [x] Round 12：画布体验、并行/暂停/重试、CI/打包/主题/日志
 - [x] Round 13：执行与 IO 韧性（节点间溢写/流式、中断恢复、取消/清理硬化、SFT Export 收尾）
 - [x] Round 14：数据工作台逐行编辑（CRUD/字段级单元格/撤销/另存/覆盖确认）、搜索高亮、校验筛选与分组树、统一样本预览
-- [ ] Round 15：节点能力收紧（LLM tools/结构化输出、Validator 代码规则、Sampler 多端口、Simulation 可视化配置）
+- [x] Round 15：节点能力收紧（多输出端口、LLM tools/结构化输出/并发/失败样本、Validator 多规则/超时/双端口、Sampler 分层与多端口、Simulation 可视化编辑器/流式/限速/价格、Query Source 模板与外部源）
 - [ ] Round 16：发布与体验（画布 polish、完整浅色主题、MSIX/文件关联、10M 基线、README 截图）
 
 ## 编码约定

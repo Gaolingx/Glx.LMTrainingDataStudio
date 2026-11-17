@@ -1,3 +1,4 @@
+using System.Text.Json;
 using LMTrainingDataStudio2.Models;
 using LMTrainingDataStudio2.Services.Executors;
 
@@ -73,49 +74,86 @@ public sealed class RecipeValidationService
     {
         foreach (var block in recipe.Blocks)
         {
-            ValidatePortCollection(
-                block, block.InputPorts, PortDirection.Input, BlockPortSchema.GetInputSpec(block.Type), result);
-            ValidatePortCollection(
-                block, block.OutputPorts, PortDirection.Output, BlockPortSchema.GetOutputSpec(block.Type), result);
+            ValidateInputPorts(block, result);
+            ValidateOutputPorts(block, result);
         }
     }
 
-    private static void ValidatePortCollection(
-        RecipeBlock block,
-        IReadOnlyCollection<BlockPort> ports,
-        PortDirection direction,
-        BlockPortSpec? expected,
-        ValidationResult result)
+    private static void ValidateInputPorts(RecipeBlock block, ValidationResult result)
     {
-        var directionName = direction == PortDirection.Input ? "input" : "output";
-
+        var expected = BlockPortSchema.GetInputSpec(block.Type);
         if (expected is null)
         {
-            if (ports.Count > 0)
+            if (block.InputPorts.Count > 0)
             {
                 AddError(result,
-                    $"Block '{block.Name}' ({block.Type}) must not have {directionName} ports.",
+                    $"Block '{block.Name}' ({block.Type}) must not have input ports.",
                     block.Id);
             }
 
             return;
         }
 
-        if (ports.Count == 0)
+        if (block.InputPorts.Count == 0)
         {
             AddError(result,
-                $"Block '{block.Name}' ({block.Type}) requires an {directionName} port.",
+                $"Block '{block.Name}' ({block.Type}) requires an input port.",
                 block.Id);
             return;
         }
 
-        if (ports.Count > 1)
+        if (block.InputPorts.Count > 1)
         {
             AddError(result,
-                $"Block '{block.Name}' ({block.Type}) supports at most one {directionName} port.",
+                $"Block '{block.Name}' ({block.Type}) supports at most one input port.",
                 block.Id);
         }
 
+        ValidatePortDataType(block, block.InputPorts, PortDirection.Input, expected.DataType, result);
+    }
+
+    private static void ValidateOutputPorts(RecipeBlock block, ValidationResult result)
+    {
+        var expected = BlockPortSchema.GetOutputSpecs(block.Type, block.Config);
+        if (expected.Count == 0)
+        {
+            if (block.OutputPorts.Count > 0)
+            {
+                AddError(result,
+                    $"Block '{block.Name}' ({block.Type}) must not have output ports.",
+                    block.Id);
+            }
+
+            return;
+        }
+
+        if (block.OutputPorts.Count == 0)
+        {
+            AddError(result,
+                $"Block '{block.Name}' ({block.Type}) requires an output port.",
+                block.Id);
+            return;
+        }
+
+        if (block.OutputPorts.Count > expected.Count)
+        {
+            AddError(result,
+                $"Block '{block.Name}' ({block.Type}) supports at most {expected.Count} output port(s); " +
+                $"found {block.OutputPorts.Count}.",
+                block.Id);
+        }
+
+        ValidatePortDataType(block, block.OutputPorts, PortDirection.Output, expected[0].DataType, result);
+    }
+
+    private static void ValidatePortDataType(
+        RecipeBlock block,
+        IReadOnlyCollection<BlockPort> ports,
+        PortDirection direction,
+        string dataType,
+        ValidationResult result)
+    {
+        var directionName = direction == PortDirection.Input ? "input" : "output";
         foreach (var port in ports)
         {
             if (port.Direction != direction)
@@ -125,11 +163,11 @@ public sealed class RecipeValidationService
                     block.Id);
             }
 
-            if (!port.DataType.Equals(expected.DataType, StringComparison.OrdinalIgnoreCase))
+            if (!port.DataType.Equals(dataType, StringComparison.OrdinalIgnoreCase))
             {
                 AddError(result,
                     $"Block '{block.Name}' {directionName} port '{port.Name}' must have data type " +
-                    $"'{expected.DataType}'; got '{port.DataType}'.",
+                    $"'{dataType}'; got '{port.DataType}'.",
                     block.Id);
             }
         }
@@ -393,6 +431,35 @@ public sealed class RecipeValidationService
                     });
                     break;
 
+                case LlmBlockConfig llm when llm.MaxConcurrency < 1:
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"LLM block '{block.Name}' max concurrency must be at least 1.",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case LlmBlockConfig llm when llm.MaxFailureSamples < 0:
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"LLM block '{block.Name}' max failure samples must not be negative.",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case LlmBlockConfig llm when
+                    !string.IsNullOrWhiteSpace(llm.ResponseSchema) &&
+                    !TryValidateJsonSchema(llm.ResponseSchema!, out var responseSchemaError):
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"LLM block '{block.Name}' has an invalid response schema: {responseSchemaError}",
+                        BlockId = block.Id
+                    });
+                    break;
+
                 case ExpressionBlockConfig expression when
                     string.IsNullOrWhiteSpace(expression.Template) && expression.Fields.Count == 0:
                     result.Issues.Add(new ValidationIssue
@@ -415,7 +482,7 @@ public sealed class RecipeValidationService
                     });
                     break;
 
-                case ValidatorBlockConfig validator when string.IsNullOrWhiteSpace(validator.Rule):
+                case ValidatorBlockConfig validator when GetValidatorRules(validator).Count == 0:
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
@@ -424,19 +491,47 @@ public sealed class RecipeValidationService
                     });
                     break;
 
-                case ValidatorBlockConfig validator when !IsKnownValidatorRuleKind(validator.RuleKind):
+                case ValidatorBlockConfig validator when validator.TimeoutMs < 0:
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
-                        Message = $"Validator block '{block.Name}' uses unknown rule kind '{validator.RuleKind}'. " +
-                                  "Supported: expression, schema.",
+                        Message = $"Validator block '{block.Name}' timeout must not be negative.",
                         BlockId = block.Id
                     });
                     break;
 
-                case ValidatorBlockConfig validator when IsSchemaRuleKind(validator.RuleKind) &&
-                                                         !string.IsNullOrWhiteSpace(validator.Rule) &&
-                                                         TryValidateJsonSchema(validator.Rule, out var schemaError) is false:
+                case ValidatorBlockConfig validator when
+                    GetValidatorRules(validator).Any(rule => !IsKnownValidatorRuleKind(rule.Kind)):
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Validator block '{block.Name}' uses an unknown rule kind. " +
+                                  "Supported: expression, schema, regex, script.",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case ValidatorBlockConfig validator when
+                    GetValidatorRules(validator).Any(rule =>
+                        IsRegexRuleKind(rule.Kind) && !IsValidRegex(rule.Rule)):
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Validator block '{block.Name}' has an invalid regular expression.",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case ValidatorBlockConfig validator when
+                    GetValidatorRules(validator).Any(rule =>
+                        IsSchemaRuleKind(rule.Kind) &&
+                        !string.IsNullOrWhiteSpace(rule.Rule) &&
+                        TryValidateJsonSchema(rule.Rule, out _) is false):
+                    var invalidSchema = GetValidatorRules(validator).First(rule =>
+                        IsSchemaRuleKind(rule.Kind) &&
+                        !string.IsNullOrWhiteSpace(rule.Rule) &&
+                        TryValidateJsonSchema(rule.Rule, out _) is false);
+                    TryValidateJsonSchema(invalidSchema.Rule, out var schemaError);
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
@@ -458,6 +553,17 @@ public sealed class RecipeValidationService
                     });
                     break;
 
+                case SamplerBlockConfig sampler when
+                    !string.IsNullOrWhiteSpace(sampler.StratifyField) &&
+                    sampler.Splits is not { Length: > 0 }:
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Sampler block '{block.Name}' can only stratify when splits are configured.",
+                        BlockId = block.Id
+                    });
+                    break;
+
                 case ToolProfileBlockConfig toolProfile when toolProfile.Profile?.Tools is not { Count: > 0 }:
                     result.Issues.Add(new ValidationIssue
                     {
@@ -467,12 +573,45 @@ public sealed class RecipeValidationService
                     });
                     break;
 
-                case QuerySourceBlockConfig query when query.Queries is not { Length: > 0 } ||
-                                                       query.Queries.All(string.IsNullOrWhiteSpace):
+                case QuerySourceBlockConfig query when
+                    string.IsNullOrWhiteSpace(query.SourcePath) &&
+                    (query.Queries is not { Length: > 0 } || query.Queries.All(string.IsNullOrWhiteSpace)):
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
                         Message = $"Query source block '{block.Name}' has no queries configured.",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case QuerySourceBlockConfig query when
+                    !string.IsNullOrWhiteSpace(query.SourcePath) &&
+                    !IsSupportedDatasetExtension(query.SourcePath!):
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Query source block '{block.Name}' source must be .jsonl, .csv or .parquet.",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case QuerySourceBlockConfig query when
+                    !string.IsNullOrWhiteSpace(query.TemplateVariablesJson) &&
+                    !IsValidJsonObject(query.TemplateVariablesJson!):
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Query source block '{block.Name}' template variables must be a JSON object.",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case QuerySourceBlockConfig query when
+                    string.IsNullOrWhiteSpace(query.QueryField):
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Query source block '{block.Name}' query field must not be empty.",
                         BlockId = block.Id
                     });
                     break;
@@ -609,6 +748,26 @@ public sealed class RecipeValidationService
                     });
                     break;
 
+                case SimulationBlockConfig simulation when simulation.RequestsPerMinute < 0:
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Simulation block '{block.Name}' requests per minute must not be negative.",
+                        BlockId = block.Id
+                    });
+                    break;
+
+                case SimulationBlockConfig simulation when
+                    simulation.StreamDeltas &&
+                    LlmProviderIds.Normalize(simulation.Provider) != LlmProviderIds.OpenAiChat:
+                    result.Issues.Add(new ValidationIssue
+                    {
+                        Severity = ValidationSeverity.Warning,
+                        Message = $"Simulation block '{block.Name}' streams deltas only with the OpenAI Chat provider.",
+                        BlockId = block.Id
+                    });
+                    break;
+
                 case SimulationBlockConfig simulation when
                     simulation.ToolMode == ToolExecutionMode.Real &&
                     simulation.Tools is { Length: > 0 } realTools &&
@@ -725,13 +884,46 @@ public sealed class RecipeValidationService
         }
     }
 
+    private static IReadOnlyList<ValidatorRuleSpec> GetValidatorRules(ValidatorBlockConfig config)
+    {
+        if (config.Rules is { Length: > 0 })
+        {
+            return config.Rules
+                .Where(rule => !string.IsNullOrWhiteSpace(rule.Rule))
+                .ToArray();
+        }
+
+        return string.IsNullOrWhiteSpace(config.Rule)
+            ? Array.Empty<ValidatorRuleSpec>()
+            : [new ValidatorRuleSpec(config.RuleKind, config.Rule)];
+    }
+
     private static bool IsKnownValidatorRuleKind(string ruleKind) =>
         string.Equals(ruleKind, "expression", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(ruleKind, "regex", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(ruleKind, "script", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(ruleKind, "code", StringComparison.OrdinalIgnoreCase) ||
         IsSchemaRuleKind(ruleKind);
 
     private static bool IsSchemaRuleKind(string ruleKind) =>
         string.Equals(ruleKind, "schema", StringComparison.OrdinalIgnoreCase) ||
         string.Equals(ruleKind, "json_schema", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsRegexRuleKind(string ruleKind) =>
+        string.Equals(ruleKind, "regex", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsValidRegex(string pattern)
+    {
+        try
+        {
+            _ = System.Text.RegularExpressions.Regex.IsMatch(string.Empty, pattern);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
 
     private static bool TryValidateJsonSchema(string json, out string? error)
     {
@@ -744,6 +936,22 @@ public sealed class RecipeValidationService
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
             error = ex.Message;
+            return false;
+        }
+    }
+
+    private static bool IsSupportedDatasetExtension(string path) =>
+        Path.GetExtension(path).ToLowerInvariant() is ".jsonl" or ".ndjson" or ".json" or ".csv" or ".parquet" or ".pq";
+
+    private static bool IsValidJsonObject(string json)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            return document.RootElement.ValueKind == JsonValueKind.Object;
+        }
+        catch (JsonException)
+        {
             return false;
         }
     }

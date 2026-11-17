@@ -54,7 +54,6 @@ public sealed class BlockPortSchemaTests
 
     [TestCase(BlockType.Llm)]
     [TestCase(BlockType.Expression)]
-    [TestCase(BlockType.Validator)]
     [TestCase(BlockType.Sampler)]
     [TestCase(BlockType.Simulation)]
     [TestCase(BlockType.Cleaner)]
@@ -70,6 +69,31 @@ public sealed class BlockPortSchemaTests
         Assert.That(output[0].Name, Is.EqualTo("output"));
         Assert.That(output[0].Direction, Is.EqualTo(PortDirection.Output));
         Assert.That(output[0].DataType, Is.EqualTo(BlockPortSchema.RowsDataType));
+    }
+
+    [Test]
+    public void CreateOutputPorts_Validator_HasPassAndRejectPorts()
+    {
+        var outputs = BlockPortSchema.CreateOutputPorts(BlockType.Validator);
+
+        Assert.That(outputs.Select(port => port.Name),
+            Is.EqualTo(new[] { BlockPortSchema.ValidatorPassPort, BlockPortSchema.ValidatorRejectPort }));
+        Assert.That(outputs.Select(port => port.Direction), Is.All.EqualTo(PortDirection.Output));
+        Assert.That(outputs.Select(port => port.DataType), Is.All.EqualTo(BlockPortSchema.RowsDataType));
+    }
+
+    [Test]
+    public void CreateOutputPorts_SamplerSplits_UseSplitNames()
+    {
+        var config = new SamplerBlockConfig(
+            Count: null,
+            Ratio: null,
+            Seed: 42,
+            Splits: new[] { "train:0.8", "valid:0.2" });
+
+        var outputs = BlockPortSchema.CreateOutputPorts(BlockType.Sampler, config);
+
+        Assert.That(outputs.Select(port => port.Name), Is.EqualTo(new[] { "train", "valid" }));
     }
 
     [Test]

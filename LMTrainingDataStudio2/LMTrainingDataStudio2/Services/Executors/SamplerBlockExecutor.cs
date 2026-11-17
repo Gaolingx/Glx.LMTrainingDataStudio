@@ -1,11 +1,14 @@
 using System.Runtime.CompilerServices;
+using System.Text.Json;
+using System.Threading.Channels;
 using LMTrainingDataStudio2.Models;
 
 namespace LMTrainingDataStudio2.Services.Executors;
 
 /// <summary>
 /// Deterministic sampler with reservoir sampling for count, Bernoulli sampling for ratio,
-/// and multi-file deterministic splits.
+/// and multi-file deterministic splits. Splits also expose one output port per split name
+/// and can be stratified by a top-level field.
 /// </summary>
 public sealed class SamplerBlockExecutor : IBlockExecutor
 {
@@ -60,26 +63,188 @@ public sealed class SamplerBlockExecutor : IBlockExecutor
             }
         }
 
-        return Task.FromResult(new BlockExecutionResult(
-            SampleAsync(context, config, splitPlan, cancellationToken)));
+        if (splitPlan is not null)
+        {
+            return Task.FromResult(CreateSplitOutputs(context, config, splitPlan, cancellationToken));
+        }
+
+        return Task.FromResult(new BlockExecutionResult(SampleAsync(context, config, cancellationToken)));
+    }
+
+    private static BlockExecutionResult CreateSplitOutputs(
+        BlockExecutionContext context,
+        SamplerBlockConfig config,
+        SamplerSplitPlan plan,
+        CancellationToken ct)
+    {
+        var connected = context.ConnectedOutputPorts;
+        var hasSplitNamedOutput = plan.Specs.Any(spec =>
+            spec.Name.Equals("output", StringComparison.OrdinalIgnoreCase));
+        var emitPrimary = !hasSplitNamedOutput &&
+                          (connected is null || connected.Contains("output", StringComparer.OrdinalIgnoreCase));
+
+        var primary = emitPrimary
+            ? Channel.CreateUnbounded<DatasetRow>(new UnboundedChannelOptions
+            {
+                SingleReader = true,
+                SingleWriter = true
+            })
+            : null;
+
+        var splitChannels = new Dictionary<int, Channel<DatasetRow>>();
+        var additional = new Dictionary<string, IAsyncEnumerable<DatasetRow>>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i < plan.Specs.Count; i++)
+        {
+            var spec = plan.Specs[i];
+            if (connected is not null &&
+                !connected.Contains(spec.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var channel = Channel.CreateUnbounded<DatasetRow>(new UnboundedChannelOptions
+            {
+                SingleReader = true,
+                SingleWriter = true
+            });
+            splitChannels[i] = channel;
+            additional[spec.Name] = channel.Reader.ReadAllAsync(ct);
+        }
+
+        var completion = ProduceSplitsAsync(context, config, plan, primary?.Writer, splitChannels, ct);
+
+        var output = primary is null ? EmptyAsync(ct) : primary.Reader.ReadAllAsync(ct);
+        return new BlockExecutionResult(output, additional, completion);
+    }
+
+    private static async IAsyncEnumerable<DatasetRow> EmptyAsync(
+        [EnumeratorCancellation] CancellationToken ct)
+    {
+        await Task.CompletedTask;
+        ct.ThrowIfCancellationRequested();
+        yield break;
+    }
+
+    private static async Task ProduceSplitsAsync(
+        BlockExecutionContext context,
+        SamplerBlockConfig config,
+        SamplerSplitPlan plan,
+        ChannelWriter<DatasetRow>? primary,
+        IReadOnlyDictionary<int, Channel<DatasetRow>> splitChannels,
+        CancellationToken ct)
+    {
+        await using var writer = SamplerSplitWriter.Create(config.OutputDirectory!, plan.Specs);
+
+        var random = new Random(config.Seed);
+        var groupRandoms = new Dictionary<string, Random>(StringComparer.Ordinal);
+        var counts = new long[plan.Specs.Count];
+        var outputIndex = 0L;
+        var seen = 0L;
+
+        try
+        {
+            await foreach (var row in context.Input!.WithCancellation(ct))
+            {
+                var split = plan.Assign(seen, ResolveRandom(config, random, groupRandoms, row));
+                counts[split]++;
+                await writer.WriteAsync(split, row, ct);
+
+                var emitted = new DatasetRow(outputIndex++, row.Json);
+                if (primary is not null)
+                {
+                    await primary.WriteAsync(emitted, ct);
+                }
+
+                if (splitChannels.TryGetValue(split, out var channel))
+                {
+                    await channel.Writer.WriteAsync(emitted, ct);
+                }
+
+                seen++;
+                context.RowsProcessed?.Report(seen);
+            }
+
+            await writer.CommitAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            primary?.TryComplete(ex);
+            foreach (var channel in splitChannels.Values)
+            {
+                channel.Writer.TryComplete(ex);
+            }
+
+            context.Log($"Split failed after {seen} row(s): {ex.Message}");
+            throw;
+        }
+
+        primary?.TryComplete();
+        foreach (var channel in splitChannels.Values)
+        {
+            channel.Writer.TryComplete();
+        }
+
+        var summary = string.Join(
+            ", ",
+            plan.Specs.Select((spec, index) => $"{spec.Name}={counts[index]}"));
+        var stratified = string.IsNullOrWhiteSpace(config.StratifyField)
+            ? string.Empty
+            : $" (stratified by '{config.StratifyField}')";
+        context.Log($"Split {seen} row(s) into {plan.Specs.Count} file(s){stratified}: {summary}.");
+    }
+
+    private static Random ResolveRandom(
+        SamplerBlockConfig config,
+        Random shared,
+        Dictionary<string, Random> groupRandoms,
+        DatasetRow row)
+    {
+        if (string.IsNullOrWhiteSpace(config.StratifyField))
+        {
+            return shared;
+        }
+
+        var group = ReadGroupValue(row.Json, config.StratifyField!);
+        if (!groupRandoms.TryGetValue(group, out var random))
+        {
+            random = new Random(HashCode.Combine(config.Seed, StringComparer.Ordinal.GetHashCode(group)));
+            groupRandoms[group] = random;
+        }
+
+        return random;
+    }
+
+    private static string ReadGroupValue(string json, string field)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            if (document.RootElement.ValueKind == JsonValueKind.Object &&
+                document.RootElement.TryGetProperty(field, out var value))
+            {
+                return value.ValueKind switch
+                {
+                    JsonValueKind.String => value.GetString() ?? string.Empty,
+                    JsonValueKind.Number => value.GetRawText(),
+                    JsonValueKind.True => "true",
+                    JsonValueKind.False => "false",
+                    JsonValueKind.Null => "(null)",
+                    _ => value.GetRawText()
+                };
+            }
+        }
+        catch (JsonException)
+        {
+        }
+
+        return "(missing)";
     }
 
     private static async IAsyncEnumerable<DatasetRow> SampleAsync(
         BlockExecutionContext context,
         SamplerBlockConfig config,
-        SamplerSplitPlan? splitPlan,
         [EnumeratorCancellation] CancellationToken ct)
     {
-        if (splitPlan is not null)
-        {
-            await foreach (var row in SplitAsync(context, config, splitPlan, ct))
-            {
-                yield return row;
-            }
-
-            yield break;
-        }
-
         var random = new Random(config.Seed);
 
         if (config.Count is { } count)
@@ -115,49 +280,19 @@ public sealed class SamplerBlockExecutor : IBlockExecutor
         }
 
         var ratio = config.Ratio!.Value;
+        var groupRandoms = new Dictionary<string, Random>(StringComparer.Ordinal);
         var index = 0L;
 
         await foreach (var row in context.Input!.WithCancellation(ct))
         {
             index++;
-            if (random.NextDouble() < ratio)
+            var groupRandom = ResolveRandom(config, random, groupRandoms, row);
+            if (groupRandom.NextDouble() < ratio)
             {
                 yield return row;
             }
 
             context.RowsProcessed?.Report(index);
         }
-    }
-
-    private static async IAsyncEnumerable<DatasetRow> SplitAsync(
-        BlockExecutionContext context,
-        SamplerBlockConfig config,
-        SamplerSplitPlan plan,
-        [EnumeratorCancellation] CancellationToken ct)
-    {
-        await using var writer = SamplerSplitWriter.Create(config.OutputDirectory!, plan.Specs);
-
-        var random = new Random(config.Seed);
-        var counts = new long[plan.Specs.Count];
-        var seen = 0L;
-        var outputIndex = 0L;
-
-        await foreach (var row in context.Input!.WithCancellation(ct))
-        {
-            var split = plan.Assign(seen, random);
-            counts[split]++;
-            await writer.WriteAsync(split, row, ct);
-
-            seen++;
-            context.RowsProcessed?.Report(seen);
-            yield return new DatasetRow(outputIndex++, row.Json);
-        }
-
-        await writer.CommitAsync(ct);
-
-        var summary = string.Join(
-            ", ",
-            plan.Specs.Select((spec, index) => $"{spec.Name}={counts[index]}"));
-        context.Log($"Split {seen} row(s) into {plan.Specs.Count} file(s): {summary}.");
     }
 }

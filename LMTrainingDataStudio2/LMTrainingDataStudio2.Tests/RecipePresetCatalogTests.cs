@@ -28,7 +28,7 @@ public sealed class RecipePresetCatalogTests
                 Assert.That(block.InputPorts.Select(port => port.Name),
                     Is.EqualTo(BlockPortSchema.CreateInputPorts(block.Type).Select(port => port.Name)));
                 Assert.That(block.OutputPorts.Select(port => port.Name),
-                    Is.EqualTo(BlockPortSchema.CreateOutputPorts(block.Type).Select(port => port.Name)));
+                    Is.EqualTo(BlockPortSchema.CreateOutputPorts(block.Type, block.Config).Select(port => port.Name)));
             }
 
             var result = _validation.Validate(recipe);

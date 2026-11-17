@@ -20,6 +20,7 @@ public sealed class RecipeRunner
 {
     private const string NodeOutputDirectoryName = "nodes";
     private const string NodeOutputExtension = ".rows";
+    private const char PortKeySeparator = '\u001f';
 
     private readonly RecipeValidationService _validation;
     private readonly Dictionary<BlockType, IBlockExecutor> _executors;
@@ -214,8 +215,8 @@ public sealed class RecipeRunner
 
             var result = results[block.Id];
             var inputEdges = recipe.Edges.Where(edge => edge.TargetBlockId == block.Id).ToList();
-            var inputRows = inputEdges.Sum(edge =>
-                outputs.TryGetValue(edge.SourceBlockId, out var rows) ? rows.Count : 0);
+            var connectedPorts = GetConnectedOutputPortNames(recipe, block);
+            var inputRows = inputEdges.Sum(edge => GetSourceBuffer(recipe, edge, outputs)?.Count ?? 0);
 
             result.Status = ExecutionStatus.Running;
             result.StartedAt = _timeProvider.GetUtcNow();
@@ -237,7 +238,7 @@ public sealed class RecipeRunner
                     var context = new BlockExecutionContext
                     {
                         Block = block,
-                        Input = BuildInput(inputEdges, outputs),
+                        Input = BuildInput(recipe, inputEdges, outputs),
                         Log = message => Log(run, $"[{block.Name}] {message}"),
                         RowsProcessed = new InlineProgress<long>(rows =>
                             progress?.Report(new ExecutionProgress(
@@ -246,34 +247,49 @@ public sealed class RecipeRunner
                                 state.CompletedBlocks,
                                 totalBlocks,
                                 state.ProcessedRows + rows))),
-                        ToolProfile = ToolProfileResolver.Resolve(recipe, block)
+                        ToolProfile = ToolProfileResolver.Resolve(recipe, block),
+                        ConnectedOutputPorts = connectedPorts
                     };
 
                     var execution = await executor.ExecuteAsync(context, cancellationToken);
-                    if (outputs.TryRemove(block.Id, out var previousBuffer))
+                    await DisposeBlockBuffersAsync(outputs, block.Id);
+
+                    var streams = MapOutputs(block, execution);
+                    var buffers = new Dictionary<string, RowSpillBuffer>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var port in streams.Keys)
                     {
-                        await previousBuffer.DisposeAsync();
+                        var buffer = new RowSpillBuffer(
+                            _options.EffectiveSpillThresholdRows,
+                            Path.Combine(spillRoot, "buffers"));
+                        buffers[port] = buffer;
+                        outputs[GetOutputKey(block.Id, port)] = buffer;
                     }
 
-                    var buffer = new RowSpillBuffer(
-                        _options.EffectiveSpillThresholdRows,
-                        Path.Combine(spillRoot, "buffers"));
-                    outputs[block.Id] = buffer;
+                    await Task.WhenAll(streams.Select(stream =>
+                        DrainAsync(stream.Value, buffers[stream.Key], cancellationToken)));
 
-                    await foreach (var row in execution.Output.WithCancellation(cancellationToken))
+                    if (execution.Completion is not null)
                     {
-                        await buffer.AppendAsync(row, cancellationToken);
+                        await execution.Completion.WaitAsync(cancellationToken);
                     }
 
-                    await buffer.SealAsync(cancellationToken);
-                    await PersistNodeOutputAsync(run, block, buffer, cancellationToken);
+                    foreach (var buffer in buffers.Values)
+                    {
+                        await buffer.SealAsync(cancellationToken);
+                    }
+
+                    await PersistNodeOutputsAsync(run, block, buffers, cancellationToken);
+
+                    var outputRows = buffers
+                        .Where(pair => IsCountedOutputPort(block, pair.Key))
+                        .Sum(pair => pair.Value.Count);
 
                     result.Status = ExecutionStatus.Succeeded;
-                    result.OutputRows = buffer.Count;
+                    result.OutputRows = outputRows;
                     result.FinishedAt = _timeProvider.GetUtcNow();
                     Interlocked.Increment(ref state.CompletedBlocks);
-                    Interlocked.Add(ref state.ProcessedRows, buffer.Count);
-                    Log(run, $"[{block.Name}] Completed: {inputRows} in, {buffer.Count} out.");
+                    Interlocked.Add(ref state.ProcessedRows, outputRows);
+                    Log(run, $"[{block.Name}] Completed: {inputRows} in, {outputRows} out.");
                     progress?.Report(new ExecutionProgress(
                         block.Id, block.Name, state.CompletedBlocks, totalBlocks, state.ProcessedRows));
                     return new BlockOutcome(block, BlockOutcomeKind.Succeeded);
@@ -341,15 +357,23 @@ public sealed class RecipeRunner
         foreach (var block in recipe.Blocks)
         {
             var result = results[block.Id];
-            var outputPath = run.OutputDirectory is null
+            var ports = GetCheckpointPortNames(recipe, block);
+            var paths = run.OutputDirectory is null
                 ? null
-                : GetNodeOutputPath(run.OutputDirectory, block.Id);
+                : ports.ToDictionary(
+                    port => port,
+                    port => GetNodeOutputPath(run.OutputDirectory, block, port));
 
             if (result.Status == ExecutionStatus.Succeeded &&
-                outputPath is not null &&
-                File.Exists(outputPath))
+                paths is not null &&
+                (paths.Count == 0 || paths.Values.All(File.Exists)))
             {
-                outputs[block.Id] = RowSpillBuffer.FromFile(outputPath, result.OutputRows);
+                foreach (var (port, path) in paths!)
+                {
+                    outputs[GetOutputKey(block.Id, port)] =
+                        RowSpillBuffer.FromFile(path, CountLines(path));
+                }
+
                 reused.Add(block.Id);
                 state.CompletedBlocks++;
                 state.ProcessedRows += result.OutputRows;
@@ -370,53 +394,205 @@ public sealed class RecipeRunner
             : $"Resume checkpoint: reusing {checkpointCount} completed block output(s).");
     }
 
-    private async Task PersistNodeOutputAsync(
+    private async Task PersistNodeOutputsAsync(
         ExecutionRun run,
         RecipeBlock block,
-        RowSpillBuffer buffer,
+        IReadOnlyDictionary<string, RowSpillBuffer> buffers,
         CancellationToken cancellationToken)
     {
         if (!_options.PersistNodeOutputs || run.OutputDirectory is null) return;
 
-        var path = GetNodeOutputPath(run.OutputDirectory, block.Id);
-        var tempPath = path + ".tmp";
-        var completed = false;
-        try
+        var declared = block.OutputPorts.Select(port => port.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var (port, buffer) in buffers)
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            await using (var stream = new FileStream(
-                tempPath, FileMode.Create, FileAccess.Write, FileShare.None, 64 * 1024,
-                FileOptions.Asynchronous | FileOptions.SequentialScan))
-            await using (var writer = new StreamWriter(
-                stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false)))
+            if (declared.Count > 0 && !declared.Contains(port))
             {
-                await foreach (var row in buffer.ReadAsync(cancellationToken))
-                {
-                    await writer.WriteLineAsync(
-                        $"{row.LineNumber}\t{row.Json}".AsMemory(), cancellationToken);
-                }
+                continue;
             }
 
-            File.Move(tempPath, path, overwrite: true);
-            completed = true;
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            Log(run,
-                $"[Warning] Could not persist output for block '{block.Name}': {ex.Message}. " +
-                "Resume will re-run this block.");
-        }
-        finally
-        {
-            if (!completed)
+            var path = GetNodeOutputPath(run.OutputDirectory, block, port);
+            var tempPath = path + ".tmp";
+            var completed = false;
+            try
             {
-                TryDeleteFile(tempPath);
+                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                await using (var stream = new FileStream(
+                    tempPath, FileMode.Create, FileAccess.Write, FileShare.None, 64 * 1024,
+                    FileOptions.Asynchronous | FileOptions.SequentialScan))
+                await using (var writer = new StreamWriter(
+                    stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false)))
+                {
+                    await foreach (var row in buffer.ReadAsync(cancellationToken))
+                    {
+                        await writer.WriteLineAsync(
+                            $"{row.LineNumber}\t{row.Json}".AsMemory(), cancellationToken);
+                    }
+                }
+
+                File.Move(tempPath, path, overwrite: true);
+                completed = true;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                Log(run,
+                    $"[Warning] Could not persist output for block '{block.Name}' port '{port}': {ex.Message}. " +
+                    "Resume will re-run this block.");
+            }
+            finally
+            {
+                if (!completed)
+                {
+                    TryDeleteFile(tempPath);
+                }
             }
         }
+    }
+
+    /// <summary>
+    /// Ports whose persisted files must exist before a completed block can be reused.
+    /// Sinks still get a single primary marker so they are not executed twice.
+    /// </summary>
+    private static IReadOnlyList<string> GetCheckpointPortNames(Recipe recipe, RecipeBlock block)
+    {
+        var connected = GetConnectedOutputPortNames(recipe, block);
+        if (connected.Count > 0)
+        {
+            return connected.ToArray();
+        }
+
+        return [ResolvePrimaryPortName(block) ?? "output"];
+    }
+
+    private static async Task DrainAsync(
+        IAsyncEnumerable<DatasetRow> rows,
+        RowSpillBuffer buffer,
+        CancellationToken cancellationToken)
+    {
+        await foreach (var row in rows.WithCancellation(cancellationToken))
+        {
+            await buffer.AppendAsync(row, cancellationToken);
+        }
+    }
+
+    private static Dictionary<string, IAsyncEnumerable<DatasetRow>> MapOutputs(
+        RecipeBlock block,
+        BlockExecutionResult execution)
+    {
+        var streams = new Dictionary<string, IAsyncEnumerable<DatasetRow>>(StringComparer.OrdinalIgnoreCase);
+        var primary = ResolvePrimaryPortName(block);
+        if (primary is not null)
+        {
+            streams[primary] = execution.Output;
+        }
+
+        if (execution.AdditionalOutputs is not null)
+        {
+            foreach (var (port, rows) in execution.AdditionalOutputs)
+            {
+                if (!string.IsNullOrWhiteSpace(port))
+                {
+                    streams[port] = rows;
+                }
+            }
+        }
+
+        return streams;
+    }
+
+    private static string? ResolvePrimaryPortName(RecipeBlock block)
+    {
+        var declared = block.OutputPorts.Select(port => port.Name).ToList();
+        var preferred = BlockPortSchema.GetOutputSpec(block.Type)?.Name;
+
+        if (preferred is not null &&
+            declared.FirstOrDefault(name => name.Equals(preferred, StringComparison.OrdinalIgnoreCase)) is { } match)
+        {
+            return match;
+        }
+
+        return declared.Count switch
+        {
+            0 => "output",
+            1 => declared[0],
+            _ => null
+        };
+    }
+
+    private static bool IsCountedOutputPort(RecipeBlock block, string port) =>
+        block.OutputPorts.Count == 0 ||
+        block.OutputPorts.Any(candidate => candidate.Name.Equals(port, StringComparison.OrdinalIgnoreCase));
+
+    private static HashSet<string> GetConnectedOutputPortNames(Recipe recipe, RecipeBlock block)
+    {
+        var portNames = block.OutputPorts.ToDictionary(
+            port => port.Id, port => port.Name, StringComparer.Ordinal);
+        return recipe.Edges
+            .Where(edge => edge.SourceBlockId == block.Id)
+            .Select(edge => portNames.GetValueOrDefault(edge.SourcePortId))
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name!)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static string GetOutputKey(string blockId, string portName) =>
+        $"{blockId}{PortKeySeparator}{portName}";
+
+    private static RowSpillBuffer? GetSourceBuffer(
+        Recipe recipe,
+        RecipeEdge edge,
+        IReadOnlyDictionary<string, RowSpillBuffer> outputs)
+    {
+        var source = recipe.Blocks.FirstOrDefault(block => block.Id == edge.SourceBlockId);
+        if (source is null)
+        {
+            return null;
+        }
+
+        var portName = source.OutputPorts
+            .FirstOrDefault(port => port.Id == edge.SourcePortId)?.Name;
+        if (portName is not null &&
+            outputs.TryGetValue(GetOutputKey(source.Id, portName), out var buffer))
+        {
+            return buffer;
+        }
+
+        var fallback = ResolvePrimaryPortName(source);
+        return fallback is not null &&
+               outputs.TryGetValue(GetOutputKey(source.Id, fallback), out var primary)
+            ? primary
+            : null;
+    }
+
+    private static async Task DisposeBlockBuffersAsync(
+        ConcurrentDictionary<string, RowSpillBuffer> outputs,
+        string blockId)
+    {
+        var prefix = blockId + PortKeySeparator;
+        foreach (var key in outputs.Keys
+                     .Where(key => key.StartsWith(prefix, StringComparison.Ordinal))
+                     .ToList())
+        {
+            if (outputs.TryRemove(key, out var buffer))
+            {
+                await buffer.DisposeAsync();
+            }
+        }
+    }
+
+    private static long CountLines(string path)
+    {
+        using var reader = new StreamReader(path);
+        var count = 0L;
+        while (reader.ReadLine() is not null)
+        {
+            count++;
+        }
+
+        return count;
     }
 
     private void CleanupPersistedNodeOutputs(ExecutionRun run)
@@ -437,8 +613,21 @@ public sealed class RecipeRunner
         }
     }
 
-    private static string GetNodeOutputPath(string outputDirectory, string blockId) =>
-        Path.Combine(outputDirectory, NodeOutputDirectoryName, GetNodeFileName(blockId));
+    private static string GetNodeOutputPath(
+        string outputDirectory,
+        RecipeBlock block,
+        string portName)
+    {
+        var fileName = GetNodeFileName(block.Id);
+        if (block.OutputPorts.Count > 1)
+        {
+            var invalid = Path.GetInvalidFileNameChars();
+            var safePort = new string(portName.Select(c => invalid.Contains(c) ? '_' : c).ToArray());
+            fileName = $"{fileName}-{safePort}";
+        }
+
+        return Path.Combine(outputDirectory, NodeOutputDirectoryName, fileName + NodeOutputExtension);
+    }
 
     private static string GetNodeFileName(string blockId)
     {
@@ -455,7 +644,7 @@ public sealed class RecipeRunner
 
         var hash = Convert.ToHexString(
             SHA256.HashData(Encoding.UTF8.GetBytes(blockId)))[..8];
-        return $"{safe}-{hash}{NodeOutputExtension}";
+        return $"{safe}-{hash}";
     }
 
     private string GetSpillRoot(ExecutionRun run) =>
@@ -479,11 +668,12 @@ public sealed class RecipeRunner
     }
 
     private static IAsyncEnumerable<DatasetRow>? BuildInput(
+        Recipe recipe,
         IReadOnlyList<RecipeEdge> inputEdges,
         IReadOnlyDictionary<string, RowSpillBuffer> outputs)
     {
         var sources = inputEdges
-            .Select(edge => outputs.TryGetValue(edge.SourceBlockId, out var rows) ? rows : null)
+            .Select(edge => GetSourceBuffer(recipe, edge, outputs))
             .Where(rows => rows is not null)
             .Select(rows => rows!)
             .ToList();

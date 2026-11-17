@@ -73,7 +73,11 @@ public abstract record BlockConfig
         {
             Fields = new Dictionary<string, string>(expression.Fields)
         },
-        ValidatorBlockConfig validator => validator with { Cleanup = CloneCleanup(validator.Cleanup) },
+        ValidatorBlockConfig validator => validator with
+        {
+            Cleanup = CloneCleanup(validator.Cleanup),
+            Rules = validator.Rules?.Select(rule => rule with { }).ToArray()
+        },
         SamplerBlockConfig sampler => sampler with { Splits = [.. sampler.Splits] },
         ToolProfileBlockConfig { Profile: var profile } => new ToolProfileBlockConfig(new ToolProfile
         {
@@ -145,7 +149,16 @@ public sealed record LlmBlockConfig(
     string? Endpoint = null,
     int TimeoutSeconds = 100,
     int MaxRetries = 2,
-    string? ToolProfileName = null) : BlockConfig;
+    string? ToolProfileName = null,
+    string? SystemPrompt = null,
+    bool UseRowMessages = false,
+    int MaxConcurrency = 1,
+    string? ResponseSchema = null,
+    string? FailureOutputPath = null,
+    int MaxFailureSamples = 100,
+    double InputCostPerMillionTokens = 0,
+    double OutputCostPerMillionTokens = 0,
+    bool ContinueOnError = false) : BlockConfig;
 
 public sealed record ExpressionBlockConfig(
     string Template,
@@ -156,13 +169,22 @@ public sealed record ValidatorBlockConfig(
     string Rule,
     bool RejectOnFailure,
     DatasetCleanupRules? Cleanup = null,
-    string? RejectOutputPath = null) : BlockConfig;
+    string? RejectOutputPath = null,
+    ValidatorRuleSpec[]? Rules = null,
+    bool MatchAllRules = true,
+    int TimeoutMs = 0) : BlockConfig;
 
 public sealed record SamplerBlockConfig(
     long? Count,
     double? Ratio,
     int Seed,
     string[] Splits,
-    string? OutputDirectory = null) : BlockConfig;
+    string? OutputDirectory = null,
+    string? StratifyField = null) : BlockConfig;
+
+/// <summary>
+/// One validator rule. <see cref="Kind"/> supports expression, schema, regex and script.
+/// </summary>
+public sealed record ValidatorRuleSpec(string Kind, string Rule, bool Negate = false);
 
 public sealed record ToolProfileBlockConfig(ToolProfile Profile) : BlockConfig;

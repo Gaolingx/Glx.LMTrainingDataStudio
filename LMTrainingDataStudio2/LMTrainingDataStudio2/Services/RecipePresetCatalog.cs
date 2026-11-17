@@ -251,7 +251,7 @@ public static class RecipePresetCatalog
             Y = y,
             Config = config,
             InputPorts = BlockPortSchema.CreateInputPorts(type),
-            OutputPorts = BlockPortSchema.CreateOutputPorts(type)
+            OutputPorts = BlockPortSchema.CreateOutputPorts(type, config)
         };
 
         recipe.Blocks.Add(block);

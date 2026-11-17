@@ -37,7 +37,16 @@ public sealed class LlmApiClient : ILlmClient
     }
 
     public async Task<string> CompleteAsync(
-        string prompt, LlmBlockConfig config, CancellationToken cancellationToken = default)
+        string prompt, LlmBlockConfig config, CancellationToken cancellationToken = default) =>
+        (await CompleteAsync(
+            new LlmCompletionRequest([new LlmChatTurn("user", prompt)]),
+            config,
+            cancellationToken)).Content;
+
+    public async Task<LlmCompletionResult> CompleteAsync(
+        LlmCompletionRequest request,
+        LlmBlockConfig config,
+        CancellationToken cancellationToken = default)
     {
         if (config.TimeoutSeconds <= 0)
         {
@@ -56,23 +65,31 @@ public sealed class LlmApiClient : ILlmClient
 
         return provider switch
         {
-            LlmProviderIds.OpenAiChat => await CompleteOpenAiChatAsync(prompt, config, cancellationToken),
-            LlmProviderIds.OpenAiResponses => await CompleteOpenAiResponsesAsync(prompt, config, cancellationToken),
-            LlmProviderIds.Anthropic => await CompleteAnthropicAsync(prompt, config, cancellationToken),
+            LlmProviderIds.OpenAiChat => await CompleteOpenAiChatAsync(request, config, cancellationToken),
+            LlmProviderIds.OpenAiResponses => await CompleteOpenAiResponsesAsync(request, config, cancellationToken),
+            LlmProviderIds.Anthropic => await CompleteAnthropicAsync(request, config, cancellationToken),
             _ => throw new InvalidOperationException($"LLM provider '{provider}' is not implemented.")
         };
     }
 
-    private async Task<string> CompleteOpenAiChatAsync(
-        string prompt, LlmBlockConfig config, CancellationToken ct)
+    private async Task<LlmCompletionResult> CompleteOpenAiChatAsync(
+        LlmCompletionRequest request, LlmBlockConfig config, CancellationToken ct)
     {
         var apiKey = RequireApiKey(LlmProviderIds.OpenAiChat, "OPENAI_API_KEY");
         var baseUrl = ResolveBaseUrl(config, LlmProviderIds.OpenAiChat, DefaultOpenAiBaseUrl);
-        var payload = new ChatCompletionRequest(
-            config.ModelAlias,
-            new[] { new ChatMessage("user", prompt) },
-            config.Temperature,
-            config.MaxTokens);
+        var tools = BuildOpenAiChatTools(request.Tools);
+        var payload = new
+        {
+            model = config.ModelAlias,
+            messages = request.Messages
+                .Select(message => new { role = message.Role, content = message.Content ?? string.Empty })
+                .ToArray(),
+            temperature = config.Temperature,
+            max_tokens = config.MaxTokens,
+            tools,
+            tool_choice = tools is null ? null : "auto",
+            response_format = BuildOpenAiChatResponseFormat(request.ResponseSchema)
+        };
 
         var body = await SendWithRetryAsync(
             () =>
@@ -89,27 +106,62 @@ public sealed class LlmApiClient : ILlmClient
             ct);
 
         using var document = JsonDocument.Parse(body);
+        var choice = document.RootElement.GetProperty("choices")[0];
+        var message = choice.GetProperty("message");
+        var content = message.TryGetProperty("content", out var contentElement) &&
+                      contentElement.ValueKind != JsonValueKind.Null
+            ? contentElement.ValueKind == JsonValueKind.String
+                ? contentElement.GetString() ?? string.Empty
+                : contentElement.GetRawText()
+            : string.Empty;
 
-        var content = document.RootElement
-            .GetProperty("choices")[0]
-            .GetProperty("message")
-            .GetProperty("content");
-
-        return content.ValueKind == JsonValueKind.String
-            ? content.GetString() ?? string.Empty
-            : content.GetRawText();
+        return new LlmCompletionResult(
+            content,
+            ParseOpenAiChatToolCalls(message),
+            ParseUsage(document.RootElement, "prompt_tokens", "completion_tokens"));
     }
 
-    private async Task<string> CompleteOpenAiResponsesAsync(
-        string prompt, LlmBlockConfig config, CancellationToken ct)
+    private async Task<LlmCompletionResult> CompleteOpenAiResponsesAsync(
+        LlmCompletionRequest request, LlmBlockConfig config, CancellationToken ct)
     {
         var apiKey = RequireApiKey(LlmProviderIds.OpenAiResponses, "OPENAI_API_KEY");
         var baseUrl = ResolveBaseUrl(config, LlmProviderIds.OpenAiResponses, DefaultOpenAiBaseUrl);
-        var payload = new ResponsesRequest(
-            config.ModelAlias,
-            prompt,
-            config.Temperature,
-            config.MaxTokens);
+        var instructions = string.Join(
+            "\n\n",
+            request.Messages
+                .Where(message => message.Role is "system" or "developer")
+                .Select(message => message.Content)
+                .Where(content => !string.IsNullOrWhiteSpace(content)));
+        var input = request.Messages
+            .Where(message => message.Role is not ("system" or "developer"))
+            .Select(message => new { role = message.Role, content = message.Content ?? string.Empty })
+            .ToArray();
+        var tools = request.Tools?.Select(tool => new
+        {
+            type = "function",
+            name = tool.Function.Name,
+            description = tool.Function.Description,
+            parameters = tool.Function.Parameters
+        }).ToArray();
+        var format = string.IsNullOrWhiteSpace(request.ResponseSchema)
+            ? null
+            : new
+            {
+                type = "json_schema",
+                name = "response",
+                strict = true,
+                schema = ParseSchema(request.ResponseSchema!)
+            };
+        var payload = new
+        {
+            model = config.ModelAlias,
+            instructions = string.IsNullOrWhiteSpace(instructions) ? null : instructions,
+            input,
+            temperature = config.Temperature,
+            max_output_tokens = config.MaxTokens,
+            tools,
+            text = format is null ? null : new { format }
+        };
 
         var body = await SendWithRetryAsync(
             () =>
@@ -128,10 +180,24 @@ public sealed class LlmApiClient : ILlmClient
         using var document = JsonDocument.Parse(body);
         var root = document.RootElement;
 
+        var text = new List<string>();
+        var toolCalls = new List<LlmToolCall>();
         if (root.TryGetProperty("output", out var output) && output.ValueKind == JsonValueKind.Array)
         {
             foreach (var item in output.EnumerateArray())
             {
+                var type = item.TryGetProperty("type", out var typeElement)
+                    ? typeElement.GetString()
+                    : null;
+                if (type == "function_call")
+                {
+                    toolCalls.Add(new LlmToolCall(
+                        item.TryGetProperty("call_id", out var callId) ? callId.GetString() ?? string.Empty : string.Empty,
+                        item.TryGetProperty("name", out var name) ? name.GetString() ?? string.Empty : string.Empty,
+                        item.TryGetProperty("arguments", out var arguments) ? arguments.GetRawText() : "{}"));
+                    continue;
+                }
+
                 if (!item.TryGetProperty("content", out var content) ||
                     content.ValueKind != JsonValueKind.Array)
                 {
@@ -140,62 +206,201 @@ public sealed class LlmApiClient : ILlmClient
 
                 foreach (var part in content.EnumerateArray())
                 {
-                    if (part.TryGetProperty("text", out var text) &&
-                        text.ValueKind == JsonValueKind.String)
+                    if (part.TryGetProperty("text", out var partText) &&
+                        partText.ValueKind == JsonValueKind.String)
                     {
-                        return text.GetString() ?? string.Empty;
+                        text.Add(partText.GetString() ?? string.Empty);
                     }
                 }
             }
         }
 
-        if (root.TryGetProperty("output_text", out var outputText) &&
+        if (text.Count == 0 &&
+            root.TryGetProperty("output_text", out var outputText) &&
             outputText.ValueKind == JsonValueKind.String)
         {
-            return outputText.GetString() ?? string.Empty;
+            text.Add(outputText.GetString() ?? string.Empty);
         }
 
-        throw new InvalidOperationException("OpenAI Responses API returned no output text.");
+        if (text.Count == 0 && toolCalls.Count == 0)
+        {
+            throw new InvalidOperationException("OpenAI Responses API returned no output text.");
+        }
+
+        return new LlmCompletionResult(
+            string.Concat(text),
+            toolCalls.Count == 0 ? null : toolCalls,
+            ParseUsage(root, "input_tokens", "output_tokens"));
     }
 
-    private async Task<string> CompleteAnthropicAsync(
-        string prompt, LlmBlockConfig config, CancellationToken ct)
+    private async Task<LlmCompletionResult> CompleteAnthropicAsync(
+        LlmCompletionRequest request, LlmBlockConfig config, CancellationToken ct)
     {
         var apiKey = RequireApiKey(LlmProviderIds.Anthropic, "ANTHROPIC_API_KEY");
         var baseUrl = ResolveBaseUrl(config, LlmProviderIds.Anthropic, DefaultAnthropicBaseUrl);
-        var payload = new AnthropicRequest(
-            config.ModelAlias,
-            config.MaxTokens,
-            config.Temperature,
-            new[] { new AnthropicMessage("user", prompt) });
+        var systemText = string.Join(
+            "\n\n",
+            request.Messages
+                .Where(message => message.Role == "system")
+                .Select(message => message.Content)
+                .Where(content => !string.IsNullOrWhiteSpace(content)));
+        var messages = request.Messages
+            .Where(message => message.Role != "system")
+            .Select(message => new
+            {
+                role = message.Role == "assistant" ? "assistant" : "user",
+                content = message.Content ?? string.Empty
+            })
+            .ToArray();
+        var tools = request.Tools?.Select(tool => new
+        {
+            name = tool.Function.Name,
+            description = tool.Function.Description,
+            input_schema = tool.Function.Parameters
+        }).ToArray();
+        var payload = new
+        {
+            model = config.ModelAlias,
+            max_tokens = config.MaxTokens,
+            temperature = config.Temperature,
+            system = string.IsNullOrWhiteSpace(systemText) ? null : systemText,
+            messages,
+            tools
+        };
 
         var body = await SendWithRetryAsync(
             () =>
             {
-                var request = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/v1/messages")
+                var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/v1/messages")
                 {
                     Content = JsonContent.Create(payload, options: JsonOptions)
                 };
-                request.Headers.Add("x-api-key", apiKey);
-                request.Headers.Add("anthropic-version", "2023-06-01");
-                return request;
+                httpRequest.Headers.Add("x-api-key", apiKey);
+                httpRequest.Headers.Add("anthropic-version", "2023-06-01");
+                return httpRequest;
             },
             "Anthropic message",
             config,
             ct);
 
         using var document = JsonDocument.Parse(body);
-        var content = document.RootElement.GetProperty("content");
+        var root = document.RootElement;
+        var text = new List<string>();
+        var toolCalls = new List<LlmToolCall>();
 
-        foreach (var block in content.EnumerateArray())
+        foreach (var block in root.GetProperty("content").EnumerateArray())
         {
-            if (block.TryGetProperty("text", out var text) && text.ValueKind == JsonValueKind.String)
+            var type = block.TryGetProperty("type", out var typeElement) ? typeElement.GetString() : null;
+            switch (type)
             {
-                return text.GetString() ?? string.Empty;
+                case "text":
+                    if (block.TryGetProperty("text", out var value) &&
+                        value.ValueKind == JsonValueKind.String)
+                    {
+                        text.Add(value.GetString() ?? string.Empty);
+                    }
+
+                    break;
+
+                case "tool_use":
+                    toolCalls.Add(new LlmToolCall(
+                        block.TryGetProperty("id", out var id) ? id.GetString() ?? string.Empty : string.Empty,
+                        block.TryGetProperty("name", out var name) ? name.GetString() ?? string.Empty : string.Empty,
+                        block.TryGetProperty("input", out var input) ? input.GetRawText() : "{}"));
+                    break;
             }
         }
 
-        throw new InvalidOperationException("Anthropic Messages API returned no text content.");
+        if (text.Count == 0 && toolCalls.Count == 0)
+        {
+            throw new InvalidOperationException("Anthropic Messages API returned no text content.");
+        }
+
+        return new LlmCompletionResult(
+            string.Concat(text),
+            toolCalls.Count == 0 ? null : toolCalls,
+            ParseUsage(root, "input_tokens", "output_tokens"));
+    }
+
+    private static object[]? BuildOpenAiChatTools(IReadOnlyList<ToolDefinition>? tools) =>
+        tools is { Count: > 0 }
+            ? tools.Select(tool => (object)new
+            {
+                type = "function",
+                function = new
+                {
+                    name = tool.Function.Name,
+                    description = tool.Function.Description,
+                    parameters = tool.Function.Parameters
+                }
+            }).ToArray()
+            : null;
+
+    private static object? BuildOpenAiChatResponseFormat(string? schema) =>
+        string.IsNullOrWhiteSpace(schema)
+            ? null
+            : new
+            {
+                type = "json_schema",
+                json_schema = new
+                {
+                    name = "response",
+                    strict = true,
+                    schema = ParseSchema(schema)
+                }
+            };
+
+    private static JsonElement ParseSchema(string schema)
+    {
+        using var document = JsonDocument.Parse(schema);
+        return document.RootElement.Clone();
+    }
+
+    private static IReadOnlyList<LlmToolCall>? ParseOpenAiChatToolCalls(JsonElement message)
+    {
+        if (!message.TryGetProperty("tool_calls", out var toolCalls) ||
+            toolCalls.ValueKind != JsonValueKind.Array)
+        {
+            return null;
+        }
+
+        var calls = new List<LlmToolCall>();
+        foreach (var call in toolCalls.EnumerateArray())
+        {
+            if (!call.TryGetProperty("function", out var function))
+            {
+                continue;
+            }
+
+            var arguments = function.TryGetProperty("arguments", out var args)
+                ? args.ValueKind == JsonValueKind.String
+                    ? args.GetString() ?? "{}"
+                    : args.GetRawText()
+                : "{}";
+            calls.Add(new LlmToolCall(
+                call.TryGetProperty("id", out var id) ? id.GetString() ?? string.Empty : string.Empty,
+                function.TryGetProperty("name", out var name) ? name.GetString() ?? string.Empty : string.Empty,
+                arguments));
+        }
+
+        return calls.Count == 0 ? null : calls;
+    }
+
+    private static LlmTokenUsage? ParseUsage(JsonElement root, string promptName, string completionName)
+    {
+        if (!root.TryGetProperty("usage", out var usage) || usage.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        var prompt = usage.TryGetProperty(promptName, out var promptValue) && promptValue.TryGetInt64(out var p)
+            ? p
+            : 0;
+        var completion = usage.TryGetProperty(completionName, out var completionValue) &&
+                         completionValue.TryGetInt64(out var c)
+            ? c
+            : 0;
+        return new LlmTokenUsage(prompt, completion);
     }
 
     private async Task<string> SendWithRetryAsync(
@@ -292,25 +497,4 @@ public sealed class LlmApiClient : ILlmClient
         return baseUrl.TrimEnd('/');
     }
 
-    private sealed record ChatMessage(string Role, string Content);
-
-    private sealed record ChatCompletionRequest(
-        string Model,
-        ChatMessage[] Messages,
-        double Temperature,
-        [property: JsonPropertyName("max_tokens")] int MaxTokens);
-
-    private sealed record ResponsesRequest(
-        string Model,
-        string Input,
-        double Temperature,
-        [property: JsonPropertyName("max_output_tokens")] int MaxOutputTokens);
-
-    private sealed record AnthropicMessage(string Role, string Content);
-
-    private sealed record AnthropicRequest(
-        string Model,
-        [property: JsonPropertyName("max_tokens")] int MaxTokens,
-        double Temperature,
-        AnthropicMessage[] Messages);
 }

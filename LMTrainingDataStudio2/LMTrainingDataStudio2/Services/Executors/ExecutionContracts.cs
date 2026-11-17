@@ -14,12 +14,22 @@ public sealed class BlockExecutionContext
 
     /// <summary>Tool profile resolved from a referenced Tool Profile block, when configured.</summary>
     public ToolProfile? ToolProfile { get; init; }
+
+    /// <summary>
+    /// Output port names that have outgoing edges. Null means the executor cannot know
+    /// (for example in unit tests) and should produce every port it can.
+    /// </summary>
+    public IReadOnlySet<string>? ConnectedOutputPorts { get; init; }
 }
 
 /// <summary>
-/// Stream of rows produced by a block.
+/// Rows produced by a block. <see cref="Output"/> is the primary stream; named
+/// <see cref="AdditionalOutputs"/> carry extra ports such as validator rejects or sampler splits.
 /// </summary>
-public sealed record BlockExecutionResult(IAsyncEnumerable<DatasetRow> Output);
+public sealed record BlockExecutionResult(
+    IAsyncEnumerable<DatasetRow> Output,
+    IReadOnlyDictionary<string, IAsyncEnumerable<DatasetRow>>? AdditionalOutputs = null,
+    Task? Completion = null);
 
 public interface IBlockExecutor
 {

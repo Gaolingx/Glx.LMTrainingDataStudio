@@ -1,7 +1,7 @@
 # STATUS — 功能清单、节点能力矩阵与下一阶段规划
 
-> 最后核对：2026-11-17（Round 14 完成）
-> 验证基线：`dotnet build` 0 警告 0 错误；`dotnet test` 480 通过 + 6 个 gated 测试（2 个真实 provider 冒烟 + 4 个性能，默认跳过）；Headless UI 7 个测试通过；1M 行 JSONL、1M 行质量操作与 1M 行编辑保存基线通过；win-x64 单文件发布启动通过。
+> 最后核对：2026-11-17（Round 15 完成）
+> 验证基线：`dotnet build` 0 警告 0 错误；`dotnet test` 495 通过 + 6 个 gated 测试（2 个真实 provider 冒烟 + 4 个性能，默认跳过）；Headless UI 测试通过；1M 行 JSONL、1M 行质量操作与 1M 行编辑保存基线通过；win-x64 单文件发布与 Debug 启动冒烟通过。
 >
 > 图例：`[x]` 已完成并有测试/验证；`[部分]` 可用但有明确缺口；`[ ]` 未实现。
 >
@@ -42,16 +42,22 @@
 - 工作流预设：6 个基础流水线可从 File → New from Preset 或节点库一键加载，加载遵守脏文档确认。
 - 自定义预设：当前 Recipe 可保存为预设；支持导入外部预设（分配新本地 ID）与删除；单文件存于 `%APPDATA%\LMTrainingDataStudio\presets`，坏文件跳过并告警。
 - 节点说明：10 类节点具备本地化名称、简介、详细说明与端口摘要；属性面板 Node Guide 与画布悬停提示复用同一份目录。
-- 界面本地化：zh-CN / en-US 资源化静态 UI（约 230 个键），设置面板切换语言后即时刷新；运行日志/执行状态仍为英文技术文本。
+- 界面本地化：zh-CN / en-US 资源化静态 UI（约 260 个键），设置面板切换语言后即时刷新；运行日志/执行状态仍为英文技术文本。
+- 多输出端口：Validator `pass`/`reject`、Sampler 按 splits 动态端口；Runner 按端口缓冲、检查点与恢复，旧单端口 Recipe 回落主端口。
+- LLM 请求侧 tools、多行 `messages`、`response_format` JSON Schema、并发与保序、token/成本日志、失败样本 JSONL。
+- Validator 多规则组合、expression/schema/regex/script、规则超时、取反与 pass/reject 双端口。
+- Sampler 多端口切分、分层字段、切分统计预览。
+- Simulation Tools/Rules/Script 可视化编辑器、OpenAI Chat 流式 delta、RequestsPerMinute 限速与价格预设。
+- Query Source Fluid 模板变量与外部 JSONL/CSV/Parquet query 源。
 - 工程化：滚动日志与全局异常、Dark/Light 主题资源、GitHub Actions CI、win-x64 单文件发布脚本、Headless UI 测试、MIT LICENSE、应用图标。
-- 486 个自动化测试：480 个常规通过 + 6 个 gated（2 个真实 provider 冒烟 + 4 个性能）。
+- 501 个自动化测试：495 个常规通过 + 6 个 gated（2 个真实 provider 冒烟 + 4 个性能）。
 
 ### 1.2 当前最大缺口（按优先级）
 
-1. **节点能力**：LLM 不向 provider 发送 tool definitions，无结构化输出/多轮/并发/成本统计；Validator 无代码规则与超时；Sampler 无多输出端口与分层采样；Simulation 的 Tools/Rules/Script 仍依赖 Config JSON；Tool Profile 无 MCP。
-2. **发布与体验**：10M 行实测、MSIX/安装包、文件关联/单实例、README 截图、完整浅色主题、节点尺寸手柄/边过渡动画、Undo/Redo 菜单尚未完成。
-3. **执行韧性残余**：恢复仅验证行数与内容，未做逐字节/哈希比对；溢写阈值按行数计；检查点无磁盘配额。
-4. **数据编辑残余**：编辑只保存为源格式；字段编辑覆盖顶层字段，`messages` 等嵌套结构仍按 JSON 文本编辑；匹配项导航与预览分页未做。
+1. **发布与体验**：10M 行实测、MSIX/安装包、文件关联/单实例、README 截图、完整浅色主题、节点尺寸手柄/边过渡动画、Undo/Redo 菜单尚未完成。
+2. **执行韧性残余**：恢复仅验证行数与内容，未做逐字节/哈希比对；溢写阈值按行数计；检查点无磁盘配额。
+3. **数据编辑残余**：编辑只保存为源格式；字段编辑覆盖顶层字段，`messages` 等嵌套结构仍按 JSON 文本编辑；匹配项导航与预览分页未做。
+4. **节点能力残余**：LLM 不执行 tool_calls 回填；Anthropic 无结构化输出约束；Validator script 为 Fluid 布尔表达式而非任意脚本；Sampler 分层仅对 ratio/splits 生效；Tool Profile 无 MCP。
 
 ### 1.3 一页总览
 
@@ -68,9 +74,9 @@
 **部分完成（可用但有缺口）**
 
 - Seed：三种格式可读；Streaming 只在 JSONL + 关闭索引缓存时生效，UI 未暴露；无节点内过滤/列映射。
-- LLM：三种 provider、超时/重试、Fluid Prompt 可用；tools 只写入输出、不发给 provider；无结构化输出/多轮/并发/成本。
-- Validator：表达式 + JSON Schema + reject 文件可用；拒绝行可在统一预览窗口查看；无代码规则/超时/多规则组合。
-- Sampler：count/ratio/splits 可用；切分写文件但不产生独立输出端口；无分层采样/统计预览。
+- LLM：三种 provider、tools/多轮/结构化输出/并发/成本/失败样本可用；tool_calls 不执行回填，Anthropic 无结构化输出约束。
+- Validator：表达式/JSON Schema/正则/Fluid 脚本、多规则、超时与 pass/reject 双端口可用；非任意代码脚本。
+- Sampler：count/ratio/splits、多输出端口、分层（ratio/splits）与统计预览可用；count 模式不分层。
 - Cleaner：5 个布尔规则 + 正则规则可用；正则规则仍走 Config JSON；已有清洗前后 diff 预览，无坏行报告。
 - SFT Export：流式 + 原子替换 + 行透传 + 文件选择器 + 覆盖确认 + 字段白名单可用；已有输出预览弹窗；无拆分/DPO-Pretrain 直出。
 - 执行：层内并行/暂停/重试、输出摘要、溢写/流式、检查点恢复可用；检查点无配额，恢复未做哈希比对。
@@ -80,11 +86,11 @@
 **未实现（下一阶段工作池）**
 
 - 数据编辑残余：跨格式保存、消息/角色级表单编辑、匹配项导航、预览分页。
-- LLM 请求侧 tools、结构化输出、多轮上下文、并发、token/成本统计、失败样本。
-- Validator 代码规则/超时/失败样本 UI/独立通过-拒绝端口。
-- Sampler 多输出端口、分层/分组采样、统计预览。
-- Simulation Tools/Rules/Script 可视化编辑器、流式 delta、速率限制/价格预设、容器级隔离。
-- Query Source 模板/外部数据源/随机或模型生成 query。
+- LLM 工具调用回填、Anthropic 结构化输出、模型列表。
+- Validator 失败样本独立 UI、任意代码沙箱规则。
+- Sampler count 模式分层、切分内再混洗选项。
+- Simulation 非 OpenAI 流式 delta、严格令牌桶限速、容器级隔离。
+- Query Source 随机/模型生成 query、query 去重与权重。
 - Tool Profile MCP 适配、共享工具库、LLM 请求侧复用。
 - Seed 多文件/目录、过滤/列映射、编码选项、HuggingFace/HTTP 数据源。
 - 10M 行实测、CSV/Parquet 大规模质量基线、CSV 类型推断。
@@ -104,8 +110,8 @@
 | Seed | 无 | `rows` | 从 JSONL/CSV/Parquet 读取数据 |
 | LLM / Model | `input` | `output` | 逐行调用模型，输出 assistant 消息 |
 | Expression | `input` | `output` | Fluid 模板/字段映射变换 |
-| Validator | `input` | `output` | 表达式/JSON Schema 过滤，可写 reject 文件 |
-| Sampler | `input` | `output` | 数量/比例采样，或切分多文件 |
+| Validator | `input` | `pass` / `reject` | 多规则过滤，可写 reject 文件；拒绝行从 reject 端口输出 |
+| Sampler | `input` | `output` 或 splits 端口 | 数量/比例采样，或按 splits 输出多端口并写多文件 |
 | Tool Profile | 无 | 无 | 工具 schema 配置，被 Simulation/LLM 引用 |
 | Query Source | 无 | `queries` | 生成模拟用户 query |
 | Simulation | `input` | `output` | 多轮 tool-calling 轨迹生成 |
@@ -143,13 +149,13 @@
 | 节点级超时 / 指数退避重试 | [x] | `TimeoutSeconds` / `MaxRetries` |
 | 密钥设置 | [x] | settings.json 本机保存，环境变量兜底 |
 | 输出格式 | [x] | 每行输出 `messages[{role:assistant,content}]` |
-| Tool Profile 引用 | [部分] | 工具定义写入输出行，不发送给 provider |
-| Prompt 预览 / 语法校验 | [ ] | 执行期会校验模板，编辑期无预览 |
-| 多轮上下文 / 请求侧 tools | [ ] | LLM 节点只有单条 user 内容 |
-| 结构化输出（JSON Schema） | [ ] | 无 `response_format` / schema 强约束 |
-| 并发调用 / token/成本统计 | [ ] | 无 |
-| 失败样本单独输出 | [ ] | 失败即节点失败 |
-| 流式输出 / 模型列表 | [ ] | 无 |
+| Tool Profile 引用 | [x] | 工具定义写入请求 tools，同时保留在输出行 |
+| Prompt 预览 / 语法校验 | [部分] | 执行期校验模板；编辑期无预览 |
+| 多轮上下文 / 请求侧 tools | [x] | `UseRowMessages` 读取行内 messages 并追加 Prompt |
+| 结构化输出（JSON Schema） | [x] | OpenAI Chat/Responses `response_format`；非法 JSON 计为失败 |
+| 并发调用 / token/成本统计 | [x] | `MaxConcurrency` 保序并发；token 与估算成本写日志 |
+| 失败样本单独输出 | [x] | `ContinueOnError` + `FailureOutputPath` 原子写 `{lineNumber,error,data}` |
+| 流式输出 / 模型列表 | [ ] | LLM 节点无流式；Simulation 支持 OpenAI Chat SSE |
 
 ### 2.3 Expression（字段变换）
 
@@ -179,11 +185,11 @@
 | 通过/拒绝计数日志 | [x] | 节点日志输出 |
 | reject 输出端口 / 失败文件 | [x] | `RejectOutputPath` 原子写 `{ lineNumber, reason, data }` JSONL |
 | 专属属性面板 | [x] | 规则类型、规则/Schema、reject 开关与路径 |
-| 失败样本查看 / 失败率 / 超时 | [部分] | 失败样本落盘 + 失败率日志；无 UI 预览与超时 |
-| 代码规则 | [ ] | 无 C#/脚本规则 |
-| 多规则组合 / 正则规则 | [ ] | 单条规则 |
-| 独立 pass/reject 输出端口 | [ ] | reject 只写文件，不参与连线 |
-| 问题码 / 校验摘要 UI | [ ] | 仅日志与 reject 文件 |
+| 失败样本查看 / 失败率 / 超时 | [x] | reject 文件 + 失败率日志 + 单行规则超时 |
+| 代码规则 | [x] | `script` 规则用 Fluid 渲染 true/false（受限表达式，不是任意代码） |
+| 多规则组合 / 正则规则 | [x] | `Rules` 数组 + MatchAll/Any + `regex` |
+| 独立 pass/reject 输出端口 | [x] | reject 端口输出原始行；reject 文件保留原因 |
+| 问题码 / 校验摘要 UI | [部分] | 失败率与规则原因在日志/reject 文件；无独立摘要面板 |
 
 ### 2.5 Sampler（确定性采样）
 
@@ -193,10 +199,10 @@
 | 按比例采样 | [x] | Bernoulli + 固定 seed |
 | 确定性种子 | [x] | `Seed` |
 | `Splits` 切分 | [x] | `name:ratio` / `name:count`；确定性、单行只进一个文件 |
-| 多输出端口 / 多文件 | [部分] | 多文件已实现；所有行仍从单一 output 端口透传 |
-| 专属属性面板 | [x] | Count / Ratio / Seed / Splits / 输出目录 |
-| 采样结果预览 / 统计 | [部分] | 仅日志汇总各 split 行数 |
-| 分层 / 分组采样 | [ ] | 无 |
+| 多输出端口 / 多文件 | [x] | splits 每项一个输出端口；无 splits 时保留 `output` 端口 |
+| 专属属性面板 | [x] | Count / Ratio / Seed / Splits / 输出目录 / 分层字段 / 统计预览 |
+| 采样结果预览 / 统计 | [x] | 面板显示比例与预计行数；运行日志汇总各 split 实际行数 |
+| 分层 / 分组采样 | [部分] | ratio 与 splits 模式按顶层字段独立随机；count 模式不分层 |
 | 切分内再混洗 / 保序选项 | [ ] | 无 |
 
 ### 2.6 Tool Profile（工具配置）
@@ -223,10 +229,10 @@
 | 多组 query 展开 | [x] | `MultipleQueries` |
 | System Prompt | [x] | 写入行 `system` 字段 |
 | 专属属性面板 | [x] | 多行 query、模式、Repeat、System Prompt |
-| query 模板 / 变量替换 | [ ] | 按字面量输出 |
-| CSV / JSONL / 外部 query 源 | [ ] | 仅面板内文本 |
+| query 模板 / 变量替换 | [x] | Fluid 模板变量 + `index` |
+| CSV / JSONL / 外部 query 源 | [x] | JSONL/CSV/Parquet + QueryField/SystemField |
 | 随机 / 模型生成 query | [ ] | 无 |
-| 去重 / 元数据 / 权重 | [ ] | 无 |
+| 去重 / 元数据 / 权重 | [ ] | 外部源保留原字段；无去重/权重 |
 
 ### 2.8 Simulation（多轮 tool-calling 轨迹）
 
@@ -243,8 +249,8 @@
 | 未完成轨迹独立输出 | [x] | `FailureOutputPath` 原子写，`MaxFailureSamples` 限制 |
 | 专属属性面板 | [x] | provider/模式/并发/成本/失败样本/沙箱参数 |
 | Tool Profile 合并 | [x] | profile tools 与节点 tools 合并，节点优先 |
-| Tools / Rules / Script UI 编辑器 | [ ] | 仍用 Config JSON |
-| 流式 delta / 速率限制 / 价格预设 | [ ] | 无 |
+| Tools / Rules / Script UI 编辑器 | [x] | 工具行、Harness 规则、脚本回合增删与编辑 |
+| 流式 delta / 速率限制 / 价格预设 | [部分] | OpenAI Chat SSE；RequestsPerMinute 近似限速；内置价格预设 |
 | 容器级隔离 / 非 Windows 资源限制 | [ ] | 当前为协作式沙箱 |
 | MCP 工具接入 | [ ] | 依赖 Tool Profile MCP |
 | 工具结果裁剪/摘要策略 UI | [ ] | 仅输出上限与超时 |
@@ -425,6 +431,7 @@
 | 12 | 画布、执行与发布 | 网格/吸附/锚点缩放/Fit/自动布局/Mini-map、并行/暂停/重试/输出摘要、CI/打包/主题/日志 | 386 测试 + 4 gated |
 | 13 | 执行与 IO 韧性 | 溢写缓冲、检查点/恢复、取消清理硬化、SFT 收尾 | 437 测试 + 5 gated |
 | 14 | 数据工作台编辑与预览 | 逐行 CRUD/字段级单元格编辑/撤销重做/另存与覆盖、搜索高亮、校验筛选与分组树、统一样本预览 | 480 测试 + 6 gated |
+| 15 | 节点能力收紧 | 多输出端口、LLM tools/结构化输出/并发/失败样本、Validator 多规则/超时/双端口、Sampler 分层与端口、Simulation 可视化编辑器/流式/限速/价格、Query Source 模板与外部源 | 495 测试 + 6 gated |
 
 ---
 
@@ -475,6 +482,8 @@
 - 预览弹窗与节点/文件路径可双向定位。
 
 ### Round 15 — 节点能力收紧（P1）
+
+> 状态：已完成（2026-11-17）。新增多输出端口执行契约、LLM 请求侧 tools/结构化输出/并发/失败样本、Validator 多规则与双端口、Sampler 分层与多端口、Simulation 可视化编辑器/流式 delta/限速/价格、Query Source 模板与外部源；新增 14 个测试，495 通过 + 6 gated。
 
 **目标**：补齐影响数据质量与工具调用工作流的关键节点能力。
 
@@ -530,6 +539,7 @@
 dotnet build LMTrainingDataStudio2/LMTrainingDataStudio2.slnx
 dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx
 dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx --filter HeadlessUiTests
+dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx --filter Round15NodeCapabilityTests
 ```
 
 win-x64 单文件发布：

@@ -153,7 +153,7 @@ public partial class MainWindowViewModel : ObservableObject
 
     public string SelectedBlockPorts => SelectedBlock is null
         ? string.Empty
-        : BlockCatalog.DescribePorts(SelectedBlock.Type);
+        : BlockCatalog.DescribePorts(SelectedBlock.Type, SelectedBlock.Config);
 
     /// <summary>Raised when the canvas must re-render without a collection change.</summary>
     public event Action? CanvasRenderRequested;
@@ -662,7 +662,7 @@ public partial class MainWindowViewModel : ObservableObject
         Y = y,
         Config = config,
         InputPorts = BlockPortSchema.CreateInputPorts(type),
-        OutputPorts = BlockPortSchema.CreateOutputPorts(type)
+        OutputPorts = BlockPortSchema.CreateOutputPorts(type, config)
     };
 
     private static void AddSampleEdge(Recipe recipe, string id, RecipeBlock source, RecipeBlock target)
@@ -777,6 +777,13 @@ public partial class MainWindowViewModel : ObservableObject
         MarkDirty();
         if (e.PropertyName is nameof(BlockNodeViewModel.Name) or nameof(BlockNodeViewModel.DisplayName))
         {
+            CanvasRenderRequested?.Invoke();
+        }
+        else if (e.PropertyName == nameof(BlockNodeViewModel.Config) &&
+                 sender is BlockNodeViewModel changedBlock &&
+                 changedBlock.RefreshOutputPorts())
+        {
+            OnPropertyChanged(nameof(SelectedBlockPorts));
             CanvasRenderRequested?.Invoke();
         }
     }

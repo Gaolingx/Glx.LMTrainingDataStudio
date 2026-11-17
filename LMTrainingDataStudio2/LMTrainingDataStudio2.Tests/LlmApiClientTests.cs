@@ -91,7 +91,8 @@ public sealed class LlmApiClientTests
         Assert.That(captured!.RequestUri!.ToString(), Is.EqualTo("https://api.openai.com/v1/responses"));
         using var document = JsonDocument.Parse(body!);
         Assert.That(document.RootElement.GetProperty("model").GetString(), Is.EqualTo("gpt-4o-mini"));
-        Assert.That(document.RootElement.GetProperty("input").GetString(), Is.EqualTo("Explain"));
+        Assert.That(document.RootElement.GetProperty("input")[0].GetProperty("role").GetString(), Is.EqualTo("user"));
+        Assert.That(document.RootElement.GetProperty("input")[0].GetProperty("content").GetString(), Is.EqualTo("Explain"));
         Assert.That(document.RootElement.GetProperty("max_output_tokens").GetInt32(), Is.EqualTo(2048));
     }
 

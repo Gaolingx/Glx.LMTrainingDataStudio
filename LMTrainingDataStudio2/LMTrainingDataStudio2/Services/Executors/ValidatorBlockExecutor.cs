@@ -1,6 +1,8 @@
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
+using System.Threading.Channels;
 using Json.Schema;
 using LMTrainingDataStudio2.Models;
 using LMTrainingDataStudio2.Services.Simulation;
@@ -8,12 +10,24 @@ using LMTrainingDataStudio2.Services.Simulation;
 namespace LMTrainingDataStudio2.Services.Executors;
 
 /// <summary>
-/// Filters rows with an expression rule or a JSON Schema document.
-/// Invalid rows are dropped when <see cref="ValidatorBlockConfig.RejectOnFailure"/> is true
-/// and can be written to <see cref="ValidatorBlockConfig.RejectOutputPath"/>.
+/// Evaluates one or more expression/schema/regex/script rules.
+/// Passing rows go to the <c>pass</c> output, rejected rows can go to the <c>reject</c>
+/// output and/or <see cref="ValidatorBlockConfig.RejectOutputPath"/>.
 /// </summary>
 public sealed class ValidatorBlockExecutor : IBlockExecutor
 {
+    private static readonly TimeSpan RegexTimeout = TimeSpan.FromSeconds(2);
+
+    private readonly Func<string, JsonElement, CancellationToken, Task<bool>>? _scriptEvaluator;
+
+    /// <param name="scriptEvaluator">
+    /// Optional override for script rules. The default uses the Fluid template engine and
+    /// expects the rendered result to be "true" or "false".
+    /// </param>
+    public ValidatorBlockExecutor(
+        Func<string, JsonElement, CancellationToken, Task<bool>>? scriptEvaluator = null) =>
+        _scriptEvaluator = scriptEvaluator;
+
     public BlockType Type => BlockType.Validator;
 
     public Task<BlockExecutionResult> ExecuteAsync(BlockExecutionContext context, CancellationToken cancellationToken)
@@ -30,38 +44,45 @@ public sealed class ValidatorBlockExecutor : IBlockExecutor
                 $"Validator block '{context.Block.Name}' requires an input connection.");
         }
 
-        if (string.IsNullOrWhiteSpace(config.Rule))
+        var rules = CompileRules(context.Block.Name, config);
+        if (rules.Count == 0)
         {
             throw new InvalidOperationException($"Validator block '{context.Block.Name}' has no rule configured.");
         }
 
-        JsonSchema? schema = null;
-        if (IsSchemaRule(config.RuleKind))
+        if (config.TimeoutMs < 0)
         {
-            try
-            {
-                schema = JsonSchemaRuleEvaluator.Parse(config.Rule);
-            }
-            catch (Exception ex) when (ex is not OutOfMemoryException)
-            {
-                throw new InvalidOperationException(
-                    $"Validator block '{context.Block.Name}' has an invalid JSON Schema: {ex.Message}",
-                    ex);
-            }
-        }
-        else if (!IsExpressionRule(config.RuleKind))
-        {
-            throw new NotSupportedException(
-                $"Validator rule kind '{config.RuleKind}' is not supported; use 'expression' or 'schema'.");
+            throw new InvalidOperationException(
+                $"Validator block '{context.Block.Name}' timeout must not be negative.");
         }
 
-        return Task.FromResult(new BlockExecutionResult(FilterAsync(context, config, schema, cancellationToken)));
+        var emitRejects = context.ConnectedOutputPorts is null ||
+                          context.ConnectedOutputPorts.Contains(
+                              BlockPortSchema.ValidatorRejectPort, StringComparer.OrdinalIgnoreCase);
+        var rejectChannel = emitRejects
+            ? Channel.CreateUnbounded<DatasetRow>(new UnboundedChannelOptions
+            {
+                SingleReader = true,
+                SingleWriter = true
+            })
+            : null;
+
+        var result = FilterAsync(context, config, rules, rejectChannel, cancellationToken);
+        var additional = rejectChannel is null
+            ? null
+            : new Dictionary<string, IAsyncEnumerable<DatasetRow>>(StringComparer.OrdinalIgnoreCase)
+            {
+                [BlockPortSchema.ValidatorRejectPort] = rejectChannel.Reader.ReadAllAsync(cancellationToken)
+            };
+
+        return Task.FromResult(new BlockExecutionResult(result, additional));
     }
 
-    private static async IAsyncEnumerable<DatasetRow> FilterAsync(
+    private async IAsyncEnumerable<DatasetRow> FilterAsync(
         BlockExecutionContext context,
         ValidatorBlockConfig config,
-        JsonSchema? schema,
+        IReadOnlyList<CompiledRule> rules,
+        Channel<DatasetRow>? rejectChannel,
         [EnumeratorCancellation] CancellationToken ct)
     {
         var outputIndex = 0L;
@@ -72,46 +93,59 @@ public sealed class ValidatorBlockExecutor : IBlockExecutor
             ? RejectSink.TryCreate(config.RejectOutputPath)
             : null;
 
-        await foreach (var row in context.Input!.WithCancellation(ct))
+        try
         {
-            var failure = ValidateRow(row, context.Block.Name, config, schema);
-            var isValid = failure is null;
-
-            if (!isValid && !config.RejectOnFailure)
+            await foreach (var row in context.Input!.WithCancellation(ct))
             {
-                isValid = true;
-            }
+                var failure = await ValidateRowAsync(row, context.Block.Name, config, rules, ct);
+                var isValid = failure is null;
 
-            if (isValid)
-            {
-                var outputJson = row.Json;
-                if (config.Cleanup is { HasAnyRule: true } cleanup)
+                if (!isValid && !config.RejectOnFailure)
                 {
-                    try
-                    {
-                        outputJson = TrajectoryCleaner.CleanJson(row.Json, cleanup);
-                    }
-                    catch (InvalidOperationException ex)
-                    {
-                        throw new InvalidOperationException(
-                            $"Validator block '{context.Block.Name}' cleanup failed on line {row.LineNumber}: {ex.Message}",
-                            ex);
-                    }
+                    isValid = true;
                 }
 
-                passed++;
-                yield return new DatasetRow(outputIndex++, outputJson);
-            }
-            else
-            {
+                if (isValid)
+                {
+                    var outputJson = row.Json;
+                    if (config.Cleanup is { HasAnyRule: true } cleanup)
+                    {
+                        try
+                        {
+                            outputJson = TrajectoryCleaner.CleanJson(row.Json, cleanup);
+                        }
+                        catch (InvalidOperationException ex)
+                        {
+                            throw new InvalidOperationException(
+                                $"Validator block '{context.Block.Name}' cleanup failed on line {row.LineNumber}: {ex.Message}",
+                                ex);
+                        }
+                    }
+
+                    passed++;
+                    yield return new DatasetRow(outputIndex++, outputJson);
+                    continue;
+                }
+
                 rejected++;
+                var reason = failure ?? "Rule did not match.";
                 if (rejectSink is not null)
                 {
-                    await rejectSink.WriteAsync(row, failure ?? "Rule did not match.", ct);
+                    await rejectSink.WriteAsync(row, reason, ct);
                 }
-            }
 
-            context.RowsProcessed?.Report(outputIndex + rejected);
+                if (rejectChannel is not null)
+                {
+                    await rejectChannel.Writer.WriteAsync(
+                        new DatasetRow(outputIndex++, row.Json), ct);
+                }
+
+                context.RowsProcessed?.Report(outputIndex + rejected);
+            }
+        }
+        finally
+        {
+            rejectChannel?.Writer.TryComplete();
         }
 
         if (rejectSink is not null)
@@ -124,36 +158,256 @@ public sealed class ValidatorBlockExecutor : IBlockExecutor
         context.Log($"Passed {passed}, rejected {rejected} row(s); failure rate {failureRate:P1}.");
     }
 
-    private static string? ValidateRow(
+    private async Task<string?> ValidateRowAsync(
         DatasetRow row,
         string blockName,
         ValidatorBlockConfig config,
-        JsonSchema? schema)
+        IReadOnlyList<CompiledRule> rules,
+        CancellationToken ct)
     {
-        if (schema is not null)
+        var evaluation = EvaluateAsync(row, blockName, config, rules, ct);
+        if (config.TimeoutMs > 0)
         {
-            return JsonSchemaRuleEvaluator.Validate(schema, row.Json);
+            try
+            {
+                return await evaluation.WaitAsync(TimeSpan.FromMilliseconds(config.TimeoutMs), ct);
+            }
+            catch (TimeoutException)
+            {
+                return $"Validator rule timed out after {config.TimeoutMs} ms.";
+            }
         }
 
+        return await evaluation;
+    }
+
+    private async Task<string?> EvaluateAsync(
+        DatasetRow row,
+        string blockName,
+        ValidatorBlockConfig config,
+        IReadOnlyList<CompiledRule> rules,
+        CancellationToken ct)
+    {
+        JsonDocument? document = null;
         try
         {
-            using var document = JsonRowReader.Parse(row, blockName);
-            return PredicateRuleEvaluator.Evaluate(config.Rule, document.RootElement)
-                ? null
-                : "Expression rule did not match.";
+            var needsDocument = rules.Any(rule => rule.Kind is RuleKind.Expression or RuleKind.Script);
+            if (needsDocument)
+            {
+                try
+                {
+                    document = JsonRowReader.Parse(row, blockName);
+                }
+                catch (InvalidDataException ex)
+                {
+                    return ex.Message;
+                }
+            }
+
+            var failures = new List<string>();
+            foreach (var rule in rules)
+            {
+                ct.ThrowIfCancellationRequested();
+                var (matched, reason) = await EvaluateRuleAsync(rule, row, document?.RootElement, ct);
+                if (rule.Source.Negate)
+                {
+                    matched = !matched;
+                }
+
+                if (!matched)
+                {
+                    failures.Add(reason ?? $"Rule '{rule.Source.Kind}' did not match.");
+                    if (config.MatchAllRules)
+                    {
+                        return failures[0];
+                    }
+                }
+                else if (!config.MatchAllRules)
+                {
+                    return null;
+                }
+            }
+
+            if (config.MatchAllRules)
+            {
+                return failures.Count == 0 ? null : failures[0];
+            }
+
+            return failures.Count == 0
+                ? "No validator rule matched."
+                : null;
         }
-        catch (InvalidDataException ex)
+        finally
         {
-            return ex.Message;
+            document?.Dispose();
         }
     }
 
-    private static bool IsSchemaRule(string ruleKind) =>
-        string.Equals(ruleKind, "schema", StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(ruleKind, "json_schema", StringComparison.OrdinalIgnoreCase);
+    private async Task<(bool Matched, string? Reason)> EvaluateRuleAsync(
+        CompiledRule rule,
+        DatasetRow row,
+        JsonElement? root,
+        CancellationToken ct)
+    {
+        switch (rule.Kind)
+        {
+            case RuleKind.Schema:
+                var schemaFailure = JsonSchemaRuleEvaluator.Validate(rule.Schema!, row.Json);
+                return (schemaFailure is null, schemaFailure);
 
-    private static bool IsExpressionRule(string ruleKind) =>
-        string.Equals(ruleKind, "expression", StringComparison.OrdinalIgnoreCase);
+            case RuleKind.Regex:
+            {
+                try
+                {
+                    var matched = rule.Regex!.IsMatch(row.Json);
+                    return (matched, matched ? null : $"Row did not match /{rule.Source.Rule}/.");
+                }
+                catch (RegexMatchTimeoutException)
+                {
+                    return (false, "Regular expression rule timed out.");
+                }
+            }
+
+            case RuleKind.Expression:
+            {
+                var matched = PredicateRuleEvaluator.Evaluate(rule.Source.Rule, root!.Value);
+                return (matched, matched ? null : "Expression rule did not match.");
+            }
+
+            case RuleKind.Script:
+            {
+                try
+                {
+                    var matched = _scriptEvaluator is not null
+                        ? await _scriptEvaluator(rule.Source.Rule, root!.Value, ct)
+                        : await RenderScriptAsync(rule.Source.Rule, root!.Value);
+                    return (matched, matched ? null : "Script rule rendered false.");
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return (false, $"Script rule failed: {ex.Message}");
+                }
+            }
+
+            default:
+                return (false, $"Unsupported validator rule kind '{rule.Source.Kind}'.");
+        }
+    }
+
+    private static async Task<bool> RenderScriptAsync(string script, JsonElement root)
+    {
+        var rendered = (await TemplateRenderer.RenderAsync(script, root)).Trim();
+        if (bool.TryParse(rendered, out var result))
+        {
+            return result;
+        }
+
+        throw new InvalidOperationException(
+            $"Script rule must render 'true' or 'false'; got '{rendered}'.");
+    }
+
+    private static string CreateRejectJson(DatasetRow row, string reason)
+    {
+        object data;
+        try
+        {
+            using var document = JsonDocument.Parse(row.Json);
+            data = document.RootElement.Clone();
+        }
+        catch (JsonException)
+        {
+            data = row.Json;
+        }
+
+        return JsonSerializer.Serialize(new
+        {
+            lineNumber = row.LineNumber,
+            reason,
+            data
+        });
+    }
+
+    private static IReadOnlyList<CompiledRule> CompileRules(string blockName, ValidatorBlockConfig config)
+    {
+        var sources = GetRuleSources(config);
+        var compiled = new List<CompiledRule>(sources.Count);
+        foreach (var source in sources)
+        {
+            var kind = source.Kind.Trim().ToLowerInvariant();
+            switch (kind)
+            {
+                case "schema" or "json_schema":
+                    try
+                    {
+                        compiled.Add(new CompiledRule(
+                            RuleKind.Schema, source, JsonSchemaRuleEvaluator.Parse(source.Rule), null));
+                    }
+                    catch (Exception ex) when (ex is not OutOfMemoryException)
+                    {
+                        throw new InvalidOperationException(
+                            $"Validator block '{blockName}' has an invalid JSON Schema: {ex.Message}", ex);
+                    }
+
+                    break;
+
+                case "expression":
+                    compiled.Add(new CompiledRule(RuleKind.Expression, source, null, null));
+                    break;
+
+                case "regex":
+                    try
+                    {
+                        compiled.Add(new CompiledRule(
+                            RuleKind.Regex, source, null, new Regex(source.Rule, RegexOptions.None, RegexTimeout)));
+                    }
+                    catch (ArgumentException ex)
+                    {
+                        throw new InvalidOperationException(
+                            $"Validator block '{blockName}' has an invalid regular expression: {ex.Message}", ex);
+                    }
+
+                    break;
+
+                case "script" or "code":
+                    compiled.Add(new CompiledRule(RuleKind.Script, source, null, null));
+                    break;
+
+                default:
+                    throw new NotSupportedException(
+                        $"Validator rule kind '{source.Kind}' is not supported; use expression, schema, regex or script.");
+            }
+        }
+
+        return compiled;
+    }
+
+    internal static IReadOnlyList<ValidatorRuleSpec> GetRuleSources(ValidatorBlockConfig config)
+    {
+        if (config.Rules is { Length: > 0 })
+        {
+            return config.Rules
+                .Where(rule => !string.IsNullOrWhiteSpace(rule.Rule))
+                .ToArray();
+        }
+
+        return string.IsNullOrWhiteSpace(config.Rule)
+            ? Array.Empty<ValidatorRuleSpec>()
+            : [new ValidatorRuleSpec(config.RuleKind, config.Rule)];
+    }
+
+    private enum RuleKind
+    {
+        Expression,
+        Schema,
+        Regex,
+        Script
+    }
+
+    private sealed record CompiledRule(
+        RuleKind Kind,
+        ValidatorRuleSpec Source,
+        JsonSchema? Schema,
+        Regex? Regex);
 
     private sealed class RejectSink : IAsyncDisposable
     {

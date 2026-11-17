@@ -19,7 +19,11 @@ public sealed record QuerySourceBlockConfig(
     string[] Queries,
     QuerySetMode Mode = QuerySetMode.MultipleQueries,
     int Repeat = 1,
-    string? SystemPrompt = null) : BlockConfig;
+    string? SystemPrompt = null,
+    string? SourcePath = null,
+    string QueryField = "query",
+    string? SystemField = "system",
+    string? TemplateVariablesJson = null) : BlockConfig;
 
 /// <summary>
 /// Deterministic behavior of a simulated tool.
@@ -133,7 +137,9 @@ public sealed record SimulationBlockConfig(
     int MaxFailureSamples = 100,
     double InputCostPerMillionTokens = 0,
     double OutputCostPerMillionTokens = 0,
-    string? ToolProfileName = null) : BlockConfig;
+    string? ToolProfileName = null,
+    int RequestsPerMinute = 0,
+    bool StreamDeltas = false) : BlockConfig;
 
 /// <summary>
 /// Standalone cleanup node for OAI message rows.
@@ -145,6 +151,35 @@ public sealed record CleanerBlockConfig(DatasetCleanupRules Rules) : BlockConfig
 /// When <see cref="Fields"/> is non-empty, only those top-level fields are written.
 /// </summary>
 public sealed record SftExportBlockConfig(string OutputPath, string[]? Fields = null) : BlockConfig;
+
+/// <summary>
+/// Token pricing presets used by the simulation and LLM editors.
+/// Prices are expressed in USD per million tokens and are only defaults; users can override them.
+/// </summary>
+public sealed record ModelPricePreset(
+    string Id,
+    string DisplayName,
+    double InputPerMillionTokens,
+    double OutputPerMillionTokens);
+
+public static class ModelPriceCatalog
+{
+    public static IReadOnlyList<ModelPricePreset> Presets { get; } =
+    [
+        new("custom", "Custom", 0, 0),
+        new("gpt-4o", "GPT-4o", 2.5, 10),
+        new("gpt-4o-mini", "GPT-4o mini", 0.15, 0.6),
+        new("gpt-4.1", "GPT-4.1", 2, 8),
+        new("claude-sonnet-4-5", "Claude Sonnet 4.5", 3, 15),
+        new("claude-haiku-4-5", "Claude Haiku 4.5", 1, 5)
+    ];
+
+    public static ModelPricePreset Find(double inputPerMillion, double outputPerMillion) =>
+        Presets.FirstOrDefault(preset =>
+            Math.Abs(preset.InputPerMillionTokens - inputPerMillion) < 0.0001 &&
+            Math.Abs(preset.OutputPerMillionTokens - outputPerMillion) < 0.0001) ??
+        Presets[0];
+}
 
 /// <summary>
 /// Prebuilt deterministic tool rules for the tools most agents use in traces.

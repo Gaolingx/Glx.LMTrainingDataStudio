@@ -31,6 +31,15 @@ public partial class SamplerConfigEditorViewModel : ObservableObject
     private string _outputDirectory;
 
     [ObservableProperty]
+    private string _stratifyField;
+
+    [ObservableProperty]
+    private string _previewRowsText;
+
+    [ObservableProperty]
+    private string? _statsPreview;
+
+    [ObservableProperty]
     private string? _validationError;
 
     public SamplerConfigEditorViewModel(SamplerBlockConfig config, Action<SamplerBlockConfig> apply)
@@ -44,6 +53,9 @@ public partial class SamplerConfigEditorViewModel : ObservableObject
         _seed = config.Seed;
         _splitsText = string.Join(Environment.NewLine, config.Splits);
         _outputDirectory = config.OutputDirectory ?? "out/splits";
+        _stratifyField = config.StratifyField ?? string.Empty;
+        _previewRowsText = "1000";
+        UpdateStatsPreview();
     }
 
     partial void OnCountTextChanged(string value)
@@ -52,6 +64,7 @@ public partial class SamplerConfigEditorViewModel : ObservableObject
         {
             _count = null;
             ValidationError = null;
+            UpdateStatsPreview();
             Push();
             return;
         }
@@ -64,6 +77,7 @@ public partial class SamplerConfigEditorViewModel : ObservableObject
 
         _count = count;
         ValidationError = null;
+        UpdateStatsPreview();
         Push();
     }
 
@@ -73,6 +87,7 @@ public partial class SamplerConfigEditorViewModel : ObservableObject
         {
             _ratio = null;
             ValidationError = null;
+            UpdateStatsPreview();
             Push();
             return;
         }
@@ -86,6 +101,7 @@ public partial class SamplerConfigEditorViewModel : ObservableObject
 
         _ratio = ratio;
         ValidationError = null;
+        UpdateStatsPreview();
         Push();
     }
 
@@ -105,15 +121,72 @@ public partial class SamplerConfigEditorViewModel : ObservableObject
 
         _splits = splits;
         ValidationError = null;
+        UpdateStatsPreview();
         Push();
     }
 
     partial void OnOutputDirectoryChanged(string value) => Push();
+
+    partial void OnStratifyFieldChanged(string value)
+    {
+        UpdateStatsPreview();
+        Push();
+    }
+
+    partial void OnPreviewRowsTextChanged(string value) => UpdateStatsPreview();
+
+    private void UpdateStatsPreview()
+    {
+        if (!long.TryParse(
+                PreviewRowsText,
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out var rows) ||
+            rows <= 0)
+        {
+            rows = 1000;
+        }
+
+        string? error = null;
+        SamplerSplitPlan? plan = null;
+        var parsed = _splits.Length > 0 &&
+                     SamplerSplitPlan.TryParse(_splits, out plan, out error);
+        if (parsed)
+        {
+            var parts = plan!.Specs.Select(spec =>
+            {
+                if (spec.IsCount)
+                {
+                    return $"{spec.Name}: {spec.Count:N0}";
+                }
+
+                return $"{spec.Name}: {spec.Ratio:P1} (~{Math.Round(rows * spec.Ratio):N0})";
+            });
+            var stratified = string.IsNullOrWhiteSpace(StratifyField)
+                ? string.Empty
+                : $" · stratified by {StratifyField.Trim()}";
+            StatsPreview = $"Splits: {string.Join(" | ", parts)}{stratified}";
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(error))
+        {
+            StatsPreview = error;
+            return;
+        }
+
+        StatsPreview = _count is { } count
+            ? $"Sample {count:N0} row(s) (reservoir)"
+            : _ratio is { } ratio
+                ? $"Sample {ratio:P1} (~{Math.Round(rows * ratio):N0} of {rows:N0})"
+                : "No sampling configured.";
+    }
 
     private void Push() => _apply(new SamplerBlockConfig(
         _count,
         _ratio,
         Seed,
         [.. _splits],
-        string.IsNullOrWhiteSpace(OutputDirectory) ? null : OutputDirectory.Trim()));
+        string.IsNullOrWhiteSpace(OutputDirectory) ? null : OutputDirectory.Trim(),
+        string.IsNullOrWhiteSpace(StratifyField) ? null : StratifyField.Trim()));
 }

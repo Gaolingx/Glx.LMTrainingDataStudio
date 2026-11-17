@@ -149,8 +149,10 @@ public sealed class BlockNodeViewModelTests
         Assert.That(config.Sandbox.TimeoutMs, Is.EqualTo(1234));
         Assert.That(config.Sandbox.MaxMemoryMb, Is.EqualTo(256));
         Assert.That(config.Sandbox.PythonExecutable, Is.EqualTo("python3"));
-        Assert.That(config.Tools, Is.SameAs(tools));
-        Assert.That(config.Script, Is.SameAs(script));
+        Assert.That(config.Tools, Has.Length.EqualTo(1));
+        Assert.That(config.Tools![0].Name, Is.EqualTo("python"));
+        Assert.That(config.Script, Has.Length.EqualTo(1));
+        Assert.That(config.Script![0].ToolCalls![0].Name, Is.EqualTo("python"));
         Assert.That(config.FinalContent, Is.EqualTo("done"));
     }
 

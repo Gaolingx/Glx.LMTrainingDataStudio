@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -28,6 +29,7 @@ public sealed class ProviderChatCompletionClient : IChatCompletionClient
     private readonly ILlmCredentials _credentials;
     private readonly string _provider;
     private readonly string? _endpoint;
+    private readonly bool _streamDeltas;
 
     public ProviderChatCompletionClient(
         HttpClient httpClient,
@@ -42,6 +44,7 @@ public sealed class ProviderChatCompletionClient : IChatCompletionClient
             ?? throw new InvalidOperationException(
                 $"Simulation provider '{config.Provider}' is not supported.");
         _endpoint = string.IsNullOrWhiteSpace(config.Endpoint) ? null : config.Endpoint.Trim();
+        _streamDeltas = config.StreamDeltas && _provider == LlmProviderIds.OpenAiChat;
         _httpClient = httpClient;
         _credentials = credentials;
     }
@@ -54,6 +57,11 @@ public sealed class ProviderChatCompletionClient : IChatCompletionClient
 
         var apiKey = RequireApiKey();
         var baseUrl = ResolveBaseUrl();
+
+        if (_streamDeltas)
+        {
+            return await CompleteOpenAiChatStreamAsync(request, apiKey, baseUrl, cancellationToken);
+        }
 
         using var httpRequest = _provider switch
         {
@@ -90,6 +98,172 @@ public sealed class ProviderChatCompletionClient : IChatCompletionClient
             throw new InvalidOperationException(
                 $"{DisplayName} returned invalid JSON: {ex.Message}. Body: {Snippet(body)}", ex);
         }
+    }
+
+    /// <summary>
+    /// Sends an OpenAI Chat Completions request with <c>stream=true</c> and accumulates
+    /// content/tool-call deltas into one response so the harness can keep its simple contract.
+    /// </summary>
+    private async Task<ChatCompletionResponse> CompleteOpenAiChatStreamAsync(
+        ChatCompletionRequest request,
+        string apiKey,
+        string baseUrl,
+        CancellationToken cancellationToken)
+    {
+        var tools = request.Tools.Count > 0 ? request.Tools : null;
+        var payload = new
+        {
+            model = request.Model,
+            messages = request.Messages,
+            tools,
+            tool_choice = tools is null ? null : "auto",
+            temperature = request.Temperature,
+            max_tokens = request.MaxTokens,
+            stream = true,
+            stream_options = new { include_usage = true }
+        };
+
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/chat/completions")
+        {
+            Content = JsonContent.Create(payload, options: JsonOptions)
+        };
+        httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+
+        using var response = await _httpClient.SendAsync(
+            httpRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException(
+                $"{DisplayName} failed with HTTP {(int)response.StatusCode} ({response.StatusCode}): {Snippet(errorBody)}");
+        }
+
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using var reader = new StreamReader(stream, Encoding.UTF8);
+        var content = new StringBuilder();
+        var toolCalls = new Dictionary<int, StreamingToolCall>();
+        ChatCompletionUsage? usage = null;
+        string? finishReason = null;
+
+        while (await reader.ReadLineAsync(cancellationToken) is { } line)
+        {
+            if (!line.StartsWith("data:", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var data = line[5..].Trim();
+            if (data.Length == 0)
+            {
+                continue;
+            }
+
+            if (data == "[DONE]")
+            {
+                break;
+            }
+
+            using var document = JsonDocument.Parse(data);
+            var root = document.RootElement;
+            usage = ParseOpenAiUsage(root) ?? usage;
+
+            if (!root.TryGetProperty("choices", out var choices) ||
+                choices.ValueKind != JsonValueKind.Array ||
+                choices.GetArrayLength() == 0)
+            {
+                continue;
+            }
+
+            var choice = choices[0];
+            if (choice.TryGetProperty("delta", out var delta))
+            {
+                if (delta.TryGetProperty("content", out var deltaContent) &&
+                    deltaContent.ValueKind == JsonValueKind.String)
+                {
+                    content.Append(deltaContent.GetString());
+                }
+
+                if (delta.TryGetProperty("tool_calls", out var deltaCalls) &&
+                    deltaCalls.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var call in deltaCalls.EnumerateArray())
+                    {
+                        var index = call.TryGetProperty("index", out var indexElement) &&
+                                    indexElement.TryGetInt32(out var parsedIndex)
+                            ? parsedIndex
+                            : 0;
+                        if (!toolCalls.TryGetValue(index, out var builder))
+                        {
+                            builder = new StreamingToolCall();
+                            toolCalls[index] = builder;
+                        }
+
+                        if (call.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.String)
+                        {
+                            builder.Id = id.GetString();
+                        }
+
+                        if (call.TryGetProperty("function", out var function))
+                        {
+                            if (function.TryGetProperty("name", out var name) &&
+                                name.ValueKind == JsonValueKind.String)
+                            {
+                                builder.Name = name.GetString();
+                            }
+
+                            if (function.TryGetProperty("arguments", out var arguments) &&
+                                arguments.ValueKind == JsonValueKind.String)
+                            {
+                                builder.Arguments.Append(arguments.GetString());
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (choice.TryGetProperty("finish_reason", out var finish) &&
+                finish.ValueKind == JsonValueKind.String)
+            {
+                finishReason = finish.GetString();
+            }
+        }
+
+        List<ToolCall>? calls = null;
+        if (toolCalls.Count > 0)
+        {
+            calls = toolCalls
+                .OrderBy(pair => pair.Key)
+                .Select(pair => new ToolCall
+                {
+                    Id = pair.Value.Id ?? $"call_{pair.Key}",
+                    Type = "function",
+                    Function = new ToolCallFunction
+                    {
+                        Name = pair.Value.Name ?? string.Empty,
+                        Arguments = pair.Value.Arguments.Length == 0 ? "{}" : pair.Value.Arguments.ToString()
+                    }
+                })
+                .ToList();
+        }
+
+        return new ChatCompletionResponse(
+            new ChatMessage
+            {
+                Role = "assistant",
+                Content = content.Length == 0 ? null : content.ToString(),
+                ToolCalls = calls
+            },
+            finishReason,
+            usage);
+    }
+
+    private sealed class StreamingToolCall
+    {
+        public string? Id { get; set; }
+
+        public string? Name { get; set; }
+
+        public StringBuilder Arguments { get; } = new();
     }
 
     private HttpRequestMessage CreateOpenAiChatRequest(

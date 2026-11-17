@@ -219,7 +219,7 @@ public partial class BlockNodeViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Replaces all ports with the schema required by <see cref="Type"/>.
+    /// Replaces all ports with the schema required by the block type and its current configuration.
     /// </summary>
     public void ApplyDefaultPorts()
     {
@@ -231,10 +231,40 @@ public partial class BlockNodeViewModel : ObservableObject
             InputPorts.Add(new PortViewModel { Name = spec.Name, DataType = spec.DataType });
         }
 
-        foreach (var spec in BlockPortSchema.CreateOutputPorts(Type))
+        foreach (var spec in BlockPortSchema.CreateOutputPorts(Type, _config))
         {
             OutputPorts.Add(new PortViewModel { Name = spec.Name, DataType = spec.DataType });
         }
+    }
+
+    /// <summary>
+    /// Updates dynamic output ports (validator pass/reject, sampler splits) while keeping
+    /// the ids of ports whose names did not change. Returns true when the port list changed.
+    /// </summary>
+    public bool RefreshOutputPorts()
+    {
+        if (Type is not (BlockType.Validator or BlockType.Sampler))
+        {
+            return false;
+        }
+
+        var specs = BlockPortSchema.GetOutputSpecs(Type, _config);
+        var current = OutputPorts.Select(port => port.Name).ToArray();
+        if (current.SequenceEqual(specs.Select(spec => spec.Name), StringComparer.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var existing = OutputPorts.ToDictionary(port => port.Name, StringComparer.OrdinalIgnoreCase);
+        OutputPorts.Clear();
+        foreach (var spec in specs)
+        {
+            OutputPorts.Add(existing.TryGetValue(spec.Name, out var port)
+                ? port
+                : new PortViewModel { Name = spec.Name, DataType = spec.DataType });
+        }
+
+        return true;
     }
 
     /// <summary>

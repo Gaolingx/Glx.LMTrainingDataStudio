@@ -55,16 +55,16 @@ public static class BlockCatalog
 
     public static string GetHelp(BlockType type) => LocalizationService.L(Get(type).HelpKey);
 
-    public static string DescribePorts(BlockType type)
+    public static string DescribePorts(BlockType type, BlockConfig? config = null)
     {
         var input = BlockPortSchema.GetInputSpec(type);
-        var output = BlockPortSchema.GetOutputSpec(type);
+        var outputs = BlockPortSchema.GetOutputSpecs(type, config);
         var inputText = input is null
             ? LocalizationService.L("node.port.none")
             : $"{input.Name} ({input.DataType})";
-        var outputText = output is null
+        var outputText = outputs.Count == 0
             ? LocalizationService.L("node.port.none")
-            : $"{output.Name} ({output.DataType})";
+            : string.Join(", ", outputs.Select(spec => $"{spec.Name} ({spec.DataType})"));
         return string.Format(LocalizationService.L("property.ports_format"), inputText, outputText);
     }
 }

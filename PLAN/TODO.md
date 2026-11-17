@@ -1,6 +1,6 @@
 # PLAN / TODO — 实施计划与验收标准
 
-> 最后更新：2026-11-17（Round 14 数据工作台编辑与预览完成）
+> 最后更新：2026-11-17（Round 15 节点能力收紧完成）
 > 当前基线：.NET 9 / Avalonia 11.3 / NUnit 4
 > 工作方式：小步提交，每个 Phase 独立验收；开发期允许 break change，不保留兼容层。
 >
@@ -114,6 +114,37 @@
 - 搜索高亮不区分“当前匹配项”，也未实现表格内上一处/下一处导航。
 - 预览窗口固定加载前 50 行，未提供分页或全文搜索。
 - 数据工作台编辑 UI 未做逐项人工点击验收（Headless 加载、ViewModel 单测与启动冒烟通过）。
+
+---
+
+## 附九：Round 15 节点能力收紧（2026-11-17）
+
+### 9.1 本轮做了什么
+
+- [x] 多输出端口：`BlockExecutionResult` 支持附加输出流；Runner 按端口名缓冲、持久化检查点与恢复；Validator 提供 `pass`/`reject` 端口，Sampler 按 splits 动态生成 `train`/`valid` 等端口；旧单端口 Recipe 仍按主端口回落。
+- [x] LLM：请求侧携带 Tool Profile tools、多轮 `messages`（`UseRowMessages`）与 `response_format` JSON Schema；`MaxConcurrency` 有界并行且输出保序；累计 token 与按单价估算成本写日志；失败行可跳过并在 `FailureOutputPath` 原子写入 `{lineNumber,error,data}`；结构化输出非法 JSON 视为失败样本。
+- [x] Validator：支持多个规则（`Rules`）与 `MatchAllRules`/任意匹配、`expression`/`schema`/`regex`/`script`（Fluid 渲染 true/false）四种规则、单行超时 `TimeoutMs`、规则取反；reject 端口输出原始行，reject 文件保留失败原因；属性面板可增删附加规则。
+- [x] Sampler：splits 生成独立输出端口；`StratifyField` 在 ratio/splits 模式下按顶层字段分组独立随机流；属性面板显示切分比例/预计行数统计预览。
+- [x] Simulation：属性面板新增 Tools / Harness Rules / Script 回合可视化编辑器（增删行、行为、参数 JSON、响应模板、失败/延迟/超时、允许工具、重试与中止、脚本回合与工具调用）；新增 `RequestsPerMinute` 限速、OpenAI Chat SSE 流式 delta 累积、内置价格预设下拉。
+- [x] Query Source：查询文本支持 Fluid 模板变量（含 `index`）；新增外部 JSONL/CSV/Parquet query 源、`QueryField`/`SystemField` 映射，源行字段保留并写入 `query`/`system`。
+- [x] 新增 14 个测试：LLM 请求体/多轮/并发/失败样本/结构化输出 4、Validator 多规则/双端口/超时 2、Sampler 多端口/分层/统计预览 3、Simulation 编辑器/流式 delta 2、Query Source 模板与外部源 1、配置序列化与校验 2。
+
+### 9.2 验证结果
+
+| 项目 | 命令 | 结果 |
+| --- | --- | --- |
+| 构建 | `dotnet build LMTrainingDataStudio2/LMTrainingDataStudio2.slnx` | 成功，0 警告，0 错误 |
+| 测试 | `dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx` | 495 通过，0 失败，6 跳过（2 provider + 4 性能 gated） |
+| Round 15 用例 | `dotnet test --filter Round15NodeCapabilityTests` | 14 通过 |
+| 启动冒烟 | `LMTrainingDataStudio2.exe`（Debug，8s） | 进程持续运行，无异常输出 |
+
+### 9.3 本轮未做
+
+- LLM tool_calls 只记录到输出，不执行工具回填（多轮工具执行仍由 Simulation 节点承担）；Anthropic 不发送结构化输出约束。
+- Validator `script` 是 Fluid 布尔表达式，不是任意 C#/JS 脚本；超时只停止等待，不强制终止底层纯 CPU 渲染。
+- Sampler 分层对 count 模式不生效（count 模式按全局顺序填充）；端口动态变化时指向被删除端口的旧连线只在下次校验时报错。
+- Simulation 流式 delta 仅支持 OpenAI Chat；限速按 query 启动间隔近似，不是严格 token bucket。
+- 属性面板未逐项人工点击验收（XAML 编译、Headless UI、ViewModel 单测与启动冒烟通过）。
 
 ---
 
@@ -1253,10 +1284,10 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 - [x] LLM 节点级超时与指数退避重试（Round 5）。
 - [x] LLM 密钥设置界面：settings.json 本机保存，环境变量兜底（Round 5）。
 - [x] LLM Tool Profile 引用：tools 写入输出行。
-- [ ] LLM 请求侧 tool definitions、结构化输出、多轮上下文、并发控制、token/成本统计。
+- [x] LLM 请求侧 tool definitions、结构化输出、多轮上下文、并发控制、token/成本统计、失败样本（Round 15）。
 - [x] Expression：Fluid 模板、变量映射、渲染预览、语法校验（Round 9）；无外部执行沙箱。
-- [部分] Validator：表达式/JSON Schema、reject 文件、失败样本落盘（Round 9）；代码规则、超时、失败样本 UI 未做。
-- [部分] Sampler：数量/比例、随机种子、Splits 多文件（Round 9）；多输出端口与分层采样未做。
+- [x] Validator：表达式/JSON Schema/正则/脚本规则、多规则组合、超时、reject 文件与 pass/reject 端口（Round 9/15）。
+- [x] Sampler：数量/比例、随机种子、Splits 多文件、多输出端口与分层采样、统计预览（Round 9/15）。
 - [x] Tool Profile：树形编辑器、JSON 导入导出、Simulation/LLM 复用（Round 9）；MCP 未做。
 - [x] 节点配置校验覆盖所有 10 种类型（Round 8/9）。
 - [x] 环、孤立节点、重复边、端口方向/类型兼容校验（Round 3）。
@@ -1294,7 +1325,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 - [ ] 快捷键全局化，避免焦点冲突。
 - [ ] 节点尺寸调整手柄、边过渡动画、标签避让、自动布局间距/分组选项。
 - [x] 样本/输出预览弹窗；Cleaner 前后 diff；Validator 失败样本预览（Round 14）。
-- [ ] Simulation Tools / Rules / Script 可视化编辑器。
+- [x] Simulation Tools / Rules / Script 可视化编辑器、流式 delta、速率限制与价格预设（Round 15）。
 - [ ] Cleaner 正则规则列表 UI；Validator Cleanup 规则 UI。
 - [ ] 状态栏内存占用定时刷新（当前只在构造时采样一次）。
 - [ ] 完整浅色主题：部分视图仍硬编码深色。
@@ -1430,13 +1461,13 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 4. [x] 统一样本/输出预览弹窗（SFT / Validator reject / Simulation 失败样本 / Cleaner diff）。
 5. [x] 1M 行编辑/保存内存上限验收（55.6s，托管内存增量 11MB）。
 
-### P1 — Round 15：节点能力收紧
+### P1 — Round 15：节点能力收紧（已完成，见附九）
 
-1. [ ] LLM 请求侧 tools、结构化输出、多轮、并发、token/成本、失败样本。
-2. [ ] Validator 代码规则/超时/多规则/pass-reject 端口。
-3. [ ] Sampler 多输出端口/分层采样/统计预览。
-4. [ ] Simulation Tools/Rules/Script UI、流式 delta、速率限制/价格预设。
-5. [ ] Query Source 模板与外部 query 源。
+1. [x] LLM 请求侧 tools、结构化输出、多轮、并发、token/成本、失败样本。
+2. [x] Validator 代码规则/超时/多规则/pass-reject 端口。
+3. [x] Sampler 多输出端口/分层采样/统计预览。
+4. [x] Simulation Tools/Rules/Script UI、流式 delta、速率限制/价格预设。
+5. [x] Query Source 模板与外部 query 源。
 
 ### P2 — Round 16：发布与体验
 
@@ -1479,7 +1510,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 | 15 | 节点能力收紧 | P1 | LLM tools/结构化输出/多轮/并发/成本；Validator 代码规则/超时/双端口；Sampler 多端口/分层；Simulation 可视化配置 | 请求体与结构化输出可验证；端口行数守恒；分层比例在容差内 |
 | 16 | 发布与体验 | P2 | 画布 polish、完整浅色主题、MSIX/文件关联/单实例、10M 基线、README 截图、分析器 | 500 节点逐帧 <100ms；浅色无残留；安装/双击打开可用；10M 基线记录 |
 
-**执行顺序**：Round 13 → 14 → 15 → 16；Round 13、14 已完成（见附七、附八），下一轮为 Round 15；每轮结束按第七节收尾模板更新勾选状态、README 与提交记录。
+**执行顺序**：Round 13 → 14 → 15 → 16；Round 13、14、15 已完成（见附七、附八、附九），下一轮为 Round 16；每轮结束按第七节收尾模板更新勾选状态、README 与提交记录。
 
 ---
 

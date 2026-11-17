@@ -39,6 +39,33 @@ public partial class LlmConfigEditorViewModel : ObservableObject
     [ObservableProperty]
     private string _toolProfileName;
 
+    [ObservableProperty]
+    private string _systemPrompt;
+
+    [ObservableProperty]
+    private bool _useRowMessages;
+
+    [ObservableProperty]
+    private int _maxConcurrency;
+
+    [ObservableProperty]
+    private string _responseSchema;
+
+    [ObservableProperty]
+    private string _failureOutputPath;
+
+    [ObservableProperty]
+    private int _maxFailureSamples;
+
+    [ObservableProperty]
+    private double _inputCostPerMillionTokens;
+
+    [ObservableProperty]
+    private double _outputCostPerMillionTokens;
+
+    [ObservableProperty]
+    private bool _continueOnError;
+
     public LlmConfigEditorViewModel(LlmBlockConfig config, Action<LlmBlockConfig> apply)
     {
         _apply = apply;
@@ -50,6 +77,15 @@ public partial class LlmConfigEditorViewModel : ObservableObject
         _timeoutSeconds = config.TimeoutSeconds;
         _maxRetries = config.MaxRetries;
         _toolProfileName = config.ToolProfileName ?? string.Empty;
+        _systemPrompt = config.SystemPrompt ?? string.Empty;
+        _useRowMessages = config.UseRowMessages;
+        _maxConcurrency = config.MaxConcurrency;
+        _responseSchema = config.ResponseSchema ?? string.Empty;
+        _failureOutputPath = config.FailureOutputPath ?? string.Empty;
+        _maxFailureSamples = config.MaxFailureSamples;
+        _inputCostPerMillionTokens = config.InputCostPerMillionTokens;
+        _outputCostPerMillionTokens = config.OutputCostPerMillionTokens;
+        _continueOnError = config.ContinueOnError;
         _selectedProvider = Providers.FirstOrDefault(option =>
             option.Id == LlmProviderIds.Normalize(config.Provider)) ?? Providers[0];
     }
@@ -79,6 +115,24 @@ public partial class LlmConfigEditorViewModel : ObservableObject
 
     partial void OnToolProfileNameChanged(string value) => Push();
 
+    partial void OnSystemPromptChanged(string value) => Push();
+
+    partial void OnUseRowMessagesChanged(bool value) => Push();
+
+    partial void OnMaxConcurrencyChanged(int value) => Push();
+
+    partial void OnResponseSchemaChanged(string value) => Push();
+
+    partial void OnFailureOutputPathChanged(string value) => Push();
+
+    partial void OnMaxFailureSamplesChanged(int value) => Push();
+
+    partial void OnInputCostPerMillionTokensChanged(double value) => Push();
+
+    partial void OnOutputCostPerMillionTokensChanged(double value) => Push();
+
+    partial void OnContinueOnErrorChanged(bool value) => Push();
+
     private void Push() => _apply(new LlmBlockConfig(
         SelectedProvider.Id,
         ModelAlias ?? string.Empty,
@@ -88,5 +142,14 @@ public partial class LlmConfigEditorViewModel : ObservableObject
         string.IsNullOrWhiteSpace(Endpoint) ? null : Endpoint.Trim(),
         TimeoutSeconds,
         MaxRetries,
-        string.IsNullOrWhiteSpace(ToolProfileName) ? null : ToolProfileName.Trim()));
+        string.IsNullOrWhiteSpace(ToolProfileName) ? null : ToolProfileName.Trim(),
+        string.IsNullOrWhiteSpace(SystemPrompt) ? null : SystemPrompt,
+        UseRowMessages,
+        MaxConcurrency,
+        string.IsNullOrWhiteSpace(ResponseSchema) ? null : ResponseSchema,
+        string.IsNullOrWhiteSpace(FailureOutputPath) ? null : FailureOutputPath.Trim(),
+        MaxFailureSamples,
+        InputCostPerMillionTokens,
+        OutputCostPerMillionTokens,
+        ContinueOnError));
 }
