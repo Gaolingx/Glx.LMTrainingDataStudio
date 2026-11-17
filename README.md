@@ -55,10 +55,11 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - 中英文界面本地化（zh-CN / en-US，可在设置中切换），节点库、属性面板与画布悬停提示包含完整节点说明
 - 通用 Block Config JSON 编辑器，可直接配置所有节点类型
 
-> 注意：当前仍是开发版。**LLM tool_calls 回填、Anthropic 结构化输出约束、Sampler count 模式分层、Tool Profile MCP 适配、跨格式数据编辑保存、容器级隔离尚未实现**；应用默认启动空白 Recipe，可通过 File → New from Sample 加载 4 节点示例，或恢复上次打开的文件。
+> 注意：当前仍是开发版。**LLM tool_calls 回填、Anthropic 结构化输出约束、Sampler count 模式分层、Tool Profile MCP 适配、容器级隔离尚未实现**；应用默认启动空白 Recipe，可通过 File → New from Sample 加载 4 节点示例，或恢复上次打开的文件。
 >
 > - 完整功能清单与节点能力矩阵：[PLAN/STATUS.md](PLAN/STATUS.md)
 > - 当前修复计划与验收标准：[PLAN/TODO/01-Bugfix1/HANDOFF.md](PLAN/TODO/01-Bugfix1/HANDOFF.md)
+> - 变更记录：[CHANGELOG.md](CHANGELOG.md)
 > - 建设期已归档计划（Round 0–16）：[PLAN/Done/01-BuildALL/HANDOFF.md](PLAN/Done/01-BuildALL/HANDOFF.md)
 
 ## 工作流预设与节点说明
@@ -228,8 +229,8 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 | Tool Profile | 参数树 + JSON 导入导出 + 复用 | 有 | MCP 适配 |
 | Query Source | 单组/多组 + 模板变量 + 外部 JSONL/CSV/Parquet | 有 | 随机/模型生成 query、去重/权重 |
 | Simulation | 脚本/真实 provider + 模拟/真实工具 + 可视化 Tools/Rules/Script | 有 | 非 OpenAI 流式、严格限速、容器隔离 |
-| Cleaner | 正则/格式/ANSI/reasoning/空消息 | 部分 | 正则规则 UI、预览、坏行报告 |
-| SFT Export | 流式 + 原子替换 + 行透传 | 有 | 文件选择器、字段裁剪、预览、拆分、DPO/Pretrain |
+| Cleaner | 正则/格式/ANSI/reasoning/空消息 + 正则规则 UI + 预览 | 有 | 坏行报告、自定义 JSONPath |
+| SFT Export | 流式 + 原子替换 + 行透传 + 文件选择器 + 字段白名单 + 预览 | 有 | 追加模式、拆分、DPO/Pretrain 直出 |
 
 完整矩阵与逐项缺口见 [PLAN/STATUS.md](PLAN/STATUS.md)。
 
@@ -464,7 +465,7 @@ dotnet test .\LMTrainingDataStudio2.slnx
 dotnet test .\LMTrainingDataStudio2.slnx --filter HeadlessUiTests
 ```
 
-当前基线：**505 个常规测试通过 + 7 个 gated 跳过**（2 个真实 provider 冒烟 + 5 个性能 gated）。构建启用 .NET 分析器与警告即错误，`dotnet build` 为 0 警告。
+当前基线：**531 个常规测试通过 + 7 个 gated 跳过**（2 个真实 provider 冒烟 + 5 个性能 gated），另有 1 个 `[Explicit]` 示例生成测试；`--list-tests` 共 539 个用例。构建启用 .NET 分析器与警告即错误，`dotnet build` 为 0 警告。
 
 ### 1M / 10M 行与 CSV/Parquet 基线（gated）
 
@@ -575,10 +576,9 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 
 尚未实现：
 
-- 节点尺寸调整手柄、边过渡动画、标签避让
-- Undo/Redo 菜单与按钮、`Ctrl+Shift+Z`、属性修改进入撤销历史
 - 系统剪贴板 / 跨实例粘贴
-- 完整浅色主题（部分视图仍硬编码深色）
+- 全局快捷键与文本焦点冲突治理
+- 自动布局间距/分组选项、分栏宽度持久化
 
 ### Property Panel
 
@@ -586,7 +586,7 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 
 - Block 引用名
 - 节点专属配置（Seed / LLM / Expression / Validator / Sampler / Tool Profile / Query Source / Simulation / Cleaner / SFT Export）
-- Cleaner 正则规则、Simulation 的 Tools/Rules/Script 目前仍通过 Config JSON 编辑
+- Cleaner 正则规则、Validator 清理规则与 Simulation Tools/Rules/Script 均已接入可视化编辑；其余高级项仍可通过 Config JSON 编辑
 - 通用 Config JSON 编辑器（适用于所有节点，包含 kind 与 BlockType 一致性校验）
 - Validation 摘要与问题列表（可定位节点）
 - Progress / Logs
@@ -654,7 +654,7 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 - [x] 统一样本/输出预览弹窗（SFT / Validator reject / Simulation 失败样本 / Cleaner diff）
 - [x] 去重、混洗、切分文件
 - [x] 正则搜索与替换
-- [x] OpenAI / ShareGPT / Alpaca 完整批量互转
+- [x] OpenAI / ShareGPT / Alpaca 基础批量互转（多轮 Alpaca、额外字段保留策略与 ShareGPT tool_call 错误上报仍有缺口）
 - [x] DPO / Pretrain 格式支持
 - [x] 校验问题列表与自动修复预览/写副本
 - [x] Tool Schema 可视化增删改与 JSON 导入导出
@@ -675,7 +675,7 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 - [x] 滚动日志、全局异常、CI、win-x64 单文件发布、Headless UI 测试、MIT LICENSE、应用图标
 - [x] 单实例、命令行打开、MSIX/Inno Setup 打包、文件关联、诊断/崩溃报告导出
 - [x] `.editorconfig`、.NET 分析器、警告即错误
-- [x] 单元测试与集成测试（512 个：505 常规通过 + 7 个 gated：2 个真实 provider 冒烟 + 5 个性能 gated）
+- [x] 单元测试与集成测试（539 个：531 常规通过 + 7 个 gated + 1 个 Explicit 示例生成）
 - [x] Round 8：Recipe 新建/打开/保存、脏标记、最近文件、按类型端口契约
 - [x] Round 9：Expression/Validator/Sampler/Tool Profile 节点能力补齐
 - [x] Round 10：数据预览、CSV/Parquet、格式转换、DPO/Pretrain

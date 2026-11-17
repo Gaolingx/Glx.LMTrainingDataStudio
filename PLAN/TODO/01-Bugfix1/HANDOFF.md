@@ -623,13 +623,13 @@
 
 ### 7.9 本地化与文档
 
-- [ ] **[文档/P1] README 画布“尚未实现”段落过期**：`README.md:569-574` 仍列节点尺寸手柄、边动画、标签避让、Undo/Redo 菜单、浅色主题为未实现，均已在 Round 16 完成。
-- [ ] **[文档/P1] STATUS 多处状态过期**：`Cleaner` diff（`STATUS.md:278`）、SFT 预览（`STATUS.md:294`）、Undo 菜单/尺寸手柄/边动画（`STATUS.md:359,397`）、浅色主题/内存刷新（`STATUS.md:399,401`）、Round 15 的 LLM/Validator/Sampler/Simulation/Query Source 能力（`STATUS.md:387-391`）仍标 `[ ]`。
-- [ ] **[文档/P2] 历史 TODO 内部矛盾**：4.2 先写“级别/错误码筛选未做”（旧 TODO 4.2）后写 Round 14 已完成；4.6 仍写硬编码颜色为 `[部分]`；4.7 仍写 `ValidationIssue` 缺错误码，实际模型已有 `Code`/`LineNumber`。（归档文件只读，修正记录写在本文件。）
-- [ ] **[文档/P2] Phase 1–5 验收清单未回填**：归档 TODO 中 Phase 1–5 的验收项仍为未勾选，与实际完成状态不符；在本文件记录复核结论即可，不回写归档。
-- [ ] **[文档/P2] 测试基线口径不完整**：README/STATUS 写 512（505 通过 + 7 gated），实际 `--list-tests` 为 513（另有 1 个 `ExampleRecipeTests.WriteExamples` 的 `[Explicit]` 测试）。
-- [ ] **[文档/P2] README “OpenAI / ShareGPT / Alpaca 完整批量互转”表述过强**：仍存在多轮 Alpaca、额外字段、ShareGPT tool_call 解析等缺口。
-- [ ] **[文档/P2] 无 CHANGELOG / Release Notes / 已知问题清单**：Phase 5 收尾要求未落地。
+- [x] **[文档/P1] README 画布“尚未实现”段落过期**：`README.md:569-574` 仍列节点尺寸手柄、边动画、标签避让、Undo/Redo 菜单、浅色主题为未实现，均已在 Round 16 完成。
+- [x] **[文档/P1] STATUS 多处状态过期**：`Cleaner` diff（`STATUS.md:278`）、SFT 预览（`STATUS.md:294`）、Undo 菜单/尺寸手柄/边动画（`STATUS.md:359,397`）、浅色主题/内存刷新（`STATUS.md:399,401`）、Round 15 的 LLM/Validator/Sampler/Simulation/Query Source 能力（`STATUS.md:387-391`）仍标 `[ ]`。
+- [x] **[文档/P2] 历史 TODO 内部矛盾**：4.2 先写“级别/错误码筛选未做”（旧 TODO 4.2）后写 Round 14 已完成；4.6 仍写硬编码颜色为 `[部分]`；4.7 仍写 `ValidationIssue` 缺错误码，实际模型已有 `Code`/`LineNumber`。（归档文件只读，修正记录写在本文件。）
+- [x] **[文档/P2] Phase 1–5 验收清单未回填**：归档 TODO 中 Phase 1–5 的验收项仍为未勾选，与实际完成状态不符；在本文件记录复核结论即可，不回写归档。
+- [x] **[文档/P2] 测试基线口径不完整**：README/STATUS 写 512（505 通过 + 7 gated），实际 `--list-tests` 为 513（另有 1 个 `ExampleRecipeTests.WriteExamples` 的 `[Explicit]` 测试）。
+- [x] **[文档/P2] README “OpenAI / ShareGPT / Alpaca 完整批量互转”表述过强**：仍存在多轮 Alpaca、额外字段、ShareGPT tool_call 解析等缺口。
+- [x] **[文档/P2] 无 CHANGELOG / Release Notes / 已知问题清单**：Phase 5 收尾要求未落地。
 - [ ] **[文档/P3] README 截图仅 2 张**：预设、数据编辑、校验分组、诊断导出、浅色主题等新 UI 无对应截图。
 - [ ] **[文档/P3] 无用户手册/帮助内容**：除节点 Node Guide 外无操作文档。
 - [ ] **[文档/P3] 运行日志/执行状态/统计摘要仍为英文**：与 zh-CN/en-US 界面不一致。
@@ -829,4 +829,36 @@
 
 - 生产代码没有遗留的 `TODO`/`FIXME`/`NotImplementedException`，当前不是“大量桩代码”状态；未完成工作主要是**功能边角、发布一致性、测试/CI 门禁**。
 - 最需要先处理的是：`.recipe` 全链路一致性（168/203 + 7.1）、打包/版本/图标（173 + 7.1）、CI 门禁（7.3）、节点编辑器缺口（7.5）、数据工作台取消/恢复指纹（174/175）、文档过期（7.9）。
-- 本轮仅修改计划文档，未修改业务代码；验证基线为 `dotnet build` 成功、`--list-tests` 513 用例、`dotnet test --no-build` 505 通过 / 0 失败 / 7 跳过（另有 1 个 `[Explicit]` 未计入）。完整测试结果以 6.3 的验证记录为准。
+- 归档 TODO 的 4.2/4.6/4.7 与 Phase 1–5 勾选状态是冻结快照；按冻结规则不回写归档，当前状态以本文件与 STATUS.md 为准。
+- 扫描阶段仅修改计划文档；后续 Batch 1–6 已修改代码，当前验证结果见第 9 节与 6.3 验证记录。扫描基线为 `--list-tests` 513 用例、`dotnet test --no-build` 505 通过 / 0 失败 / 7 跳过（另有 1 个 `[Explicit]` 未计入）。
+
+---
+
+## 9. Round 17 执行记录（2026-11-17）
+
+### 9.1 已完成批次
+
+| 批次 | 范围 | 提交 |
+| --- | --- | --- |
+| 文档 | 全仓扫描复核与 205 项工作池 | `9abc715 docs(plan): 补全全仓扫描复核与 205 项工作池` |
+| Batch 1 | `.recipe` 打开/保存/选择器/命令行、扩展名工具与测试 | `e036531 fix(recipe): 统一 .recipe 打开、保存与文件选择器` |
+| Batch 2 | 版本单一来源、EXE 图标、Debug-only 诊断包、MSIX/Inno/发布版本贯通 | `9ea58ab build(release): 统一版本源并补齐图标与打包参数` |
+| Batch 4 | Seed Streaming、Cleaner/Validator 共享 Cleanup 编辑器、LLM Schema 校验、SFT 字段校验 | `b3e8cc2 feat(nodes): 补齐 Seed/Cleaner/Validator/LLM/SFT 编辑缺口` |
+| Batch 5 | 数据分页取消、跨格式编辑保存、恢复 SHA256/Recipe 指纹 | `f723827 fix(data): 支持跨格式编辑保存与可验证恢复` |
+| Batch 6 | README/STATUS/CHANGELOG 同步、HANDOFF 勾选与验证记录 | 本次提交 |
+
+### 9.2 当前验证
+
+- `dotnet build -c Release`：0 警告，0 错误。
+- `dotnet test -c Release --no-build`：531 通过，0 失败，7 跳过（5 性能 gated + 2 provider gated）。
+- `dotnet test --list-tests`：539 个用例（含 1 个 `[Explicit]` 示例生成测试）。
+- 新增回归：`RecipeFileExtensionsTests`、`NodeEditorTests`、分页取消、跨格式保存、恢复哈希/指纹与 Cleanup 模板 Headless 渲染。
+
+### 9.3 本轮未做（保留在 7.x / 8.3）
+
+- CI 作为独立批次：格式、覆盖率、打包冒烟、nightly gated job。
+- LLM `tool_calls` 回填、Anthropic 结构化输出、SFT 追加/目标格式/拆分。
+- Tool Profile MCP、容器级隔离、Sampler count 分层。
+- 数据工作台消息级表单编辑、匹配导航、预览分页、列排序/筛选。
+- API Key 加密、web_fetch 加固、诊断日志脱敏、安装包签名与干净机器验证。
+- 硬编码英文静态文案、架构/安装文档、健康检查与保留策略。

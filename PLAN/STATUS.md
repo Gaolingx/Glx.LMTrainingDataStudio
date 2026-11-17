@@ -1,7 +1,7 @@
 # STATUS — 功能清单、节点能力矩阵与下一阶段规划
 
 > 最后核对：2026-11-17（Round 16 完成）
-> 验证基线：`dotnet build` 0 警告 0 错误（分析器开启）；`dotnet test` 505 通过 + 7 个 gated 测试（2 个真实 provider 冒烟 + 5 个性能 gated，默认跳过）；Headless UI 测试通过；1M 行 JSONL、1M 行质量操作与 1M 行编辑保存基线通过；10M 行链路与 CSV/Parquet 大规模基线入口已提供；win-x64 单文件发布与 Debug 启动冒烟通过。
+> 验证基线：`dotnet build` 0 警告 0 错误（分析器开启）；`dotnet test` 531 通过 + 7 个 gated 测试（2 个真实 provider 冒烟 + 5 个性能 gated，默认跳过），另有 1 个 `[Explicit]` 示例生成；`--list-tests` 539 个用例；Headless UI 测试通过；1M 行 JSONL、1M 行质量操作与 1M 行编辑保存基线通过；10M 行链路与 CSV/Parquet 大规模基线入口已提供；win-x64 单文件发布与 Debug 启动冒烟通过。
 >
 > 图例：`[x]` 已完成并有测试/验证；`[部分]` 可用但有明确缺口；`[ ]` 未实现。
 >
@@ -59,12 +59,12 @@
 - 发布：MSIX 清单/打包脚本、Inno Setup 安装脚本；`examples/` 6 个示例 Recipe；README Dark/Light 截图。
 - 工程质量：`.editorconfig`、.NET 分析器 `latest-recommended`、警告即错误；构建 0 警告。
 - 工程化：滚动日志与全局异常、GitHub Actions CI、win-x64 单文件发布脚本、Headless UI 测试、MIT LICENSE、应用图标。
-- 512 个自动化测试：505 个常规通过 + 7 个 gated（2 个真实 provider 冒烟 + 5 个性能 gated）。
+- 539 个自动化测试：531 个常规通过 + 7 个 gated（2 个真实 provider 冒烟 + 5 个性能 gated）+ 1 个 Explicit 示例生成。
 
 ### 1.2 当前最大缺口（按优先级）
 
-1. **执行韧性残余**：恢复仅验证行数与内容，未做逐字节/哈希比对；溢写阈值按行数计；检查点无磁盘配额。
-2. **数据编辑残余**：编辑只保存为源格式；字段编辑覆盖顶层字段，`messages` 等嵌套结构仍按 JSON 文本编辑；匹配项导航与预览分页未做。
+1. **执行韧性残余**：已补输出 SHA256 与 Recipe 指纹校验；溢写阈值仍按行数计；检查点无磁盘配额、无启动清理。
+2. **数据编辑残余**：已支持跨格式保存；字段编辑覆盖顶层字段，`messages` 等嵌套结构仍按 JSON 文本编辑；匹配项导航与预览分页未做。
 3. **节点能力残余**：LLM 不执行 tool_calls 回填；Anthropic 无结构化输出约束；Validator script 为 Fluid 布尔表达式而非任意脚本；Sampler 分层仅对 ratio/splits 生效；Tool Profile 无 MCP。
 4. **发布残余**：MSIX/Inno 安装包未在本机实际安装验证；单实例管道未做双进程自动化测试；10M 行结果需按本机实测记录。
 
@@ -82,19 +82,19 @@
 
 **部分完成（可用但有缺口）**
 
-- Seed：三种格式可读；Streaming 只在 JSONL + 关闭索引缓存时生效，UI 未暴露；无节点内过滤/列映射。
+- Seed：三种格式可读；Streaming UI 已暴露，仅 JSONL + 关闭索引缓存时生效；无节点内过滤/列映射。
 - LLM：三种 provider、tools/多轮/结构化输出/并发/成本/失败样本可用；tool_calls 不执行回填，Anthropic 无结构化输出约束。
 - Validator：表达式/JSON Schema/正则/Fluid 脚本、多规则、超时与 pass/reject 双端口可用；非任意代码脚本。
 - Sampler：count/ratio/splits、多输出端口、分层（ratio/splits）与统计预览可用；count 模式不分层。
-- Cleaner：5 个布尔规则 + 正则规则可用；正则规则仍走 Config JSON；已有清洗前后 diff 预览，无坏行报告。
+- Cleaner：5 个布尔规则 + 正则规则可用；正则规则 UI 与清洗前后 diff 预览已接入；无坏行报告。
 - SFT Export：流式 + 原子替换 + 行透传 + 文件选择器 + 覆盖确认 + 字段白名单可用；已有输出预览弹窗；无拆分/DPO-Pretrain 直出。
-- 执行：层内并行/暂停/重试、输出摘要、溢写/流式、检查点恢复可用；检查点无配额，恢复未做哈希比对。
+- 执行：层内并行/暂停/重试、输出摘要、溢写/流式、检查点恢复可用；恢复已加 SHA256/Recipe 指纹校验，检查点无配额。
 - 画布：核心交互、尺寸手柄、边动画、标签避让、Undo/Redo 菜单与属性撤销可用；逐帧性能未做 UI 级计时。
 - 设置：完整 Dark/Light 主题、网格吸附与内存定时刷新生效；其他设置变更仍不通知已创建的服务。
 
 **未实现（下一阶段工作池）**
 
-- 数据编辑残余：跨格式保存、消息/角色级表单编辑、匹配项导航、预览分页。
+- 数据编辑残余：消息/角色级表单编辑、匹配项导航、预览分页。
 - LLM 工具调用回填、Anthropic 结构化输出、模型列表。
 - Validator 失败样本独立 UI、任意代码沙箱规则。
 - Sampler count 模式分层、切分内再混洗选项。
@@ -103,9 +103,7 @@
 - Tool Profile MCP 适配、共享工具库、LLM 请求侧复用。
 - Seed 多文件/目录、过滤/列映射、编码选项、HuggingFace/HTTP 数据源。
 - 10M 行实测与 CSV/Parquet 大规模基线按需运行（入口已提供）。
-- 节点尺寸手柄、边过渡动画、标签避让、完整浅色主题已完成。
 - 单实例、命令行打开、文件关联、MSIX/Inno 脚本与诊断导出已完成；安装包未做本机安装验证。
-- 跨格式数据编辑保存、消息/角色级表单、匹配项导航、预览分页。
 - API Key 加密存储、设置变更通知、运行日志/执行状态本地化、Tool Profile MCP。
 
 ---
@@ -124,7 +122,7 @@
 | Tool Profile | 无 | 无 | 工具 schema 配置，被 Simulation/LLM 引用 |
 | Query Source | 无 | `queries` | 生成模拟用户 query |
 | Simulation | `input` | `output` | 多轮 tool-calling 轨迹生成 |
-| Cleaner | `input` | `output` | 正则/格式/ANSI/reasoning/空消息清洗 |
+| Cleaner | `input` | `output` | 正则/格式/ANSI/reasoning/空消息清洗 + 正则规则 UI |
 | SFT Export | `input` | 无 | 流式写 JSONL（可选字段白名单）并透传给下游（若有） |
 
 > 所有数据端口当前统一为 `rows` 类型；端口数量、名称、类型暂不可在 UI 中增删改。
@@ -140,7 +138,7 @@
 | 专属属性面板 | [x] | 路径选择、文件类型、Index Cache 开关 |
 | 端口 schema | [x] | 仅输出 `rows`；连接前校验方向/类型 |
 | 1M 行性能验收 | [x] | JSONL 1KB/行：索引 8.8s、分页 10.9ms、内存增量 14MB |
-| `Streaming` 开关 | [部分] | 仅 JSONL + 关闭索引缓存时生效；CSV/Parquet 由读取器决定；UI 未暴露 |
+| `Streaming` 开关 | [x] | UI 已暴露；仅 JSONL + 关闭索引缓存时生效，CSV/Parquet 由读取器决定 |
 | 数据预览 / 过滤 / 列映射 | [部分] | Data 视图可分页预览；节点内过滤/列映射未做 |
 | 多文件 / 目录 / HuggingFace / HTTP 源 | [ ] | 仅单文件路径 |
 | 编码/分隔符/类型推断选项 | [ ] | CSV 全部按字符串暴露 |
@@ -274,10 +272,10 @@
 | 移除 reasoning_content | [x] | |
 | 丢弃空消息 | [x] | |
 | 清洗 `messages` 与 `tools[].description` | [x] | 未知字段保留；无 `messages` 的行原样返回 |
-| 专属属性面板 | [部分] | 5 个布尔开关已接入；正则规则仍用 Config JSON |
-| 清洗预览 / diff | [ ] | 无 |
+| 专属属性面板 | [x] | 5 个布尔开关 + 正则规则列表已接入 |
+| 清洗预览 / diff | [x] | 统一样本预览支持 Cleaner 前后 diff |
 | 坏行跳过与报告 | [ ] | 遇到坏 JSON 直接失败 |
-| 规则列表 UI | [ ] | 无 |
+| 规则列表 UI | [x] | 增删、上下移动、忽略大小写与正则校验 |
 | 自定义字段/JSONPath 清洗 | [ ] | 无 |
 
 ### 2.10 SFT Export（训练样本导出）
@@ -291,8 +289,8 @@
 | “只输出 messages + tools” | [x] | 字段白名单可只保留指定顶层字段；留空则整行透传 |
 | 文件选择器 | [x] | SaveFilePicker，默认 `.jsonl` |
 | 覆盖确认 / 追加模式 | [部分] | 运行前确认覆盖；无追加模式 |
-| 输出预览 / 样本查看 | [部分] | 运行日志输出行数与首行预览；无独立预览弹窗 |
-| 字段白名单 / 目标格式选择 | [部分] | 顶层字段白名单；无目标格式选择 |
+| 输出预览 / 样本查看 | [x] | 统一样本预览弹窗与运行日志摘要 |
+| 字段白名单 / 目标格式选择 | [部分] | 顶层字段白名单已接入并校验；无目标格式选择 |
 | 按数量/比例拆分多文件 | [ ] | 可用 Sampler 前置切分 |
 | DPO / Pretrain 直出 | [ ] | 数据工作台批量转换支持，节点本身只写 JSONL |
 
@@ -355,10 +353,10 @@
 ### 3.2 部分完成
 
 - [部分] 校验：已覆盖端口契约、必需输入、单输入、方向/类型、环与配置；缺少列号与问题分组（数据集校验已有错误码/路径）。
-- [部分] 执行：已支持层内并行/暂停/重试、输出摘要、节点间溢写/流式与节点级恢复；检查点无配额，恢复未做哈希比对。
-- [部分] 画布：端口坐标已改为实测值，缩放锚点/Fit/自动布局/Mini-map 点击/复制连线已完成；Undo/Redo 无菜单/按钮、无节点尺寸手柄与边过渡动画。
-- [部分] 设置：网格吸附与主题变体已生效；部分视图仍硬编码深色；内存占用只在构造时读取一次，无定时刷新。
-- [部分] 主题：Dark/Light 资源已拆分；Data 视图行、属性面板部分文本等仍有硬编码颜色。
+- [x] 执行：层内并行/暂停/重试、输出摘要、节点间溢写/流式、节点级恢复、输出 SHA256/Recipe 指纹校验；检查点仍无配额。
+- [x] 画布：端口坐标、缩放锚点/Fit/自动布局/Mini-map 点击/复制连线、Undo/Redo 菜单、节点尺寸手柄、边动画、标签避让与属性撤销已完成；逐帧性能未做 UI 级计时。
+- [x] 设置：网格吸附、完整 Dark/Light 主题、语言切换与内存定时刷新生效；其他设置变更仍不通知已创建的服务。
+- [x] 主题：Dark/Light 资源完整，视图无 `#RRGGBB` 硬编码颜色残留。
 
 ### 3.3 未实现（按领域）
 
@@ -368,47 +366,50 @@
 - [x] 数据编辑撤销/重做与保存前差异摘要。
 - [x] 搜索命中行内高亮；校验问题按级别/错误码筛选与分组树。
 - [x] 统一样本/输出预览弹窗（SFT Export、Validator reject、Simulation 失败样本、Cleaner 前后 diff）。
-- [ ] 跨格式保存、消息/角色级表单编辑、匹配项导航、预览窗口分页。
+- [x] 跨格式编辑保存。
+- [ ] 消息/角色级表单编辑、匹配项导航、预览窗口分页。
 - [ ] CSV 类型推断与列类型展示；CSV/Parquet 1M 行质量基线；10M 行实测。
 - [ ] Seed 节点内过滤/列映射/多文件/目录/HuggingFace/HTTP 源。
-- [ ] 输出文件追加模式、字段白名单与目标格式选择。
+- [x] 字段白名单与输入校验。
+- [ ] 输出文件追加模式、目标格式选择。
 
 **执行与性能**
 
 - [x] 节点间流式读取与溢写磁盘（内存阈值、临时目录、成功后清理）。
 - [x] 节点级中断恢复：记录已完成节点输出，从上次失败/中断节点继续。
 - [x] 取消 1s 内停止的定量验收；全链路临时文件清理验收。
+- [x] 恢复输出 SHA256 与 Recipe 指纹校验。
 - [ ] 执行竞态/并发写同一目标文件的检测与提示。
 - [ ] 10M 行执行/质量/转换基线。
 - [ ] 执行历史批量清理与保留策略。
 
 **节点能力**
 
-- [ ] LLM 请求侧 tools、结构化输出、多轮上下文、并发、token/成本统计、失败样本。
-- [ ] Validator 代码规则、超时、多规则组合、失败样本 UI、独立 pass/reject 端口。
-- [ ] Sampler 多输出端口、分层/分组采样、统计预览。
-- [ ] Simulation Tools/Rules/Script 可视化编辑器、流式 delta、速率限制/价格预设、容器级隔离。
-- [ ] Query Source 模板/外部数据源/随机或模型生成 query。
+- [x] LLM 请求侧 tools、结构化输出、多轮上下文、并发、token/成本统计、失败样本。
+- [x] Validator 受限代码规则、超时、多规则组合、失败样本预览、独立 pass/reject 端口。
+- [x] Sampler 多输出端口、分层/分组采样、统计预览。
+- [部分] Simulation Tools/Rules/Script 可视化编辑器、流式 delta、速率限制/价格预设已完成；容器级隔离未做。
+- [部分] Query Source 模板与外部数据源已完成；随机/模型生成 query 未做。
 - [ ] Tool Profile MCP（stdio/HTTP）、共享工具库、鉴权。
 - [部分] Validator/LLM/SFT Export 的文件选择器与路径校验统一：SFT Export 已接入，其余仍手输路径。
 
 **画布与 UI**
 
-- [ ] 节点尺寸调整手柄、边过渡动画、标签避让、自动布局间距/分组选项。
-- [ ] Undo/Redo 菜单与按钮、`Ctrl+Shift+Z`、属性面板删除/配置修改进入撤销历史。
+- [部分] 节点尺寸手柄、边过渡动画、标签避让已完成；自动布局间距/分组选项未做。
+- [x] Undo/Redo 菜单与按钮、`Ctrl+Shift+Z`、属性面板删除/配置修改进入撤销历史。
 - [ ] 系统剪贴板/跨实例粘贴；全局快捷键避免焦点冲突。
-- [ ] 完整浅色主题（移除硬编码深色）。
-- [ ] 可拖动分栏持久化列宽；状态栏内存定时刷新。
+- [x] 完整浅色主题（移除硬编码深色）。
+- [部分] 状态栏内存定时刷新已完成；可拖动分栏列宽持久化未做。
 
 **发布与工程化**
 
 - [ ] 10M 性能报告与 CSV/Parquet 基线。
-- [ ] MSIX/安装包、文件关联、单实例、命令行打开 Recipe。
-- [ ] README 截图、示例 Recipe、发布说明。
+- [部分] MSIX/Inno 脚本、文件关联、单实例、命令行打开已完成；安装包未在干净机器实际安装验证。
+- [部分] README 截图与 6 个示例 Recipe 已完成；发布说明由 [CHANGELOG.md](CHANGELOG.md) 承担。
 - [ ] 崩溃报告导出；日志级别/来源筛选。
 - [ ] API Key 加密存储、设置变更通知。
 - [部分] 运行日志/执行状态/统计摘要本地化（静态 UI、节点说明与预设已支持 zh-CN / en-US）。
-- [ ] `.editorconfig`、分析器、警告即错误。
+- [x] `.editorconfig`、分析器、警告即错误。
 
 ---
 
@@ -416,20 +417,20 @@
 
 | 节点 | 专属面板 | 已覆盖字段 | 仍依赖 Config JSON |
 | --- | --- | --- | --- |
-| Seed | 是 | 路径、文件类型、Index Cache | 无（Streaming 未暴露） |
+| Seed | 是 | 路径、文件类型、Index Cache、Streaming | 无 |
 | LLM | 是 | Provider、Model、温度、Max tokens、超时、重试、Endpoint、Prompt、Tool Profile | 无 |
 | Expression | 是 | 模板、字段别名、样本 JSON、预览输出 | 无 |
-| Validator | 是 | 规则类型、规则/Schema、reject 开关与路径 | Cleanup 正则规则 |
+| Validator | 是 | 规则类型、规则/Schema、reject 开关与路径、Cleanup 规则 | 无（脚本仍为受限 Fluid） |
 | Sampler | 是 | Count、Ratio、Seed、Splits、输出目录 | 无 |
 | Tool Profile | 是 | 工具列表、参数 JSON、参数树、profile JSON 导入导出 | Enum/Default 未暴露 |
 | Query Source | 是 | Queries、Mode、Repeat、System Prompt | 无 |
-| Simulation | 是 | Provider、模式、模型、轮数、并发、温度、tokens、超时、重试、Endpoint、System/Final、失败样本、成本、沙箱、Tool Profile | Tools、Rules、Script |
-| Cleaner | 是（部分） | 5 个布尔规则 | RegexReplacements |
-| SFT Export | 是 | 输出路径、Browse、字段白名单 | 目标格式选择 |
+| Simulation | 是 | Provider、模式、模型、轮数、并发、温度、tokens、超时、重试、Endpoint、System/Final、失败样本、成本、沙箱、Tool Profile、Tools/Rules/Script | 无（容器隔离未做） |
+| Cleaner | 是 | 5 个布尔规则 + 正则规则 | 无（高级 JSONPath 未做） |
+| SFT Export | 是 | 输出路径、Browse、字段白名单与校验 | 目标格式选择、追加模式 |
 
 ---
 
-## 五、已完成轮次（Round 8–14）
+## 五、已完成轮次（Round 8–16）
 
 | Round | 主题 | 关键交付 | 结果 |
 | --- | --- | --- | --- |
