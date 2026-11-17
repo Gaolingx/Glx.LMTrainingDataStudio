@@ -260,7 +260,7 @@ public sealed class DataWorkbenchEditTests
         vm.SelectedRow = vm.Rows[0];
 
         Assert.That(vm.FieldsAvailable, Is.False);
-        Assert.That(vm.SelectedEditorTabIndex, Is.EqualTo(1));
+        Assert.That(vm.SelectedEditorTabIndex, Is.EqualTo(2));
 
         vm.SelectedJsonText = """[3,4]""";
         await vm.ApplyRowEditCommand.ExecuteAsync(null);
@@ -327,6 +327,129 @@ public sealed class DataWorkbenchEditTests
             .First(mode => mode.Key == ValidationGroupModeOption.NoneKey);
         Assert.That(vm.Validation.IsGrouped, Is.False);
         Assert.That(vm.Validation.IssueTree, Is.Empty);
+    }
+
+    [Test]
+    public async Task Edit_MessagesForm_ReplacesRoleAndContent()
+    {
+        var target = Path.Combine(_directory, "chat-edited.jsonl");
+        var vm = new DataWorkbenchViewModel(_settings);
+        await vm.OpenDatasetAsync(CreateChatJsonl());
+
+        vm.SelectedRow = vm.Rows[0];
+
+        Assert.That(vm.HasMessages, Is.True);
+        Assert.That(vm.Messages, Has.Count.EqualTo(2));
+        Assert.That(vm.SelectedEditorTabIndex, Is.EqualTo(1));
+        Assert.That(vm.MessagesDirty, Is.False);
+
+        vm.Messages[0].Role = "system";
+        vm.Messages[0].ContentText = "be brief";
+        Assert.That(vm.MessagesDirty, Is.True);
+        Assert.That(vm.ApplyMessagesCommand.CanExecute(null), Is.True);
+
+        await vm.ApplyMessagesCommand.ExecuteAsync(null);
+
+        Assert.That(vm.MessageEditError, Is.Null);
+        Assert.That(vm.HasPendingEdits, Is.True);
+        Assert.That(vm.Rows[0].Preview, Does.Contain("be brief"));
+        Assert.That(vm.Rows[0].Preview, Does.Contain("\"system\""));
+
+        Assert.That(await vm.SaveEditsAsync(target), Is.True, vm.EditStatusText);
+        var row = System.Text.Json.Nodes.JsonNode
+            .Parse((await File.ReadAllLinesAsync(target)).Single())!.AsObject();
+        Assert.That(row["id"]!.GetValue<int>(), Is.EqualTo(1));
+        var messages = row["messages"]!.AsArray();
+        Assert.That(messages, Has.Count.EqualTo(2));
+        Assert.That(messages[0]!["role"]!.GetValue<string>(), Is.EqualTo("system"));
+        Assert.That(messages[0]!["content"]!.GetValue<string>(), Is.EqualTo("be brief"));
+        Assert.That(messages[1]!["content"]!.GetValue<string>(), Is.EqualTo("answer"));
+        Assert.That(messages[1]!["name"]!.GetValue<string>(), Is.EqualTo("a1"));
+    }
+
+    [Test]
+    public async Task Edit_MessagesForm_AddMoveAndRemoveMessages()
+    {
+        var vm = new DataWorkbenchViewModel(_settings);
+        await vm.OpenDatasetAsync(CreateChatJsonl());
+        vm.SelectedRow = vm.Rows[0];
+        var originalFirst = vm.Messages[0];
+
+        vm.AddMessageCommand.Execute(null);
+        Assert.That(vm.Messages, Has.Count.EqualTo(3));
+        vm.Messages[^1].ContentText = "extra";
+        vm.SelectedMessage = vm.Messages[^1];
+
+        vm.MoveMessageUpCommand.Execute(null);
+        Assert.That(vm.Messages[1].ContentText, Is.EqualTo("extra"));
+
+        vm.SelectedMessage = originalFirst;
+        vm.RemoveMessageCommand.Execute(null);
+        Assert.That(vm.Messages, Has.Count.EqualTo(2));
+        Assert.That(vm.Messages.Any(message => ReferenceEquals(message, originalFirst)), Is.False);
+
+        await vm.ApplyMessagesCommand.ExecuteAsync(null);
+
+        Assert.That(vm.HasPendingEdits, Is.True);
+        Assert.That(vm.Rows[0].Preview, Does.Contain("extra"));
+        Assert.That(vm.Rows[0].Preview, Does.Not.Contain("first question"));
+    }
+
+    [Test]
+    public async Task Edit_MessagesForm_InvalidToolCalls_ReportsError()
+    {
+        var vm = new DataWorkbenchViewModel(_settings);
+        await vm.OpenDatasetAsync(CreateChatJsonl());
+        vm.SelectedRow = vm.Rows[0];
+
+        var assistant = vm.Messages[1];
+        assistant.ShowToolCalls = true;
+        assistant.ToolCallsText = "{broken";
+
+        await vm.ApplyMessagesCommand.ExecuteAsync(null);
+
+        Assert.That(vm.MessageEditError, Does.Contain("tool_calls"));
+        Assert.That(vm.HasPendingEdits, Is.False);
+    }
+
+    [Test]
+    public async Task Edit_ApplyFields_KeepsPendingMessageEdits()
+    {
+        var vm = new DataWorkbenchViewModel(_settings);
+        await vm.OpenDatasetAsync(CreateChatJsonl());
+        vm.SelectedRow = vm.Rows[0];
+
+        vm.SelectedRowFields.First(field => field.Name == "id").ValueText = "42";
+        vm.Messages[1].ContentText = "merged";
+
+        Assert.That(vm.ApplyFieldsCommand.CanExecute(null), Is.True);
+        await vm.ApplyFieldsCommand.ExecuteAsync(null);
+
+        Assert.That(vm.HasPendingEdits, Is.True);
+        Assert.That(vm.Rows[0].Preview, Does.Contain("\"id\": 42"));
+        Assert.That(vm.Rows[0].Preview, Does.Contain("merged"));
+    }
+
+    [Test]
+    public async Task Edit_MessagesMissing_UsesFieldsAndRawTabs()
+    {
+        var vm = new DataWorkbenchViewModel(_settings);
+        await vm.OpenDatasetAsync(CreateJsonl(1));
+
+        vm.SelectedRow = vm.Rows[0];
+
+        Assert.That(vm.HasMessages, Is.False);
+        Assert.That(vm.Messages, Is.Empty);
+        Assert.That(vm.SelectedEditorTabIndex, Is.Zero);
+        Assert.That(vm.AddMessageCommand.CanExecute(null), Is.False);
+    }
+
+    private string CreateChatJsonl()
+    {
+        var path = Path.Combine(_directory, $"chat-{Guid.NewGuid():N}.jsonl");
+        File.WriteAllText(path,
+            """{"id":1,"messages":[{"role":"user","content":"first question"},{"role":"assistant","content":"answer","name":"a1"}]}""");
+        return path;
     }
 
     private string CreateJsonl(int rows)

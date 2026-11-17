@@ -1,6 +1,6 @@
 # HANDOFF — 01-Bugfix1（全仓缺陷修复与门禁补齐）
 
-> 状态：进行中（Round 21）
+> 状态：进行中（Round 22）
 > 创建：2026-11-17
 > 基线：`895c08e feat(release): Round 16 发布与体验`
 > 上一阶段归档：[PLAN/Done/01-BuildALL/HANDOFF.md](../../Done/01-BuildALL/HANDOFF.md)
@@ -443,6 +443,7 @@
 | 2026-11-18 | Batch 8：CI 门禁 | 本地 `check-coverage.ps1`；发布脚本 `-Version 0.0.0`；示例再生成 + `git diff` | 总行 74.64%、Services/Commands 84.32%；FileVersion 0.0.0.0；示例无漂移 | `.github/workflows/ci.yml`、`scripts/check-coverage.ps1` |
 | 2026-11-18 | Batch 10：SFT 导出与路径选择 | `dotnet build -c Release`；`dotnet test -c Release`；`dotnet format --verify-no-changes`；示例再生成 | 见第 12.3 节 | `SftExportExecutorTests`、`SftExportFieldSelectorTests`、`HeadlessUiTests` |
 | 2026-11-18 | Batch 11：LLM 工具回填与 Anthropic 结构化输出 | `dotnet build -c Release`；`dotnet test -c Release`；`dotnet format --verify-no-changes`；示例再生成 | 见第 13.3 节 | `LlmToolLoopTests`、`LlmApiClientTests`、`LlmConfigEditorTests`、校验与 Headless 测试 |
+| 2026-11-18 | Batch 12：数据工作台 `messages` 结构化编辑 | `dotnet build -c Release`；`dotnet test -c Release`；`dotnet format --verify-no-changes` | 见第 14.3 节 | `DatasetMessageEditorTests`、`DataWorkbenchEditTests`、Headless 面板测试 |
 
 ---
 
@@ -583,7 +584,7 @@
 ### 7.6 数据工作台与数据治理
 
 - [x] **[数据/P1] 跨格式保存未支持**：编辑保存只允许源格式，`DatasetEditService.SaveAsync` 对不同目标格式直接抛 `DatasetFormatException`。
-- [ ] **[数据/P2] 嵌套消息/角色级表单未做**：`messages` 等结构仍以整段 JSON 文本编辑。
+- [x] **[数据/P2] 嵌套消息/角色级表单未做**：Round 22 新增 `messages` 结构化编辑器（角色/内容/tool_calls、增删与上下移），保留其余消息字段与 Raw JSON 兜底；其他嵌套结构仍按 JSON 文本编辑。
 - [x] **[数据/P2] 搜索匹配项导航未做**：只有命中高亮，没有上一处/下一处。
 - [x] **[数据/P2] 预览窗口固定 50 行**：`SamplePreviewService.DefaultMaxRows = 50`，无分页/全文搜索。
 - [ ] **[数据/P2] CSV 类型推断与列类型展示未做**。
@@ -1016,3 +1017,36 @@
 - Tool Profile Enum/Default 编辑、MCP（7.5 P2）。
 - 数据工作台 `messages` 结构化表单、列排序/筛选/列宽持久化（191）。
 - SFT 按比例拆片、并发写检测与路径存在性提示（206）。
+
+---
+
+## 14. Round 22 执行记录（2026-11-18）
+
+### 14.1 已完成项
+
+| 项 | 范围 | 提交 |
+| --- | --- | --- |
+| Batch 12 | 数据工作台 `messages` 结构化编辑 | 本次提交 |
+
+### 14.2 具体改动
+
+- 新增 `DatasetMessageEditor`：解析/构建顶层 `messages` 数组，暴露角色、文本内容、结构化内容与 `tool_calls`；未暴露的属性从原始 JSON 原样保留。
+- `DataWorkbenchViewModel` 新增 `HasMessages`、`Messages`、`SelectedMessage`、`MessagesDirty` 与增删/上下移/应用消息命令；行选中时按可用性选择字段页、消息页或原始 JSON。
+- `ApplyFieldsAsync` 在消息存在未应用修改时先合并 `messages` 字段，避免两个编辑器互相覆盖；`ApplyMessagesAsync` 反向合并其他字段修改。
+- 行编辑器新增“消息”标签页：每条消息可编辑角色、内容与可选 `tool_calls`；结构化内容标记“内容为 JSON”。标签顺序为“字段 / 消息 / 原始 JSON”，双击行仍跳转原始 JSON。
+- 本地化新增 9 个键；README / STATUS / CHANGELOG 已同步。
+
+### 14.3 当前验证
+
+- `dotnet build -c Release`：0 警告，0 错误。
+- `dotnet test -c Release`：612 通过，0 失败，7 跳过（5 性能 gated + 2 provider gated）；`--list-tests` 620 个用例（含 1 个 `[Explicit]`）。
+- `dotnet format --verify-no-changes`：通过。
+- 新增测试：`DatasetMessageEditorTests` 10 项、`DataWorkbenchEditTests` 5 项（角色/内容、增删移动、tool_calls 错误、字段合并、无 messages 回退）、消息页 Headless 控件检查。
+- UI 仅经 Headless 渲染与 ViewModel 验证，未在交互窗口中手工点击。
+
+### 14.4 本轮未做（保留在 7.x / 8.3）
+
+- 数据工作台列排序/条件筛选/列宽持久化（191）、CSV 类型推断。
+- 非 `messages` 嵌套结构（如 ShareGPT `conversations`）的结构化表单。
+- SFT 按比例拆片、并发写检测与输出路径存在性提示（206）。
+- LLM 流式输出与模型列表、Tool Profile Enum/Default 编辑。

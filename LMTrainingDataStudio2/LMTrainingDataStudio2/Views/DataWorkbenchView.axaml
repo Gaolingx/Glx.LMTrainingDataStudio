@@ -271,6 +271,99 @@
                             </Grid>
                         </TabItem>
 
+                        <TabItem Header="{loc:Loc data.messages_tab}">
+                            <Grid RowDefinitions="Auto,*,Auto" RowSpacing="4">
+                                <TextBlock Text="{loc:Loc data.messages_not_available}"
+                                           FontSize="9" Foreground="{DynamicResource TextFaintBrush}"
+                                           TextWrapping="Wrap" Margin="0,6"
+                                           IsVisible="{Binding !HasMessages}" />
+
+                                <ListBox x:Name="MessageList"
+                                         Grid.Row="1"
+                                         ItemsSource="{Binding Messages}"
+                                         SelectedItem="{Binding SelectedMessage, Mode=TwoWay}"
+                                         IsVisible="{Binding HasMessages}"
+                                         Background="{DynamicResource InputBackgroundBrush}"
+                                         BorderBrush="{DynamicResource AppBorderBrush}"
+                                         BorderThickness="1" FontSize="10" Margin="0,4">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:DatasetMessageViewModel">
+                                            <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="4" Margin="2">
+                                                <Grid ColumnDefinitions="120,Auto,*" ColumnSpacing="6">
+                                                    <AutoCompleteBox ItemsSource="{Binding Roles}"
+                                                                     Text="{Binding Role, Mode=TwoWay}"
+                                                                     FontSize="10" MinHeight="24"
+                                                                     HorizontalAlignment="Stretch" />
+                                                    <CheckBox Grid.Column="1"
+                                                              Content="{loc:Loc data.message_tool_calls}"
+                                                              IsChecked="{Binding ShowToolCalls, Mode=TwoWay}"
+                                                              FontSize="9" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="2"
+                                                               Text="{loc:Loc data.message_content_json}"
+                                                               IsVisible="{Binding ContentIsJson}"
+                                                               FontSize="9" Foreground="{DynamicResource TextFaintBrush}"
+                                                               VerticalAlignment="Center"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                </Grid>
+                                                <TextBox Grid.Row="1"
+                                                         Text="{Binding ContentText, Mode=TwoWay}"
+                                                         AcceptsReturn="True" TextWrapping="Wrap"
+                                                         MinHeight="44" MaxHeight="120"
+                                                         FontFamily="Consolas, Menlo, monospace" FontSize="10"
+                                                         Padding="5,3"
+                                                         Background="{DynamicResource AppSurfaceDeepBrush}"
+                                                         BorderBrush="{DynamicResource AppBorderStrongBrush}" />
+                                                <TextBox Grid.Row="2"
+                                                         Text="{Binding ToolCallsText, Mode=TwoWay}"
+                                                         IsVisible="{Binding ShowToolCalls}"
+                                                         AcceptsReturn="True" TextWrapping="Wrap"
+                                                         MinHeight="32" MaxHeight="90"
+                                                         Watermark="[]"
+                                                         FontFamily="Consolas, Menlo, monospace" FontSize="10"
+                                                         Padding="5,3"
+                                                         Background="{DynamicResource AppSurfaceDeepBrush}"
+                                                         BorderBrush="{DynamicResource AppBorderStrongBrush}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+
+                                <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto" ColumnSpacing="6">
+                                    <Button x:Name="AddMessageButton"
+                                            Content="{loc:Loc data.add_message}"
+                                            Command="{Binding AddMessageCommand}"
+                                            FontSize="10" Padding="8,3"
+                                            Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
+                                    <Button x:Name="RemoveMessageButton" Grid.Column="1"
+                                            Content="{loc:Loc data.remove_message}"
+                                            Command="{Binding RemoveMessageCommand}"
+                                            FontSize="10" Padding="8,3"
+                                            Background="{DynamicResource DangerSurfaceBrush}" Foreground="{DynamicResource DangerTextBrush}" />
+                                    <Button x:Name="MoveMessageUpButton" Grid.Column="2"
+                                            Content="↑"
+                                            Command="{Binding MoveMessageUpCommand}"
+                                            ToolTip.Tip="{loc:Loc data.move_message_up}"
+                                            FontSize="11" Padding="8,3"
+                                            Background="Transparent" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                    <Button x:Name="MoveMessageDownButton" Grid.Column="3"
+                                            Content="↓"
+                                            Command="{Binding MoveMessageDownCommand}"
+                                            ToolTip.Tip="{loc:Loc data.move_message_down}"
+                                            FontSize="11" Padding="8,3"
+                                            Background="Transparent" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                    <TextBlock Grid.Column="4" Text="{Binding MessageEditError}" FontSize="10"
+                                               Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap"
+                                               VerticalAlignment="Center" Margin="4,0"
+                                               MaxHeight="40" />
+                                    <Button x:Name="ApplyMessagesButton" Grid.Column="5"
+                                            Content="{loc:Loc data.apply_messages}"
+                                            Command="{Binding ApplyMessagesCommand}"
+                                            FontSize="11" Padding="12,4"
+                                            Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
+                                </Grid>
+                            </Grid>
+                        </TabItem>
+
                         <TabItem Header="{loc:Loc data.raw_json_tab}">
                             <TextBox x:Name="RowJsonEditor"
                                      Text="{Binding SelectedJsonText, Mode=TwoWay}"

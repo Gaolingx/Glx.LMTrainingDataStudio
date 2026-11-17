@@ -39,6 +39,7 @@ public partial class DataWorkbenchViewModel : ObservableObject
     private bool _updatingTargetPath;
     private DatasetEditSession? _editSession;
     private bool _fieldsStructureDirty;
+    private bool _messagesStructureDirty;
 
     private const string NewRowTemplate = """{"text":""}""";
 
@@ -137,9 +138,20 @@ public partial class DataWorkbenchViewModel : ObservableObject
     private string _newFieldName = string.Empty;
 
     [ObservableProperty]
-    private int _selectedEditorTabIndex = 1;
+    private int _selectedEditorTabIndex = 2;
+
+    [ObservableProperty]
+    private bool _hasMessages;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RemoveMessageCommand), nameof(MoveMessageUpCommand), nameof(MoveMessageDownCommand))]
+    private DatasetMessageViewModel? _selectedMessage;
+
+    [ObservableProperty]
+    private string? _messageEditError;
 
     public ObservableCollection<DatasetFieldViewModel> SelectedRowFields { get; } = new();
+    public ObservableCollection<DatasetMessageViewModel> Messages { get; } = new();
     public ObservableCollection<DatasetRowViewModel> Rows { get; } = new();
     public ObservableCollection<string> ConversionErrors { get; } = new();
     public IReadOnlyList<int> AvailablePageSizes => PageSizes;
@@ -161,6 +173,10 @@ public partial class DataWorkbenchViewModel : ObservableObject
         : SourcePath;
 
     public long TotalPages => TotalRows == 0 ? 1 : (TotalRows + PageSize - 1) / PageSize;
+
+    public bool MessagesDirty =>
+        HasMessages &&
+        (_messagesStructureDirty || Messages.Any(message => message.IsDirty));
 
     public void RefreshLocalization()
     {
@@ -499,6 +515,14 @@ public partial class DataWorkbenchViewModel : ObservableObject
     {
         if (SelectedRow is null || !FieldsAvailable) return;
 
+        if (MessagesDirty && !TryApplyMessagesToField(out var messageError))
+        {
+            RowEditError = messageError;
+            MessageEditError = messageError;
+            return;
+        }
+
+        MessageEditError = null;
         var fields = SelectedRowFields
             .Select(field => new DatasetFieldValue(field.Name, field.ValueText, field.Kind))
             .ToArray();
@@ -554,6 +578,105 @@ public partial class DataWorkbenchViewModel : ObservableObject
         ApplyFieldsCommand.NotifyCanExecuteChanged();
         RemoveFieldCommand.NotifyCanExecuteChanged();
     }
+
+    #region Message editing
+
+    [RelayCommand(CanExecute = nameof(CanEditMessages))]
+    private void AddMessage()
+    {
+        var model = CreateMessageViewModel(new DatasetMessage("user", string.Empty, false, string.Empty, "{}"));
+        Messages.Add(model);
+        SelectedMessage = model;
+        _messagesStructureDirty = true;
+        MessageEditError = null;
+        NotifyMessagesDirty();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRemoveMessage))]
+    private void RemoveMessage()
+    {
+        if (SelectedMessage is null) return;
+
+        var index = Messages.IndexOf(SelectedMessage);
+        Messages.Remove(SelectedMessage);
+        SelectedMessage = Messages.Count == 0
+            ? null
+            : Messages[Math.Min(index, Messages.Count - 1)];
+        _messagesStructureDirty = true;
+        MessageEditError = null;
+        NotifyMessagesDirty();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanMoveMessageUp))]
+    private void MoveMessageUp() => MoveMessage(-1);
+
+    [RelayCommand(CanExecute = nameof(CanMoveMessageDown))]
+    private void MoveMessageDown() => MoveMessage(1);
+
+    private void MoveMessage(int offset)
+    {
+        if (SelectedMessage is null) return;
+
+        var index = Messages.IndexOf(SelectedMessage);
+        var target = index + offset;
+        if (target < 0 || target >= Messages.Count) return;
+
+        Messages.Move(index, target);
+        _messagesStructureDirty = true;
+        MessageEditError = null;
+        NotifyMessagesDirty();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanApplyMessages))]
+    private async Task ApplyMessagesAsync()
+    {
+        if (SelectedRow is null) return;
+
+        if (!TryApplyMessagesToField(out var error))
+        {
+            MessageEditError = error;
+            return;
+        }
+
+        MessageEditError = null;
+        var fields = SelectedRowFields
+            .Select(field => new DatasetFieldValue(field.Name, field.ValueText, field.Kind))
+            .ToArray();
+        if (!DatasetFieldEditor.TryBuild(fields, out var json, out var buildError))
+        {
+            MessageEditError = buildError;
+            return;
+        }
+
+        await ApplySelectedRowJsonAsync(json, "Messages applied; save to write them.");
+    }
+
+    /// <summary>Rebuilds the row's messages field from the structured editor.</summary>
+    private bool TryApplyMessagesToField(out string? error)
+    {
+        error = null;
+        if (!DatasetMessageEditor.TryBuild(
+                Messages.Select(message => message.ToValue()),
+                out var json,
+                out error))
+        {
+            return false;
+        }
+
+        var field = SelectedRowFields.FirstOrDefault(
+            field => field.Name == DatasetMessageEditor.MessagesFieldName);
+        if (field is null)
+        {
+            error = "The row has no 'messages' field.";
+            return false;
+        }
+
+        field.ValueText = json;
+        _messagesStructureDirty = false;
+        return true;
+    }
+
+    #endregion
 
     private async Task ApplySelectedRowJsonAsync(string json, string status)
     {
@@ -874,6 +997,24 @@ public partial class DataWorkbenchViewModel : ObservableObject
 
     private bool CanRemoveField() => CanEditFields() && SelectedField is not null;
 
+    private bool CanEditMessages() => CanEditSelectedRow() && HasMessages;
+
+    private bool CanRemoveMessage() => CanEditMessages() && SelectedMessage is not null;
+
+    private bool CanMoveMessageUp() =>
+        CanEditMessages() &&
+        SelectedMessage is not null &&
+        Messages.IndexOf(SelectedMessage) > 0;
+
+    private bool CanMoveMessageDown()
+    {
+        if (!CanEditMessages() || SelectedMessage is null) return false;
+        var index = Messages.IndexOf(SelectedMessage);
+        return index >= 0 && index < Messages.Count - 1;
+    }
+
+    private bool CanApplyMessages() => CanEditMessages() && MessagesDirty;
+
     private bool CanUndoEdit() =>
         _editSession?.CanUndo == true && !IsBusy && !IsConverting && !IsSavingEdits;
 
@@ -896,6 +1037,22 @@ public partial class DataWorkbenchViewModel : ObservableObject
         UndoEditCommand.NotifyCanExecuteChanged();
         RedoEditCommand.NotifyCanExecuteChanged();
         DiscardEditsCommand.NotifyCanExecuteChanged();
+        NotifyMessageCommands();
+    }
+
+    private void NotifyMessageCommands()
+    {
+        AddMessageCommand.NotifyCanExecuteChanged();
+        RemoveMessageCommand.NotifyCanExecuteChanged();
+        MoveMessageUpCommand.NotifyCanExecuteChanged();
+        MoveMessageDownCommand.NotifyCanExecuteChanged();
+        ApplyMessagesCommand.NotifyCanExecuteChanged();
+    }
+
+    private void NotifyMessagesDirty()
+    {
+        OnPropertyChanged(nameof(MessagesDirty));
+        NotifyMessageCommands();
     }
 
     private void ApplyHighlight(DatasetRowViewModel row)
@@ -928,17 +1085,62 @@ public partial class DataWorkbenchViewModel : ObservableObject
             }
 
             SelectedField = SelectedRowFields.FirstOrDefault();
-            SelectedEditorTabIndex = 0;
         }
         else
         {
             FieldsAvailable = false;
-            SelectedEditorTabIndex = 1;
         }
 
         ApplyFieldsCommand.NotifyCanExecuteChanged();
         AddFieldCommand.NotifyCanExecuteChanged();
         RemoveFieldCommand.NotifyCanExecuteChanged();
+    }
+
+    private void LoadMessagesFromRow()
+    {
+        foreach (var message in Messages)
+        {
+            message.PropertyChanged -= OnMessagePropertyChanged;
+        }
+
+        Messages.Clear();
+        SelectedMessage = null;
+        MessageEditError = null;
+        _messagesStructureDirty = false;
+        HasMessages = false;
+
+        var field = SelectedRowFields.FirstOrDefault(
+            field => field.Name == DatasetMessageEditor.MessagesFieldName);
+        if (field is not null &&
+            DatasetMessageEditor.TryReadMessages(field.ValueText, out var messages, out _))
+        {
+            HasMessages = true;
+            foreach (var message in messages)
+            {
+                Messages.Add(CreateMessageViewModel(message));
+            }
+
+            SelectedMessage = Messages.FirstOrDefault();
+        }
+
+        NotifyMessagesDirty();
+    }
+
+    private DatasetMessageViewModel CreateMessageViewModel(DatasetMessage message)
+    {
+        var model = new DatasetMessageViewModel(message);
+        model.PropertyChanged += OnMessagePropertyChanged;
+        return model;
+    }
+
+    private void OnMessagePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(DatasetMessageViewModel.Role)
+            or nameof(DatasetMessageViewModel.ContentText)
+            or nameof(DatasetMessageViewModel.ToolCallsText))
+        {
+            NotifyMessagesDirty();
+        }
     }
 
     private void OnFieldPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -1107,8 +1309,12 @@ public partial class DataWorkbenchViewModel : ObservableObject
         RowEditError = null;
         SelectedJsonText = value?.Json ?? string.Empty;
         LoadFieldsFromRow();
+        LoadMessagesFromRow();
+        SelectedEditorTabIndex = HasMessages ? 1 : FieldsAvailable ? 0 : 2;
         NotifyEditCommands();
     }
+
+    partial void OnHasMessagesChanged(bool value) => NotifyMessageCommands();
 
     partial void OnSelectedJsonTextChanged(string value) => ApplyRowEditCommand.NotifyCanExecuteChanged();
 
@@ -1185,6 +1391,62 @@ public sealed partial class DatasetFieldViewModel : ObservableObject
     public bool IsDirty => !string.Equals(ValueText, OriginalValueText, StringComparison.Ordinal);
 
     partial void OnValueTextChanged(string value) => OnPropertyChanged(nameof(IsDirty));
+}
+
+/// <summary>
+/// One chat message of the selected row. Only role, content and tool_calls are editable;
+/// every other property is carried through from <see cref="DatasetMessage.RawJson"/>.
+/// </summary>
+public sealed partial class DatasetMessageViewModel : ObservableObject
+{
+    private readonly string _originalRole;
+    private readonly string _originalContentText;
+    private readonly string _originalToolCallsText;
+
+    public DatasetMessageViewModel(DatasetMessage message)
+    {
+        _originalRole = message.Role;
+        _originalContentText = message.ContentText;
+        _originalToolCallsText = message.ToolCallsText;
+        _role = message.Role;
+        _contentText = message.ContentText;
+        _toolCallsText = message.ToolCallsText;
+        _showToolCalls = !string.IsNullOrWhiteSpace(message.ToolCallsText);
+        ContentIsJson = message.ContentIsJson;
+        RawJson = message.RawJson;
+    }
+
+    public IReadOnlyList<string> Roles => DatasetMessageEditor.CommonRoles;
+
+    public bool ContentIsJson { get; }
+
+    public string RawJson { get; }
+
+    [ObservableProperty]
+    private string _role;
+
+    [ObservableProperty]
+    private string _contentText;
+
+    [ObservableProperty]
+    private string _toolCallsText;
+
+    [ObservableProperty]
+    private bool _showToolCalls;
+
+    public bool IsDirty =>
+        !string.Equals(Role, _originalRole, StringComparison.Ordinal) ||
+        !string.Equals(ContentText, _originalContentText, StringComparison.Ordinal) ||
+        !string.Equals(ToolCallsText, _originalToolCallsText, StringComparison.Ordinal);
+
+    public DatasetMessage ToValue() =>
+        new(Role, ContentText, ContentIsJson, ToolCallsText, RawJson);
+
+    partial void OnRoleChanged(string value) => OnPropertyChanged(nameof(IsDirty));
+
+    partial void OnContentTextChanged(string value) => OnPropertyChanged(nameof(IsDirty));
+
+    partial void OnToolCallsTextChanged(string value) => OnPropertyChanged(nameof(IsDirty));
 }
 
 /// <summary>

@@ -204,7 +204,7 @@ public partial class DataWorkbenchView : UserControl
             return;
         }
 
-        vm.SelectedEditorTabIndex = 1;
+        vm.SelectedEditorTabIndex = 2;
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
             RowJsonEditor.Focus();

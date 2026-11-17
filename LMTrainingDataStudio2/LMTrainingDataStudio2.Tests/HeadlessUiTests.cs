@@ -225,6 +225,51 @@ public sealed class HeadlessUiTests
     }
 
     [AvaloniaTest]
+    public async Task DataWorkbench_MessagesTab_RendersStructuredEditor()
+    {
+        var vm = new MainWindowViewModel(new SettingsStore(Path.Combine(_directory, "settings.json")));
+        var window = new MainWindow { DataContext = vm };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        try
+        {
+            var path = Path.Combine(_directory, "chat.jsonl");
+            await File.WriteAllTextAsync(path,
+                """{"id":1,"messages":[{"role":"user","content":"hi"},{"role":"assistant","content":"hello"}]}""");
+
+            vm.SwitchToDataCommand.Execute(null);
+            Dispatcher.UIThread.RunJobs();
+
+            await vm.DataWorkbench.OpenDatasetAsync(path);
+            vm.DataWorkbench.SelectedRow = vm.DataWorkbench.Rows[0];
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.That(vm.DataWorkbench.HasMessages, Is.True);
+            Assert.That(vm.DataWorkbench.SelectedEditorTabIndex, Is.EqualTo(1));
+
+            var tabs = window.GetVisualDescendants()
+                .OfType<TabControl>()
+                .FirstOrDefault(control => control.Name == "RowEditorTabs");
+            Assert.That(tabs, Is.Not.Null);
+            Assert.That(tabs!.ItemCount, Is.EqualTo(3));
+
+            var names = window.GetVisualDescendants()
+                .OfType<Control>()
+                .Select(control => control.Name)
+                .ToArray();
+            Assert.That(names, Does.Contain("MessageList"));
+            Assert.That(names, Does.Contain("AddMessageButton"));
+            Assert.That(names, Does.Contain("RemoveMessageButton"));
+            Assert.That(names, Does.Contain("ApplyMessagesButton"));
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaTest]
     public void HighlightBehavior_RendersMatchedRuns()
     {
         var block = new TextBlock();

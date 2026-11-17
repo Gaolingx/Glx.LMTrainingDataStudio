@@ -23,7 +23,7 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - Sampler：确定性多文件切分、按 splits 生成多输出端口、分层采样与统计预览
 - Tool Profile：参数树编辑、JSON 导入导出，并被 Simulation/LLM 引用复用
 - 统一数据集 IO：JSONL / CSV / Parquet 分页读取与原子写出；Seed 支持三种格式
-- 数据工作台（Data 视图）：分页预览、行号跳转、页面大小切换、逐行 CRUD（插入/复制/删除/恢复）、字段级单元格编辑与整行 JSON 编辑、撤销/重做、编辑另存或覆盖源文件
+- 数据工作台（Data 视图）：分页预览、行号跳转、页面大小切换、逐行 CRUD（插入/复制/删除/恢复）、字段级单元格编辑与整行 JSON 编辑、`messages` 角色/内容/tool_calls 结构化表单、撤销/重做、编辑另存或覆盖源文件
 - 搜索命中行内高亮；校验问题按级别/错误码筛选，并支持按级别/错误码分组树
 - 统一样本预览弹窗：SFT Export 输出、Validator 拒绝行、Simulation 失败样本、Cleaner 前后 diff，可一键在数据工作台打开
 - 数据质量与治理：校验问题列表（级别/行号/JSON 路径/错误码）与跳行、JSONL 自动修复预览与写副本、搜索/正则替换、去重、固定 seed 混洗、比例/份数切分、数据集统计

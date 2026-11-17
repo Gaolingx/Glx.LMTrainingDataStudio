@@ -2,6 +2,30 @@
 
 本文件记录用户可见变更与工程化修复。完整未完成清单见 [PLAN/TODO/01-Bugfix1/HANDOFF.md](PLAN/TODO/01-Bugfix1/HANDOFF.md)。
 
+## [Unreleased] — 2026-11-18（Round 22 / 数据工作台 messages 结构化编辑）
+
+### Added
+
+- 数据工作台行编辑器新增“消息”标签页：把顶层 `messages` 数组展示为角色/内容表单，支持增删消息与上下移动。
+- 每条消息可展开编辑 `tool_calls`（JSON 数组）；结构化内容（数组/对象）按 JSON 编辑并标记“内容为 JSON”。
+- 应用消息时保留消息中未暴露的字段（如 `name`、`tool_call_id`）与行内其他顶层字段；Raw JSON 仍作为兜底。
+- 字段与消息同时有未应用修改时，“应用字段”会一并提交消息修改，避免互相覆盖。
+
+### Changed
+
+- 行编辑器标签顺序调整为“字段 / 消息 / 原始 JSON”；有 `messages` 时默认打开消息页，否则维持字段页或原始 JSON。
+- 新增 zh-CN/en-US 本地化键（消息页、增删/上下移、应用消息）。
+
+### Tests
+
+- `--list-tests`：620 个用例；`dotnet test`：612 通过 / 0 失败 / 7 跳过（另 1 个 `[Explicit]`）。
+- 新增 `DatasetMessageEditorTests`（读写往返、字段保留、结构化内容、tool_calls 校验）、数据工作台消息表单与字段合并回归、Headless 面板检查。
+
+### Known Issues
+
+- 除 `messages` 外的嵌套结构仍需在 Raw JSON 中编辑。
+- 数据工作台暂无列排序/条件筛选/列宽持久化（191）。
+
 ## [Unreleased] — 2026-11-18（Round 21 / LLM 工具回填与 Anthropic 结构化输出）
 
 ### Added
