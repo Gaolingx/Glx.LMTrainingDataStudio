@@ -1,4 +1,5 @@
 using LMTrainingDataStudio2.Models;
+using LMTrainingDataStudio2.Services;
 using LMTrainingDataStudio2.Services.Datasets;
 using LMTrainingDataStudio2.ViewModels;
 
@@ -299,6 +300,25 @@ public sealed class DataWorkbenchViewModelTests
         Assert.That(Path.GetFileName(vm.SourcePath), Is.EqualTo("fast.jsonl"));
         Assert.That(vm.Rows, Has.Count.EqualTo(1));
         Assert.That(vm.IsBusy, Is.False);
+    }
+
+    [Test]
+    public async Task SettingsUpdate_RoutesNewReadersToUpdatedCacheDirectory()
+    {
+        var service = new AppSettingsService(_settings);
+        var vm = new DataWorkbenchViewModel(service);
+
+        await vm.OpenDatasetAsync(CreateJsonl(10));
+        var firstCache = _settings.CacheDirectory;
+        Assert.That(Directory.GetFiles(firstCache, "*.db"), Is.Not.Empty);
+
+        var updatedCache = Path.Combine(_directory, "cache-updated");
+        service.Update(new AppSettings { CacheDirectory = updatedCache, MaxCacheSizeMb = 16 });
+
+        await vm.OpenDatasetAsync(CreateJsonl(10));
+
+        Assert.That(Directory.Exists(updatedCache), Is.True);
+        Assert.That(Directory.GetFiles(updatedCache, "*.db"), Is.Not.Empty);
     }
 
     private static async Task WaitForAsync(Func<bool> condition)

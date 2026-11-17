@@ -18,18 +18,25 @@ public partial class MainWindowViewModel : ObservableObject
 {
     private readonly RecipeValidationService _recipeValidation = new();
     private readonly ISettingsStore _settingsStore;
+    private readonly AppSettingsService _settingsService;
     private readonly RecipeStore _recipeStore;
     private readonly RecipePresetStore _presetStore;
     private readonly ExecutionStore _executionStore = new();
     private readonly HttpClient _llmHttpClient = new();
     private readonly List<string> _presetLoadWarnings = new();
-    private AppSettings _settings;
     private CancellationTokenSource? _runCancellation;
     private ExecutionPauseController? _runPause;
     private string _recipeId = Guid.NewGuid().ToString("N");
     private DateTime _recipeCreatedAt = DateTime.UtcNow;
     private DateTime _recipeModifiedAt = DateTime.UtcNow;
     private bool _suppressDocumentEvents;
+
+    private AppSettings Settings => _settingsService.Current;
+
+    /// <summary>
+    /// Settings live in effect; long-lived services can subscribe to <see cref="IAppSettingsService.Changed"/>.
+    /// </summary>
+    public IAppSettingsService SettingsService => _settingsService;
 
     [ObservableProperty]
     private string _recipeName = "Untitled Recipe";
@@ -193,11 +200,11 @@ public partial class MainWindowViewModel : ObservableObject
         _recipeStore = recipeStore ?? new RecipeStore();
         _presetStore = presetStore ?? new RecipePresetStore();
         var loadResult = _settingsStore.Load();
-        _settings = loadResult.Settings;
-        LocalizationService.Instance.SetLanguage(_settings.Language);
-        ThemeManager.Apply(_settings.IsDarkTheme);
+        _settingsService = new AppSettingsService(loadResult.Settings);
+        LocalizationService.Instance.SetLanguage(Settings.Language);
+        ThemeManager.Apply(Settings.IsDarkTheme);
         Executions = new ExecutionsViewModel(_executionStore);
-        DataWorkbench = new DataWorkbenchViewModel(_settings);
+        DataWorkbench = new DataWorkbenchViewModel(_settingsService);
 
         LoadSettingsSnapshot();
         InitializeBlockTemplates();
@@ -224,22 +231,22 @@ public partial class MainWindowViewModel : ObservableObject
 
     private void LoadSettingsSnapshot()
     {
-        MaxCacheSizeMb = _settings.MaxCacheSizeMb;
-        CacheDirectory = _settings.CacheDirectory;
-        EnableGridSnap = _settings.EnableGridSnap;
-        GridSnapSize = _settings.GridSnapSize;
-        MaxParallelism = _settings.MaxParallelism;
-        NodeRetryCount = _settings.NodeRetryCount;
-        RunOutputDirectory = _settings.RunOutputDirectory ?? string.Empty;
-        SpillThresholdRows = _settings.SpillThresholdRows;
-        RunTempDirectory = _settings.RunTempDirectory;
-        IsDarkTheme = _settings.IsDarkTheme;
-        OpenAiApiKey = _settings.OpenAiApiKey ?? string.Empty;
-        AnthropicApiKey = _settings.AnthropicApiKey ?? string.Empty;
-        SelectedLanguageOption = LanguageCatalog.Resolve(_settings.Language);
+        MaxCacheSizeMb = Settings.MaxCacheSizeMb;
+        CacheDirectory = Settings.CacheDirectory;
+        EnableGridSnap = Settings.EnableGridSnap;
+        GridSnapSize = Settings.GridSnapSize;
+        MaxParallelism = Settings.MaxParallelism;
+        NodeRetryCount = Settings.NodeRetryCount;
+        RunOutputDirectory = Settings.RunOutputDirectory ?? string.Empty;
+        SpillThresholdRows = Settings.SpillThresholdRows;
+        RunTempDirectory = Settings.RunTempDirectory;
+        IsDarkTheme = Settings.IsDarkTheme;
+        OpenAiApiKey = Settings.OpenAiApiKey ?? string.Empty;
+        AnthropicApiKey = Settings.AnthropicApiKey ?? string.Empty;
+        SelectedLanguageOption = LanguageCatalog.Resolve(Settings.Language);
 
         RecentFiles.Clear();
-        foreach (var path in _settings.RecentFiles)
+        foreach (var path in Settings.RecentFiles)
         {
             if (File.Exists(path) &&
                 !RecentFiles.Any(existing => string.Equals(existing, path, StringComparison.OrdinalIgnoreCase)))
@@ -448,7 +455,7 @@ public partial class MainWindowViewModel : ObservableObject
     /// </summary>
     public async Task<bool> RestoreLastRecipeAsync()
     {
-        var path = _settings.LastRecipePath;
+        var path = Settings.LastRecipePath;
         if (string.IsNullOrWhiteSpace(path))
         {
             return false;
@@ -714,11 +721,11 @@ public partial class MainWindowViewModel : ObservableObject
     private async Task ClearRecentFilesAsync()
     {
         RecentFiles.Clear();
-        _settings.RecentFiles = new List<string>();
+        Settings.RecentFiles = new List<string>();
 
         try
         {
-            await _settingsStore.SaveAsync(_settings);
+            await _settingsStore.SaveAsync(Settings);
             StatusText = "Recent files cleared";
             LogMessages.Add("[Info] Recent files cleared.");
         }
@@ -747,12 +754,12 @@ public partial class MainWindowViewModel : ObservableObject
 
     private async Task PersistDocumentStateAsync()
     {
-        _settings.RecentFiles = RecentFiles.ToList();
-        _settings.LastRecipePath = string.IsNullOrWhiteSpace(CurrentFilePath) ? null : CurrentFilePath;
+        Settings.RecentFiles = RecentFiles.ToList();
+        Settings.LastRecipePath = string.IsNullOrWhiteSpace(CurrentFilePath) ? null : CurrentFilePath;
 
         try
         {
-            await _settingsStore.SaveAsync(_settings);
+            await _settingsStore.SaveAsync(Settings);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {
@@ -1192,14 +1199,14 @@ public partial class MainWindowViewModel : ObservableObject
         _recipeValidation,
         new IBlockExecutor[]
         {
-            new SeedBlockExecutor(_settings),
+            new SeedBlockExecutor(Settings),
             new ExpressionBlockExecutor(),
             new ValidatorBlockExecutor(),
             new SamplerBlockExecutor(),
-            new LlmBlockExecutor(new LlmApiClient(_llmHttpClient, new LlmCredentials(_settings))),
+            new LlmBlockExecutor(new LlmApiClient(_llmHttpClient, new LlmCredentials(Settings))),
             new ToolProfileBlockExecutor(),
             new QuerySourceBlockExecutor(),
-            new SimulationBlockExecutor(new LlmCredentials(_settings), _llmHttpClient),
+            new SimulationBlockExecutor(new LlmCredentials(Settings), _llmHttpClient),
             new CleanerBlockExecutor(),
             new SftExportBlockExecutor()
         },
@@ -1343,7 +1350,7 @@ public partial class MainWindowViewModel : ObservableObject
     /// <summary>Creates a sample preview whose "open in Data" action switches views and opens the file.</summary>
     public SamplePreviewViewModel CreateSamplePreview()
     {
-        var preview = new SamplePreviewViewModel(_settings);
+        var preview = new SamplePreviewViewModel(Settings);
         preview.OpenInDataRequested = OpenDatasetInDataViewAsync;
         return preview;
     }
@@ -1422,10 +1429,9 @@ public partial class MainWindowViewModel : ObservableObject
         try
         {
             await _settingsStore.SaveAsync(settings);
-            _settings = settings;
+            _settingsService.Update(settings);
             ThemeManager.Apply(settings.IsDarkTheme);
             LocalizationService.Instance.SetLanguage(settings.Language);
-            DataWorkbench.ApplySettings(settings);
             LoadSettingsSnapshot();
             StatusText = "Settings saved ✓";
             LogMessages.Add($"[Info] Settings saved to '{_settingsStore.FilePath}'.");
@@ -1514,7 +1520,7 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void CleanIndexCache()
     {
-        var service = new IndexCacheService(_settings);
+        var service = new IndexCacheService(Settings);
         service.CleanCache();
         UpdateCacheSizeText();
         StatusText = "Index cache cleaned ✓";
@@ -1535,7 +1541,7 @@ public partial class MainWindowViewModel : ObservableObject
     {
         try
         {
-            using var service = new IndexCacheService(_settings);
+            using var service = new IndexCacheService(Settings);
             var mb = service.GetTotalCacheSize() / (1024.0 * 1024.0);
             CacheSizeText = $"{mb:F1} MB";
         }

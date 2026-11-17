@@ -25,10 +25,10 @@ public partial class DataWorkbenchViewModel : ObservableObject
         new(DatasetFormat.Pretrain, "Pretrain text")
     };
 
-    private readonly DatasetBatchConverter _converter;
-    private readonly Func<DataFileType, IDatasetReader> _readerFactory;
+    private readonly IAppSettingsService _settingsService;
+    private readonly Func<DataFileType, IDatasetReader>? _readerFactoryOverride;
+    private DatasetBatchConverter _converter;
     private DatasetEditService _editService;
-    private AppSettings _settings;
     private IDatasetReader? _reader;
     private DataFileType _sourceFileType;
     private CancellationTokenSource? _conversionCancellation;
@@ -188,23 +188,30 @@ public partial class DataWorkbenchViewModel : ObservableObject
     }
 
     public DataWorkbenchViewModel(AppSettings settings)
-        : this(settings, fileType => DatasetIO.CreateReader(fileType, settings))
+        : this(new AppSettingsService(settings))
     {
     }
 
     internal DataWorkbenchViewModel(
         AppSettings settings,
         Func<DataFileType, IDatasetReader> readerFactory)
+        : this(new AppSettingsService(settings), readerFactory)
     {
-        _settings = settings ?? throw new ArgumentNullException(nameof(settings));
-        _readerFactory = readerFactory ?? throw new ArgumentNullException(nameof(readerFactory));
-        _converter = new DatasetBatchConverter(settings);
-        _editService = new DatasetEditService(settings);
+    }
 
-        Validation = new DatasetValidationViewModel(settings);
-        Search = new DatasetSearchReplaceViewModel(settings);
-        Transform = new DatasetTransformViewModel(settings);
-        Statistics = new DatasetStatisticsViewModel(settings);
+    internal DataWorkbenchViewModel(
+        IAppSettingsService settingsService,
+        Func<DataFileType, IDatasetReader>? readerFactory = null)
+    {
+        _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
+        _readerFactoryOverride = readerFactory;
+        _converter = new DatasetBatchConverter(settingsService.Current);
+        _editService = new DatasetEditService(settingsService.Current);
+
+        Validation = new DatasetValidationViewModel(settingsService.Current);
+        Search = new DatasetSearchReplaceViewModel(settingsService.Current);
+        Transform = new DatasetTransformViewModel(settingsService.Current);
+        Statistics = new DatasetStatisticsViewModel(settingsService.Current);
 
         Validation.JumpRequested += line => _ = JumpToLineAsync(line);
         Search.JumpRequested += line => _ = JumpToLineAsync(line);
@@ -218,11 +225,16 @@ public partial class DataWorkbenchViewModel : ObservableObject
                 HighlightCaseSensitive = Search.CaseSensitive;
             }
         };
+
+        _settingsService.Changed += OnSettingsChanged;
     }
 
-    public void ApplySettings(AppSettings settings)
+    private void OnSettingsChanged(object? sender, SettingsChangedEventArgs e) =>
+        ApplySettings(e.Current);
+
+    private void ApplySettings(AppSettings settings)
     {
-        _settings = settings;
+        _converter = new DatasetBatchConverter(settings);
         _editService = new DatasetEditService(settings);
         Validation.ApplySettings(settings);
         Search.ApplySettings(settings);
@@ -257,7 +269,8 @@ public partial class DataWorkbenchViewModel : ObservableObject
         try
         {
             var fileType = DatasetIO.DetectFileType(path);
-            reader = _readerFactory(fileType);
+            reader = _readerFactoryOverride?.Invoke(fileType)
+                     ?? DatasetIO.CreateReader(fileType, _settingsService.Current);
             await reader.OpenAsync(path, cancellation.Token);
 
             if (openVersion != _openVersion || cancellation.IsCancellationRequested)
@@ -951,7 +964,7 @@ public partial class DataWorkbenchViewModel : ObservableObject
 
     private async Task ReopenAfterOverwriteAsync()
     {
-        var reader = DatasetIO.CreateReader(_sourceFileType, _settings);
+        var reader = DatasetIO.CreateReader(_sourceFileType, _settingsService.Current);
         await reader.OpenAsync(SourcePath);
         _reader = reader;
         TotalRows = reader.TotalRows;

@@ -91,5 +91,22 @@ public sealed class SettingsPanelTests
         Assert.That(saved.NodeRetryCount, Is.EqualTo(2));
         Assert.That(saved.SpillThresholdRows, Is.EqualTo(20_000));
         Assert.That(saved.GridSnapSize, Is.EqualTo(24));
+        Assert.That(vm.SettingsService.Current.MaxParallelism, Is.EqualTo(8));
+    }
+
+    [Test]
+    public async Task ApplySettings_NotifiesSubscribers()
+    {
+        var vm = CreateViewModel(out _);
+        vm.OpenSettingsCommand.Execute(null);
+        UseWritableDirectories(vm);
+        vm.MaxParallelism = 6;
+        SettingsChangedEventArgs? captured = null;
+        vm.SettingsService.Changed += (_, args) => captured = args;
+
+        await vm.ApplySettingsCommand.ExecuteAsync(null);
+
+        Assert.That(captured, Is.Not.Null);
+        Assert.That(captured!.Current.MaxParallelism, Is.EqualTo(6));
     }
 }

@@ -2,6 +2,28 @@
 
 本文件记录用户可见变更与工程化修复。完整未完成清单见 [PLAN/TODO/01-Bugfix1/HANDOFF.md](PLAN/TODO/01-Bugfix1/HANDOFF.md)。
 
+## [Unreleased] — 2026-11-18（Round 25 / web_fetch DNS 加固与设置通知）
+
+### Added
+
+- 新增 `IAppSettingsService` / `AppSettingsService`：保存当前设置并在 Apply 成功后发布 `Changed`；主窗口通过 `SettingsService` 暴露给长生命周期服务。
+- 数据工作台订阅设置变更，保存新设置后自动重建读取器工厂、批量转换器与校验/搜索/转换/统计子服务。
+
+### Changed
+
+- `web_fetch` 只解析一次主机名，并固定连接已校验的 IP（`SocketsHttpHandler.ConnectCallback`），关闭 DNS 重绑定窗口；任一解析结果为私网/回环即拒绝，混合结果同样拒绝。
+- 修复数据工作台读取器工厂长期持有旧设置、批量转换器不随设置更新的问题；新打开或覆盖重开的数据集使用当前缓存目录与容量。
+- 保留测试用 `HttpClient` 注入口；未注入时使用固定地址客户端，重定向仍关闭。
+
+### Tests
+
+- `--list-tests`：638 个用例；`dotnet test`：630 通过 / 0 失败 / 7 跳过（另 1 个 `[Explicit]`）。
+- 新增 web_fetch 混合私网结果拒绝、只解析一次并固定地址、设置变更事件、数据工作台缓存目录切换与 Apply 通知等 6 项测试。
+
+### Known Issues
+
+- 未在真实公网执行抓取，也未手工验证 HTTPS/SNI；诊断日志内容脱敏、目录 ACL 与域名白名单仍未做。
+
 ## [Unreleased] — 2026-11-18（Round 24 / API Key DPAPI 加密）
 
 ### Added
@@ -23,7 +45,7 @@
 ### Known Issues
 
 - DPAPI 绑定当前 Windows 用户；更换用户或迁移机器后需重新输入 Key（环境变量仍可兜底）。
-- 设置变更通知、`Settings`/索引缓存 schema 版本与迁移策略仍未做。
+- 设置变更通知已在 Round 25 完成；`Settings`/索引缓存 schema 版本与迁移策略仍未做。
 
 ## [Unreleased] — 2026-11-18（Round 23 / Tool Profile 枚举与输出冲突校验）
 

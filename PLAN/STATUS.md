@@ -1,7 +1,7 @@
 # STATUS — 功能清单、节点能力矩阵与下一阶段规划
 
-> 最后核对：2026-11-18（Round 24 完成）
-> 验证基线：`dotnet build` 0 警告 0 错误（分析器开启）；`dotnet test` 624 通过 + 7 个 gated 测试（2 个真实 provider 冒烟 + 5 个性能 gated，默认跳过），另有 1 个 `[Explicit]` 示例生成；`--list-tests` 632 个用例；`dotnet format --verify-no-changes` 通过；覆盖率总行 74.64%、Services/Commands 84.32%；Headless UI 测试通过；1M 行 JSONL、1M 行质量操作与 1M 行编辑保存基线通过；10M 行链路与 CSV/Parquet 大规模基线入口已提供；win-x64 单文件发布与 Debug 启动冒烟通过。
+> 最后核对：2026-11-18（Round 25 完成）
+> 验证基线：`dotnet build` 0 警告 0 错误（分析器开启）；`dotnet test` 630 通过 + 7 个 gated 测试（2 个真实 provider 冒烟 + 5 个性能 gated，默认跳过），另有 1 个 `[Explicit]` 示例生成；`--list-tests` 638 个用例；`dotnet format --verify-no-changes` 通过；覆盖率总行 74.64%、Services/Commands 84.32%；Headless UI 测试通过；1M 行 JSONL、1M 行质量操作与 1M 行编辑保存基线通过；10M 行链路与 CSV/Parquet 大规模基线入口已提供；win-x64 单文件发布与 Debug 启动冒烟通过。
 >
 > 图例：`[x]` 已完成并有测试/验证；`[部分]` 可用但有明确缺口；`[ ]` 未实现。
 >
@@ -40,7 +40,7 @@
 - CSV/Parquet 大规模基线：20 万行 @256B，JSONL→CSV 14.3s、JSONL→Parquet 13.1s、最慢 100 行分页 18.2ms、托管内存增量 17MB。
 - 10 种节点类型全部接入 Block Sheet、画布、默认配置与 Recipe JSON。
 - Query Source → Simulation → Cleaner → SFT Export 端到端 SFT 轨迹生成可用（脚本/真实 provider、模拟/真实工具均可切换）。
-- 真实 provider tool-calling（OpenAI Chat/Responses、Anthropic）与真实沙箱工具（python/PowerShell/bash/web_fetch）；设置中的 API Key 使用 Windows DPAPI 加密落盘，旧明文自动迁移。
+- 真实 provider tool-calling（OpenAI Chat/Responses、Anthropic）与真实沙箱工具（python/PowerShell/bash/web_fetch）；设置中的 API Key 使用 Windows DPAPI 加密落盘，旧明文自动迁移；web_fetch 连接固定为已校验的解析地址，关闭 DNS 重绑定窗口。
 - 画布交互：网格/吸附（Alt 关闭）、鼠标中心缩放、Fit、拓扑自动布局、Mini-map 视口与点击导航、双击添加、复制携带连线、内联重命名、真实端口坐标、边 hover、增量拖拽、可拖动分栏。
 - 工作流预设：6 个基础流水线可从 File → New from Preset 或节点库一键加载，加载遵守脏文档确认。
 - 自定义预设：当前 Recipe 可保存为预设；支持导入外部预设（分配新本地 ID）与删除；单文件存于 `%APPDATA%\LMTrainingDataStudio\presets`，坏文件跳过并告警。
@@ -60,7 +60,7 @@
 - 发布：MSIX 清单/打包脚本、Inno Setup 安装脚本；`examples/` 6 个示例 Recipe；README Dark/Light 截图。
 - 工程质量：`.editorconfig`、.NET 分析器 `latest-recommended`、警告即错误；构建 0 警告。
 - 工程化：滚动日志与全局异常、GitHub Actions CI、win-x64 单文件发布脚本、Headless UI 测试、MIT LICENSE、应用图标。
-- 632 个自动化测试：624 个常规通过 + 7 个 gated（2 个真实 provider 冒烟 + 5 个性能 gated）+ 1 个 Explicit 示例生成。
+- 638 个自动化测试：630 个常规通过 + 7 个 gated（2 个真实 provider 冒烟 + 5 个性能 gated）+ 1 个 Explicit 示例生成。
 
 ### 1.2 当前最大缺口（按优先级）
 
@@ -357,7 +357,7 @@
 - [部分] 校验：已覆盖端口契约、必需输入、单输入、方向/类型、环与配置；缺少列号与问题分组（数据集校验已有错误码/路径）。
 - [x] 执行：层内并行/暂停/重试、输出摘要、节点间溢写/流式、节点级恢复、输出 SHA256/Recipe 指纹校验；检查点仍无配额。
 - [x] 画布：端口坐标、缩放锚点/Fit/自动布局/Mini-map 点击/复制连线、Undo/Redo 菜单、节点尺寸手柄、边动画、标签避让与属性撤销已完成；逐帧性能未做 UI 级计时。
-- [x] 设置：网格吸附、完整 Dark/Light 主题、语言切换与内存定时刷新生效；其他设置变更仍不通知已创建的服务。
+- [x] 设置：网格吸附、完整 Dark/Light 主题、语言切换与内存定时刷新生效；设置变更经 `IAppSettingsService` 通知长生命周期服务（数据工作台重建读取器工厂、批量转换器与子服务）。
 - [x] 主题：Dark/Light 资源完整，视图无 `#RRGGBB` 硬编码颜色残留。
 
 ### 3.3 未实现（按领域）
@@ -412,7 +412,7 @@
 - [部分] README 截图与 6 个示例 Recipe 已完成；发布说明由 [CHANGELOG.md](CHANGELOG.md) 承担。
 - [ ] 崩溃报告导出；日志级别/来源筛选。
 - [x] API Key 使用 Windows DPAPI 加密保存，旧明文加载时自动迁移；非 Windows 只使用环境变量。
-- [ ] 设置变更通知。
+- [x] 设置变更通知（`AppSettingsService` 事件；数据工作台已接入，按需服务在创建时读取当前设置）。
 - [部分] 运行日志/执行状态/统计摘要本地化（静态 UI、节点说明与预设已支持 zh-CN / en-US）。
 - [x] `.editorconfig`、分析器、警告即错误。
 
@@ -456,6 +456,7 @@
 | 22 | 数据工作台消息编辑 | `messages` 角色/内容/tool_calls 结构化表单、增删与上下移、字段/消息合并应用 | 620 用例（612 通过 + 7 gated + 1 Explicit） |
 | 23 | Tool Profile 与输出冲突 | Enum/默认值编辑、跨节点输出目标冲突校验（含 Sampler 分片展开） | 626 用例（618 通过 + 7 gated + 1 Explicit） |
 | 24 | API Key 加密与迁移 | Windows DPAPI（CurrentUser）加密落盘、旧明文自动迁移、非 Windows 环境变量回退 | 632 用例（624 通过 + 7 gated + 1 Explicit） |
+| 25 | 网络安全与设置通知 | web_fetch 固定已校验解析地址（SocketsHttpHandler.ConnectCallback）、混合公网/私网结果拒绝、设置变更事件与数据工作台自动刷新 | 638 用例（630 通过 + 7 gated + 1 Explicit） |
 
 ---
 

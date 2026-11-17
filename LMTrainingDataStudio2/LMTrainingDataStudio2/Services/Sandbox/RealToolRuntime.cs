@@ -27,15 +27,31 @@ public sealed class RealToolRuntime : IToolRuntime
     private readonly SandboxLimits _limits;
     private readonly ISandboxProcessRunner _runner;
     private readonly HttpClient _httpClient;
+    private readonly bool _hasInjectedHttpClient;
+    private readonly Func<Uri, CancellationToken, Task<IPAddress[]>> _resolveHost;
+    private readonly Func<IReadOnlyList<IPAddress>, HttpClient> _pinnedClientFactory;
 
     public RealToolRuntime(
         SandboxLimits? limits,
         ISandboxProcessRunner runner,
         HttpClient? httpClient = null)
+        : this(limits, runner, httpClient, resolveHost: null, pinnedClientFactory: null)
+    {
+    }
+
+    internal RealToolRuntime(
+        SandboxLimits? limits,
+        ISandboxProcessRunner runner,
+        HttpClient? httpClient,
+        Func<Uri, CancellationToken, Task<IPAddress[]>>? resolveHost,
+        Func<IReadOnlyList<IPAddress>, HttpClient>? pinnedClientFactory)
     {
         _limits = limits ?? new SandboxLimits();
         _runner = runner ?? throw new ArgumentNullException(nameof(runner));
         _httpClient = httpClient ?? DefaultHttpClient;
+        _hasInjectedHttpClient = httpClient is not null;
+        _resolveHost = resolveHost ?? ResolveHostAsync;
+        _pinnedClientFactory = pinnedClientFactory ?? CreatePinnedHttpClient;
     }
 
     public async Task<string> ExecuteAsync(
@@ -186,7 +202,7 @@ public sealed class RealToolRuntime : IToolRuntime
                 $"Tool '{toolName}' does not allow credentials embedded in URLs.");
         }
 
-        await EnsureHostAllowedAsync(uri, cancellationToken);
+        var pinnedAddresses = await ResolveAllowedAddressesAsync(uri, cancellationToken);
 
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         if (_limits.TimeoutMs > 0)
@@ -194,65 +210,94 @@ public sealed class RealToolRuntime : IToolRuntime
             timeoutCts.CancelAfter(_limits.TimeoutMs);
         }
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, uri);
-        request.Headers.UserAgent.ParseAdd("LMTrainingDataStudio2-Sandbox/1.0");
+        // When the host was validated, connect only to the addresses that were checked.
+        // The pinned client never resolves the hostname again, so a second DNS answer
+        // (rebinding) cannot redirect the request to a private address.
+        var client = _httpClient;
+        var disposeClient = false;
+        if (pinnedAddresses is not null && !_hasInjectedHttpClient)
+        {
+            client = _pinnedClientFactory(pinnedAddresses);
+            disposeClient = true;
+        }
 
-        HttpResponseMessage response;
         try
         {
-            response = await _httpClient.SendAsync(
-                request, HttpCompletionOption.ResponseHeadersRead, timeoutCts.Token);
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            throw new TimeoutException($"Tool '{toolName}' timed out after {_limits.TimeoutMs} ms.");
-        }
+            using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+            request.Headers.UserAgent.ParseAdd("LMTrainingDataStudio2-Sandbox/1.0");
 
-        using (response)
-        {
-            if (!response.IsSuccessStatusCode)
+            HttpResponseMessage response;
+            try
             {
-                throw new InvalidOperationException(
-                    $"Tool '{toolName}' fetch failed with HTTP {(int)response.StatusCode} ({response.StatusCode}).");
+                response = await client.SendAsync(
+                    request, HttpCompletionOption.ResponseHeadersRead, timeoutCts.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                throw new TimeoutException($"Tool '{toolName}' timed out after {_limits.TimeoutMs} ms.");
             }
 
-            var maxBytes = _limits.MaxFetchBytes <= 0 ? int.MaxValue : _limits.MaxFetchBytes;
-            await using var stream = await response.Content.ReadAsStreamAsync(timeoutCts.Token);
-            using var buffer = new MemoryStream(Math.Min(maxBytes, 64 * 1024));
-            var chunk = new byte[8192];
-            var truncated = false;
-
-            while (true)
+            using (response)
             {
-                var read = await stream.ReadAsync(chunk.AsMemory(), timeoutCts.Token);
-                if (read == 0)
+                if (!response.IsSuccessStatusCode)
                 {
-                    break;
+                    throw new InvalidOperationException(
+                        $"Tool '{toolName}' fetch failed with HTTP {(int)response.StatusCode} ({response.StatusCode}).");
                 }
 
-                if (buffer.Length + read > maxBytes)
+                var maxBytes = _limits.MaxFetchBytes <= 0 ? int.MaxValue : _limits.MaxFetchBytes;
+                await using var stream = await response.Content.ReadAsStreamAsync(timeoutCts.Token);
+                using var buffer = new MemoryStream(Math.Min(maxBytes, 64 * 1024));
+                var chunk = new byte[8192];
+                var truncated = false;
+
+                while (true)
                 {
-                    var take = (int)Math.Max(0, maxBytes - buffer.Length);
-                    buffer.Write(chunk, 0, take);
-                    truncated = true;
-                    break;
+                    var read = await stream.ReadAsync(chunk.AsMemory(), timeoutCts.Token);
+                    if (read == 0)
+                    {
+                        break;
+                    }
+
+                    if (buffer.Length + read > maxBytes)
+                    {
+                        var take = (int)Math.Max(0, maxBytes - buffer.Length);
+                        buffer.Write(chunk, 0, take);
+                        truncated = true;
+                        break;
+                    }
+
+                    buffer.Write(chunk, 0, read);
                 }
 
-                buffer.Write(chunk, 0, read);
+                var text = Encoding.UTF8.GetString(buffer.ToArray());
+                return truncated
+                    ? text + "\n[truncated at " + maxBytes + " bytes]"
+                    : text;
             }
-
-            var text = Encoding.UTF8.GetString(buffer.ToArray());
-            return truncated
-                ? text + "\n[truncated at " + maxBytes + " bytes]"
-                : text;
+        }
+        finally
+        {
+            if (disposeClient)
+            {
+                client.Dispose();
+            }
         }
     }
 
-    private async Task EnsureHostAllowedAsync(Uri uri, CancellationToken cancellationToken)
+    /// <summary>
+    /// Resolves the host once and returns the addresses that may be connected to.
+    /// The returned list is the authoritative connection target; callers must not
+    /// resolve the hostname again (that is what closes the DNS rebinding window).
+    /// Returns <see langword="null"/> when private networks are allowed and no check is needed.
+    /// </summary>
+    private async Task<IReadOnlyList<IPAddress>?> ResolveAllowedAddressesAsync(
+        Uri uri,
+        CancellationToken cancellationToken)
     {
         if (_limits.AllowPrivateNetwork)
         {
-            return;
+            return null;
         }
 
         IPAddress[] addresses;
@@ -264,7 +309,7 @@ public sealed class RealToolRuntime : IToolRuntime
         {
             try
             {
-                addresses = await Dns.GetHostAddressesAsync(uri.Host, cancellationToken);
+                addresses = await _resolveHost(uri, cancellationToken);
             }
             catch (SocketException ex)
             {
@@ -279,6 +324,56 @@ public sealed class RealToolRuntime : IToolRuntime
                 $"Tool 'web_fetch' blocked host '{uri.Host}' because it resolves to a loopback or private address. " +
                 "Enable AllowPrivateNetwork to override.");
         }
+
+        return addresses;
+    }
+
+    private static Task<IPAddress[]> ResolveHostAsync(Uri uri, CancellationToken cancellationToken) =>
+        Dns.GetHostAddressesAsync(uri.Host, cancellationToken);
+
+    private static HttpClient CreatePinnedHttpClient(IReadOnlyList<IPAddress> addresses) =>
+        new(new SocketsHttpHandler
+        {
+            AllowAutoRedirect = false,
+            AutomaticDecompression = DecompressionMethods.All,
+            ConnectCallback = (context, cancellationToken) =>
+                ConnectPinnedAsync(context.DnsEndPoint, addresses, cancellationToken)
+        })
+        {
+            Timeout = Timeout.InfiniteTimeSpan
+        };
+
+    private static async ValueTask<Stream> ConnectPinnedAsync(
+        DnsEndPoint endPoint,
+        IReadOnlyList<IPAddress> addresses,
+        CancellationToken cancellationToken)
+    {
+        Exception? lastError = null;
+        foreach (var address in addresses)
+        {
+            var socket = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
+            {
+                NoDelay = true
+            };
+            try
+            {
+                await socket.ConnectAsync(new IPEndPoint(address, endPoint.Port), cancellationToken);
+                return new NetworkStream(socket, ownsSocket: true);
+            }
+            catch (SocketException ex)
+            {
+                socket.Dispose();
+                lastError = ex;
+            }
+            catch
+            {
+                socket.Dispose();
+                throw;
+            }
+        }
+
+        throw new HttpRequestException(
+            $"Could not connect to any validated address for host '{endPoint.Host}'.", lastError);
     }
 
     private static bool IsPrivateAddress(IPAddress address)

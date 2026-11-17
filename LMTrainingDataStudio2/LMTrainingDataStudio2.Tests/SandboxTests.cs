@@ -374,6 +374,70 @@ public sealed class SandboxTests
     }
 
     [Test]
+    public void RealToolRuntime_WebFetch_BlocksHostResolvingToPrivateAddress()
+    {
+        var pinnedCalls = 0;
+        var runtime = CreateFetchRuntime(
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("unused", Encoding.UTF8, "text/plain")
+            },
+            maxFetchBytes: 1024,
+            resolveHost: (_, _) => Task.FromResult(new[]
+            {
+                IPAddress.Parse("93.184.216.34"),
+                IPAddress.Loopback
+            }),
+            pinnedClientFactory: _ =>
+            {
+                pinnedCalls++;
+                return new HttpClient(new FixedResponseHandler(new HttpResponseMessage(HttpStatusCode.OK)));
+            });
+
+        var exception = Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await runtime.ExecuteAsync(
+                Rule("web_fetch"),
+                Call("web_fetch", """{"url":"https://rebind.example/page"}"""),
+                CancellationToken.None));
+
+        Assert.That(exception!.Message, Does.Contain("private address"));
+        Assert.That(pinnedCalls, Is.Zero);
+    }
+
+    [Test]
+    public async Task RealToolRuntime_WebFetch_ConnectsOnlyToValidatedAddresses()
+    {
+        var resolutions = 0;
+        var expected = new[] { IPAddress.Parse("93.184.216.34"), IPAddress.Parse("93.184.216.35") };
+        IReadOnlyList<IPAddress>? pinned = null;
+        var runtime = CreateFetchRuntime(
+            new HttpResponseMessage(HttpStatusCode.OK),
+            maxFetchBytes: 1024,
+            resolveHost: (_, _) =>
+            {
+                resolutions++;
+                return Task.FromResult(expected);
+            },
+            pinnedClientFactory: addresses =>
+            {
+                pinned = addresses;
+                return new HttpClient(new FixedResponseHandler(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("pinned body", Encoding.UTF8, "text/plain")
+                }));
+            });
+
+        var output = await runtime.ExecuteAsync(
+            Rule("web_fetch"),
+            Call("web_fetch", """{"url":"https://rebind.example/page"}"""),
+            CancellationToken.None);
+
+        Assert.That(output, Is.EqualTo("pinned body"));
+        Assert.That(resolutions, Is.EqualTo(1), "the host must be resolved exactly once");
+        Assert.That(pinned, Is.EqualTo(expected));
+    }
+
+    [Test]
     public void RealToolRuntime_WebFetch_DoesNotFollowRedirects()
     {
         var runtime = CreateFetchRuntime(
@@ -482,16 +546,23 @@ public sealed class SandboxTests
 
     private static RealToolRuntime CreateFetchRuntime(
         HttpResponseMessage response,
-        int maxFetchBytes) =>
-        new(
-            new SandboxLimits
-            {
-                AllowNetwork = true,
-                TimeoutMs = 5000,
-                MaxFetchBytes = maxFetchBytes
-            },
-            new CapturingRunner(_ => throw new InvalidOperationException("process runner should not be used")),
-            new HttpClient(new FixedResponseHandler(response)));
+        int maxFetchBytes,
+        Func<Uri, CancellationToken, Task<IPAddress[]>>? resolveHost = null,
+        Func<IReadOnlyList<IPAddress>, HttpClient>? pinnedClientFactory = null)
+    {
+        var limits = new SandboxLimits
+        {
+            AllowNetwork = true,
+            TimeoutMs = 5000,
+            MaxFetchBytes = maxFetchBytes
+        };
+        var runner = new CapturingRunner(
+            _ => throw new InvalidOperationException("process runner should not be used"));
+
+        return resolveHost is null && pinnedClientFactory is null
+            ? new RealToolRuntime(limits, runner, new HttpClient(new FixedResponseHandler(response)))
+            : new RealToolRuntime(limits, runner, httpClient: null, resolveHost, pinnedClientFactory);
+    }
 
     private static bool IsExecutableAvailable(string fileName, string arguments)
     {

@@ -1,6 +1,6 @@
 # HANDOFF — 01-Bugfix1（全仓缺陷修复与门禁补齐）
 
-> 状态：进行中（Round 24）
+> 状态：进行中（Round 25）
 > 创建：2026-11-17
 > 基线：`895c08e feat(release): Round 16 发布与体验`
 > 上一阶段归档：[PLAN/Done/01-BuildALL/HANDOFF.md](../../Done/01-BuildALL/HANDOFF.md)
@@ -446,6 +446,7 @@
 | 2026-11-18 | Batch 12：数据工作台 `messages` 结构化编辑 | `dotnet build -c Release`；`dotnet test -c Release`；`dotnet format --verify-no-changes` | 见第 14.3 节 | `DatasetMessageEditorTests`、`DataWorkbenchEditTests`、Headless 面板测试 |
 | 2026-11-18 | Batch 13：Tool Profile Enum/Default 与输出冲突校验 | `dotnet build -c Release`；`dotnet test -c Release`；`dotnet format --verify-no-changes` | 见第 15.3 节 | `ToolProfileReuseTests`、`RecipeValidationServiceTests`、Headless 面板测试 |
 | 2026-11-18 | Batch 14：API Key DPAPI 加密 | `dotnet build -c Release`；`dotnet test -c Release`；`dotnet format --verify-no-changes` | 见第 16.3 节 | `SettingsStoreTests`（6 项新增）、DPAPI 落盘与迁移断言 |
+| 2026-11-18 | Batch 15：web_fetch DNS 加固与设置通知 | `dotnet build -c Release`；`dotnet test -c Release`；`dotnet format --verify-no-changes` | 0 警告；630 通过 / 0 失败 / 7 跳过；格式通过 | 见第 17.3 节；`SandboxTests`、`AppSettingsServiceTests`、`DataWorkbenchViewModelTests`、`SettingsPanelTests` |
 
 ---
 
@@ -505,7 +506,7 @@
 ### 7.4 配置与设置
 
 - [ ] **[配置][P2] API Key 加密存储**：当前 `settings.json` 明文保存（诊断包会脱敏，但磁盘文件未加密）；可接入 DPAPI/凭据管理器。
-- [ ] **[设置][P2] 设置变更通知**：除主题、语言、DataWorkbench 外，其他已创建服务不会收到设置变更通知。
+- [x] **[设置][P2] 设置变更通知**：Round 25 新增 `IAppSettingsService` / `AppSettingsService`（`Current` + `Changed`），主窗口在 Apply 成功后发布变更；数据工作台订阅事件并重建读取器工厂、批量转换器与四个子服务。按需创建的服务（预览、索引缓存、每次运行执行器）在创建时读取 `Current`，因此始终使用最新设置。
 - [ ] **[设置][P2] Settings/Index Cache 无 schema 版本与迁移策略**：Recipe 有 schemaVersion，其余持久化没有。
 - [ ] **[设置][P2] 无“恢复默认设置”入口**。
 - [ ] **[设置][P2] 无日志级别/来源筛选**：日志面板只显示文本，滚动文件日志也没有 UI 筛选。
@@ -644,7 +645,7 @@
 ### 7.10 安全与沙箱
 
 - [x] **[安全/P1] API Key 明文落盘**：`settings.json` 未加密；诊断包已脱敏，但本机文件仍需保护。—Round 24 已用 Windows DPAPI（CurrentUser）加密，旧明文在加载时自动迁移；非 Windows 不持久化 Key。
-- [ ] **[安全/P2] web_fetch 存在 DNS 重绑定窗口**：先 `Dns.GetHostAddressesAsync` 校验，再由 `HttpClient` 重新解析（`Services/Sandbox/RealToolRuntime.cs:252-280`）；需固定解析结果或使用自定义 `SocketsHttpHandler.ConnectCallback`。
+- [x] **[安全/P2] web_fetch 存在 DNS 重绑定窗口**：Round 25 改为解析一次并校验全部地址，随后用 `SocketsHttpHandler.ConnectCallback` 只连接这些 IP；主机名不再二次解析。任一解析结果为私网/回环即拒绝（含混合结果），仍禁跟随重定向。
 - [ ] **[安全/P2] 诊断包只脱敏设置**：日志/运行摘要原样打包，可能包含 prompt、模型响应或工具输出。
 - [ ] **[安全/P2] 沙箱是协作式隔离**：同用户运行，无容器/命名空间；非 Windows 无内存/进程数限制。
 - [ ] **[安全/P3] settings.json/日志目录 ACL 未收紧**：默认用户目录权限。
@@ -1119,5 +1120,40 @@
 
 - 设置变更通知（7.4）、Settings/Index Cache schema 版本与迁移。
 - web_fetch DNS 重绑定加固、诊断日志内容脱敏、目录 ACL 收紧（7.10 P2/P3）。
+- LLM 流式输出与模型列表。
+- 数据工作台列排序/筛选/列宽持久化（191）、CSV 类型推断。
+
+---
+
+## 17. Round 25 执行记录（2026-11-18）
+
+### 17.1 已完成项
+
+| 项 | 范围 | 提交 |
+| --- | --- | --- |
+| Batch 15 | web_fetch DNS 重绑定加固、设置变更通知 | 本次提交 |
+
+### 17.2 具体改动
+
+- `RealToolRuntime` 的 web_fetch 只解析一次主机名；解析结果全部为非私网/回环后才发起请求，任一地址为私网即拒绝（包括“公网 + 私网”混合结果）。
+- 未注入测试用 `HttpClient` 时，每次抓取创建 `SocketsHttpHandler`，通过 `ConnectCallback` 只连接已校验的 IP；主机名不会再次解析，TLS/Host 仍按原 URL 校验，重定向仍关闭。
+- 新增内部解析器与固定客户端工厂注入口，便于在不访问真实网络的情况下验证“只解析一次、只连接校验地址”。
+- 新增 `IAppSettingsService` / `AppSettingsService`：`Current` 保存当前设置，`Update` 在实例变化时发布 `Changed`。
+- `MainWindowViewModel` 改为以 `AppSettingsService` 为设置单一读取点；Apply 成功后发布变更，不再手工调用数据工作台刷新；对外暴露 `SettingsService` 供长生命周期服务订阅。
+- `DataWorkbenchViewModel` 订阅设置变更，自动重建读取器工厂（默认读取器按 `Current` 创建）、批量转换器与四个子服务；修复原先读取器工厂闭包长期持有旧设置、批量转换器不随设置更新的问题。
+- 按需创建的服务（样本预览、索引缓存、每次运行的执行器）继续在创建时读取 `Current`，无需订阅。
+
+### 17.3 当前验证
+
+- `dotnet build -c Release`：0 警告，0 错误。
+- `dotnet test -c Release`：630 通过，0 失败，7 跳过（5 性能 gated + 2 provider gated）；`--list-tests` 638 个用例（含 1 个 `[Explicit]`）。
+- `dotnet format --verify-no-changes`：通过。
+- 新增测试：`SandboxTests` 2 项（混合公网/私网解析结果被拒绝且不建立连接；只解析一次并把校验地址交给固定客户端）、`AppSettingsServiceTests` 2 项（变更事件携带前后实例、同一实例不重复通知）、`DataWorkbenchViewModelTests` 1 项（设置更新后新读取器使用新索引缓存目录）、`SettingsPanelTests` 2 项（Apply 更新当前设置并通知订阅者）。
+- 仅经单元/集成测试验证，未在真实公网环境发起抓取，也未手工验证 TLS/SNI 行为。
+
+### 17.4 本轮未做（保留在 7.x / 8.3）
+
+- 诊断日志内容脱敏、settings/日志目录 ACL 收紧、web_fetch 域名白名单/代理策略（7.10 P2/P3）。
+- Settings/Index Cache schema 版本与迁移、“恢复默认设置”、日志级别/来源筛选（7.4）。
 - LLM 流式输出与模型列表。
 - 数据工作台列排序/筛选/列宽持久化（191）、CSV 类型推断。

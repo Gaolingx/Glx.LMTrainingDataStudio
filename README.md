@@ -149,7 +149,7 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
   - `FailureOutputPath` / `MaxFailureSamples` 将未完成轨迹单独原子写入 JSONL。
   - `InputCostPerMillionTokens` / `OutputCostPerMillionTokens` 用于估算成本，只写入运行日志。
 - `ProviderChatCompletionClient`：OpenAI Chat Completions、OpenAI Responses、Anthropic Messages 的请求构造与 tool call 解析；密钥从应用设置或环境变量读取，设置中的 Key 使用 Windows DPAPI（当前用户）加密保存，旧明文配置在加载时自动迁移。
-- `RealToolRuntime` + `SandboxProcessRunner`：python（`-I`）、PowerShell（`-NoProfile -NonInteractive -ExecutionPolicy Bypass -File`）、bash（`--noprofile --norc -c`）、web_fetch（默认关闭，阻止私网/回环，禁跟随重定向）。
+- `RealToolRuntime` + `SandboxProcessRunner`：python（`-I`）、PowerShell（`-NoProfile -NonInteractive -ExecutionPolicy Bypass -File`）、bash（`--noprofile --norc -c`）、web_fetch（默认关闭，解析一次并在校验后的 IP 上固定连接以阻止私网/回环与 DNS 重绑定，禁跟随重定向）。
 - `DatasetCleanupRules`：正则替换、空白/换行规范化、ANSI 清理、移除 reasoning、丢弃空消息；Cleaner 节点与 Validator 均可使用。
 - `SftExportBlockExecutor`：流式写临时文件，成功后原子替换目标 JSONL；按行透传并做 JSON 规范化（不主动裁剪字段，上游 Simulation 输出 `messages` 与 `tools`）。
 
