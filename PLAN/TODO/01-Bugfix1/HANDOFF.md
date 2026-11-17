@@ -28,7 +28,8 @@
 - [x] 完成全仓扫描：`LMTrainingDataStudio2/`、测试项目、`.github/`、`scripts/`、`packaging/`、`examples/`、`README.md`、`PLAN/*.md`。
 - [x] 建立当前基线：`dotnet build` 0 警告；`dotnet test --list-tests` 513 个用例（505 通过 + 7 gated + 1 Explicit）。
 - [x] 将建设期 TODO 归档并冻结到 [PLAN/Done/01-BuildALL/HANDOFF.md](../../Done/01-BuildALL/HANDOFF.md)。
-- [x] 建立本 HANDOFF，形成 167 项未完成工作池，按 P1/P2/P3 与领域分类。
+- [x] 建立本 HANDOFF，形成 167 项未完成工作池，按 P1/P2/P3 与领域分类；二次扫描后增补至 205 项。
+- [x] 2026-11-17 二次全仓扫描复核：`dotnet test --list-tests` 返回 513 个用例且构建成功；生产代码无遗留 `TODO` / `FIXME` / `NotImplementedException`；zh-CN / en-US 资源键各 432 个；确认 7.x 清单与代码一致，并新增 8.3 的 38 项增补。
 - [x] 确认以下高优先级问题（本轮尚未修复）：
   - `.recipe` 文件关联与命令行解析不一致：`Program.cs:62` 只接受 `.json`，但 MSIX/Inno 注册 `.recipe`。
   - `.recipe` 不在打开/保存文件选择器中：过滤器只有 `*.json`。
@@ -433,10 +434,11 @@
 | 日期 | 批次/项 | 命令/步骤 | 结果 | 证据 |
 | --- | --- | --- | --- | --- |
 | 2026-11-17 | 扫描与归档 | `git diff --check`；`dotnet test --list-tests` | 通过；513 用例 | 本文件与归档文件 |
+| 2026-11-17 | 二次扫描复核 | `dotnet test --list-tests`；`dotnet test --no-build`；全仓 grep 遗留标记 | 513 用例；505 通过 / 0 失败 / 7 跳过；生产代码 0 遗留标记 | 第 8 节 |
 
 ---
 
-## 7. 详细工作池（167 项）
+## 7. 详细工作池（167 项；第 8 节增补 38 项，合计 205 项）
 
 > 以下为本轮扫描得到的完整清单。完成一项勾选一项；P1 优先，P2 尽量，P3 可延期但需保留入口。
 
@@ -667,3 +669,160 @@
 2. **CI 与测试门禁**：7.3 的格式/覆盖率/打包 job，7.2 的单实例、命令行、本地化、打包校验。
 3. **节点与数据边角**：7.5 的 P1/P2（Seed Streaming、Validator Cleanup、Cleaner 正则、LLM tool_calls、SFT 格式/追加），7.6 的跨格式编辑/匹配导航/预览分页。
 4. **执行与发布验证**：7.7 的哈希恢复/保留策略，7.10 的密钥与 web_fetch 加固，7.1/7.3 的安装、签名、版本单源。
+
+---
+
+## 8. 全仓扫描复核与增补（2026-11-17）
+
+> 本节是第二次全仓扫描的结论。完整未完成清单 = **第 7 节 167 项 + 本节 38 项增补（168–205）**。
+> 扫描范围：`LMTrainingDataStudio2/`（生产代码、测试）、`.github/`、`scripts/`、`packaging/`、`examples/`、`docs/`、`README.md`、`PLAN/*.md`。
+
+### 8.1 扫描基线
+
+| 检查 | 命令/方式 | 结果 |
+| --- | --- | --- |
+| 用例枚举 | `dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx --list-tests` | 513 个用例，命令退出码 0；505 常规 + 5 性能 gated + 2 provider gated + 1 Explicit |
+| 完整测试 | `dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx --no-build` | 505 通过，0 失败，7 跳过（5 性能 + 2 provider）；`WriteExamples` 为 `[Explicit]` 未计入运行总数 |
+| 遗留标记 | 全仓 grep `TODO` / `FIXME` / `HACK` / `NotImplementedException` | 生产代码 0 处；仅保留有意的 `NotSupportedException` 分支（不支持的类型/转换器/标记扩展） |
+| 本地化键 | `Localization/*.json` | zh-CN 432、en-US 432；`LocalizationTests` 覆盖服务行为、节点目录与预设，但无键集合/占位符一致性测试 |
+| 主题硬编码 | `.axaml` 中 `#RRGGBB` / 命名颜色 | 除 `Themes/Colors.axaml` 外仅剩 `Transparent`；Round 16 的“完整浅色主题”实际已完成，STATUS/README 仍有过期描述 |
+| 测试数据 | `git status --short` | 工作区无未提交改动（本文件修改前） |
+| 示例 | `examples/*.recipe.json` | 6 个示例文件存在；生成测试 `ExampleRecipeTests.WriteExamples` 为 `[Explicit]`，CI 不校验示例是否漂移 |
+
+**结论**：项目不是“有大量半成品桩代码”的状态；本轮缺口集中在**一致性、门禁、节点/数据能力边角、恢复与安全加固、文档同步**。现有 7.x 清单基本准确，以下为复核后确认遗漏或需要单独跟踪的项。
+
+### 8.2 分类索引
+
+| 分类 | 现有清单 | 本次增补 |
+| --- | --- | --- |
+| 一致性缺陷 | 7.1（12 项） | 8.3.1（168–173） |
+| 测试 | 7.2（12 项） | 8.3.2（174–179） |
+| CI | 7.3（12 项） | 8.3.3（180–182） |
+| 配置 | 7.4（9 项） | 8.3.4（183–186） |
+| 节点模块 | 7.5（Seed/LLM/Expression/Validator/Sampler/Tool Profile/Query Source/Simulation/Cleaner/SFT，共 41 项） | 8.3.5（187–190） |
+| 数据工作台 | 7.6（15 项） | 8.3.6（191） |
+| 执行恢复 | 7.7（10 项） | 8.3.7（192–193） |
+| 编辑器 UI | 7.8（13 项） | 8.3.8（194–196） |
+| 本地化文档 | 7.9（12 项） | 8.3.9（197–199） |
+| 安全 | 7.10（8 项） | 8.3.10（200） |
+| 代码质量 | 7.11（7 项） | 8.3.11（201–203） |
+| 未排期 backlog | 7.12（8 项） | 8.3.12（204–205） |
+| 修复顺序 | 7.13 | 8.4（修订版） |
+
+### 8.3 本次扫描增补项（168–205）
+
+#### 8.3.1 一致性缺陷（168–173）
+
+- [ ] **168 [P1] 保存链强制 `.json`**：`DefaultExtension = "json"`（`Views/MainWindow.axaml.cs:529`）、`GetSuggestedFileName` 只判断 `.json` 并追加 `.json`（`Views/MainWindow.axaml.cs:549-561`）。用户输入 `foo.recipe` 会得到 `foo.recipe.json`；与 7.1 的 `.recipe` 打开/关联修复必须一起改。
+- [ ] **169 [P2] 第二实例转发失败无反馈**：`Program.Main` 调用 `SingleInstanceService.TrySendToPrimary(recipePath)` 但忽略返回值（`Program.cs:35-41`）；主实例管道不可达时第二个进程直接退出，用户看不到任何错误。
+- [ ] **170 [P3] 命令行只处理第一个 Recipe 参数**：`Array.Find(args, IsRecipePath)`（`Program.cs:30`）；多文件/批量打开会被静默忽略。
+- [ ] **171 [P3] MSIX 生成 `Wide310x150Logo.png` 但清单未引用**：脚本生成该资产（`scripts/package-msix.ps1:69`），`packaging/msix/AppxManifest.xml` 只引用 Square/StoreLogo；宽磁贴可能缺失或资产无效。
+- [ ] **172 [P3] 发布 zip 文件名不含版本**：`scripts/publish-win-x64.ps1:16-20` 固定输出 `win-x64.zip`；无法区分多个版本产物。
+- [ ] **173 [P2] Inno 打包脚本无 `-Version` 参数**：`scripts/package-inno.ps1` 只接收 `Configuration` / `SkipPublish`，版本继续由 `LMTrainingDataStudio.iss:7` 硬编码；与 7.1 的“版本单一来源”配套修复。
+- [ ] **补充**：7.1 的 `.recipe` 打开/选择器/安装器/README 四项仍全部有效；`Program.IsRecipePath` 当前只比较 `.json`（`Program.cs:62-64`）。
+
+#### 8.3.2 测试缺口（174–179）
+
+- [ ] **174 [P2] 数据工作台分页取消/过期结果无测试**：`OpenDatasetAsync` / `LoadPageAsync` 使用 `CancellationToken.None`（`ViewModels/DataWorkbenchViewModel.cs:234,325`），且没有请求代际标识；切换文件时旧页可能回写新文件。需要“取消旧请求 + 忽略过期结果”的测试。
+- [ ] **175 [P2] 中断恢复未校验 Recipe/节点配置指纹**：`RehydrateCompletedNodes` 只按 block ID、输出文件存在和行数复用（`Services/RecipeRunner.cs:353-398`）；修改 Recipe 后恢复可能复用旧配置的输出。需要 recipe/config 哈希或版本指纹。
+- [ ] **176 [P2] 本地化测试不扫描硬编码英文**：现有 `LocalizationTests` 只测服务、节点目录和预设，不检查 VM/代码后置里的用户可见英文字符串（见 197）。建议增加静态/反射扫描测试。
+- [ ] **177 [P2] 设置 UI 校验无测试**：只测 `SettingsStore.Load` 的非法值回退；TextBox 非法数值、不可写目录的即时提示没有测试。
+- [ ] **178 [P3] 示例文件漂移无检查**：`ExampleRecipeTests.WriteExamples` 为 `[Explicit]`（`Tests/ExampleRecipeTests.cs:36`）；CI 不验证 `examples/` 与 `RecipePresetCatalog`/默认配置一致。
+- [ ] **179 [P3] 无跨平台构建冒烟**：CI 只有 Windows；Avalonia/net9.0 核心逻辑没有 Linux/macOS 构建验证。
+
+#### 8.3.3 CI 与工程化（180–182）
+
+- [ ] **180 [P3] 无跨平台 CI job**：与 179 配套；沙箱/Job Object 测试可条件跳过，构建与纯逻辑测试可跨平台跑。
+- [ ] **181 [P3] 无 Debug/Release 双配置构建**：CI 只构建 Release（`.github/workflows/ci.yml`）；Debug 下的条件编译/诊断引用没有持续验证。
+- [ ] **182 [P3] CI 不校验示例与显式测试**：`ExampleRecipeTests.WriteExamples` 不会在 PR 中运行，示例 Recipe 可能与代码/预设漂移。
+
+#### 8.3.4 配置与设置（183–186）
+
+- [ ] **183 [P3] 无设置导入/导出**：迁移机器或备份只能手动复制 `%APPDATA%\LMTrainingDataStudio\settings.json`。
+- [ ] **184 [P3] 无“打开日志/配置目录”入口**：诊断导出已有，但日常排障需要手动找 `%LOCALAPPDATA%` / `%APPDATA%`。
+- [ ] **185 [P3] 新节点默认配置不可改**：`BlockConfig.CreateDefault` 写死默认值（`Models/BlockConfig.cs:21-37`），设置页不能改默认 Seed 路径、默认并发、默认导出字段等。
+- [ ] **186 [P3] 无 API Key 测试连接**：Key 错误只能在首次运行时发现；可在设置页加“测试连接”（只读请求）并区分认证失败/网络失败。
+
+#### 8.3.5 节点模块（187–190）
+
+- [ ] **187 [P2] SFT 字段白名单是逗号文本框**：`SftExportConfigEditorViewModel.FieldsText` 直接按逗号拆分（`ViewModels/SftExportConfigEditorViewModel.cs:39-44`），面板只有 TextBox（`Views/PropertyPanelView.axaml:943-947`）；无字段选择器、无样本字段提示、拼写错误会静默输出缺字段。建议从输入样本读取顶层字段做多选。
+- [ ] **188 [P3] LLM `response_schema` 无编辑期校验/格式化**：面板是纯 TextBox（`Views/PropertyPanelView.axaml:221`），没有 JSON 语法校验、格式化或从 Schema 生成示例；错误只在运行时暴露。
+- [ ] **189 [P3] Sampler splits 是纯多行文本**：`SplitsText` 只有整体解析/错误提示（`ViewModels/SamplerConfigEditorViewModel.cs:110-130`），没有逐行增删、排序、重命名和单行预览。
+- [ ] **190 [P3] 路径输入体验不统一**：Seed 与 SFT 有 Browse/可写性检查；Validator reject 路径（`Views/PropertyPanelView.axaml:401`）、LLM failure 路径（`:229`）、Simulation failure 路径（`:671`）、Sampler 输出目录（`:451`）仍是纯文本，且没有目录/文件存在性提示。
+
+#### 8.3.6 数据工作台（191）
+
+- [ ] **191 [P3] 无列排序/筛选/列宽持久化**：Data 工作台当前只有搜索与分页；`DataWorkbenchViewModel` 无按列排序、条件筛选、列宽保存/恢复，CSV/Parquet 大表定位效率受限。
+
+#### 8.3.7 执行与恢复（192–193）
+
+- [ ] **192 [P2] 崩溃后溢写/检查点临时目录无启动清理**：`RecipeRunner` 只在 `finally` 中清理（`Services/RecipeRunner.cs:178-189`）；进程崩溃/断电会留下 `run-spill`、`run-temp` 与检查点目录，长期累积。建议启动时按时间/大小清理。
+- [ ] **193 [P3] 无整体运行超时/最大时长**：只有节点级 `TimeoutSeconds`；一个卡住的 DAG 可能需要人工取消。可加运行级超时设置与 UI 提示。
+
+#### 8.3.8 编辑器 UI（194–196）
+
+- [ ] **194 [P3] 最近文件无清空/失效路径清理**：`File → Recent` 只追加/去重（`ViewModels/MainWindowViewModel.cs:696-706`），没有“清空最近文件”和失效路径自动移除。
+- [ ] **195 [P3] Executions 输出目录无“打开文件夹”**：只显示路径文本（`Views/ExecutionsView.axaml:126-129`），排障时需要手动复制路径。
+- [ ] **196 [P3] 无节点分组/注释框**：画布没有 Group/Sticky Note/Comment 节点或分组框；大 Recipe 的可读性和布局维护成本高。
+
+#### 8.3.9 本地化与文档（197–199）
+
+- [ ] **197 [P2] 大量用户可见文本硬编码英文**：例如 `Untitled Recipe`（`ViewModels/MainWindowViewModel.cs:35,618`）、`Recipe history updated`（`:825`）、`Connection added`（`:992`）、`Execution cancelled`（`:1034,1074`）、`Invalid block configuration`（`:1230`）；统计指标名（`DatasetStatisticsViewModel.cs:87-95`）、执行状态（`ExecutionsViewModel.cs:46`）、数据集格式名（`DataWorkbenchViewModel.cs:21-25`）、校验/采样错误文本也未资源化。与 7.9 的“日志/状态/摘要英文”是同一类问题，但这里是**静态 UI/错误提示**，应单独跟踪。
+- [ ] **198 [P3] 无架构/开发文档**：`docs/` 目前只有 2 张截图；没有模块边界、执行模型、数据格式契约、扩展节点指南。
+- [ ] **199 [P3] 无安装/排障文档**：README 有打包命令，但没有干净机器安装、证书/Developer Mode、文件关联修复、日志位置与常见错误排查。
+
+#### 8.3.10 安全与沙箱（200）
+
+- [ ] **200 [P3] 无独立威胁模型**：README 只有一段“协作式沙箱、非内核级安全边界”的说明（`README.md:154`）；API Key 存储、web_fetch 私网/重绑定、诊断包内容、settings/日志目录权限等未形成一页“信任边界与已知限制”。
+
+#### 8.3.11 代码质量（201–203）
+
+- [ ] **201 [P2] `DataWorkbenchViewModel` 约 1183 行，职责偏重**：分页、编辑会话、搜索、校验、转换、统计入口集中在一个 VM；可先拆纯逻辑（分页/编辑/搜索）再拆 UI 绑定。
+- [ ] **202 [P3] `MainWindow.axaml.cs` 约 563 行代码后置**：菜单、快捷键、对话框、文件选择、拖动、诊断等集中；与 7.11 的 `async void` 清单一起治理。
+- [ ] **203 [P3] 扩展名/Recipe 路径判断重复**：`Program.IsRecipePath`、`MainWindow.RecipeFileType`、`GetSuggestedFileName` 各自硬编码 `.json`；应抽出统一 `RecipeFileExtensions`（与 7.1 的修复同一批次）。
+
+#### 8.3.12 未排期 backlog（204–205）
+
+> 7.12 已列 MCP、容器隔离、HuggingFace/HTTP、插件/云端、实时图表、自动更新、更多语言、BenchmarkDotNet；本节只补充尚未出现在 7.12 的项。
+
+- [ ] **204 [P3] Recipe diff/merge 与协作编辑**。
+- [ ] **205 [P3] 便携模式 / 设置同步**。
+
+### 8.4 修订后的修复顺序
+
+> 原 7.13 仍有效；结合 8.3 调整为以下批次。每批建议 3–5 项，先测试后实现或同提交。
+
+1. **P1 一致性与文档同步**
+   - 7.1 全部（`.recipe` 打开/选择器/安装器/README、版本、图标、诊断包版本）。
+   - 168、173、203（保存链 `.json`、Inno 版本参数、统一扩展名工具）。
+   - 7.9 的 P1/P2（README 画布段落、STATUS 2.9/2.10/3.2/3.3、测试计数 512→513、CHANGELOG）。
+   - 197（先修静态 UI 硬编码英文，至少覆盖主窗口/属性面板/错误提示）。
+   - 验收：双击/命令行/选择器/安装器/README 五处一致；版本、图标、测试计数一致；`dotnet build` 0 警告。
+
+2. **P1 测试与 CI 门禁**
+   - 7.2 的 P1（单实例、命令行/文件关联、打包清单/脚本校验）。
+   - 7.3 的 P1（`dotnet format --verify-no-changes`、覆盖率采集/阈值、打包/启动冒烟）。
+   - 174–177（数据分页取消、恢复指纹、本地化硬编码扫描、设置 UI 校验）。
+   - 验收：每个 P1 缺陷至少 1 个回归测试；PR 上能看到格式、测试、覆盖率、打包结果。
+
+3. **P1/P2 节点与数据边角**
+   - 7.5 的 P1：Seed `Streaming` UI、Validator `Cleanup` UI、Cleaner 正则 UI。
+   - LLM `tool_calls` 回填、Anthropic 结构化输出；SFT 追加/目标格式/拆分；187、188、190。
+   - 7.6：跨格式保存、`messages` 结构化编辑、匹配导航、预览分页、191。
+   - 验收：每个节点成功/失败/边界测试；UI 入口真实可用；行数守恒、未修改 LF JSONL 逐字节一致。
+
+4. **P2 执行、安全与发布验证**
+   - 7.7：恢复哈希、溢写字节阈值、检查点配额、并发写检测、执行历史清理；192、193。
+   - 7.10：API Key 加密、web_fetch 加固、诊断包脱敏、ACL；200。
+   - 7.1/7.3 的安装、签名、版本单源；171、172、179–182。
+   - 验收：恢复输出哈希一致；取消后无半成品；检查点不超配额；干净机器安装/启动/文件关联各一次记录。
+
+5. **P3 体验与 backlog**
+   - 7.8 剩余 UI 项、183–186、194–196、198–199、201–202、204–205。
+   - 这些项可延期，但必须在下一 HANDOFF 保留入口与原因。
+
+### 8.5 扫描结论
+
+- 生产代码没有遗留的 `TODO`/`FIXME`/`NotImplementedException`，当前不是“大量桩代码”状态；未完成工作主要是**功能边角、发布一致性、测试/CI 门禁**。
+- 最需要先处理的是：`.recipe` 全链路一致性（168/203 + 7.1）、打包/版本/图标（173 + 7.1）、CI 门禁（7.3）、节点编辑器缺口（7.5）、数据工作台取消/恢复指纹（174/175）、文档过期（7.9）。
+- 本轮仅修改计划文档，未修改业务代码；验证基线为 `dotnet build` 成功、`--list-tests` 513 用例、`dotnet test --no-build` 505 通过 / 0 失败 / 7 跳过（另有 1 个 `[Explicit]` 未计入）。完整测试结果以 6.3 的验证记录为准。
