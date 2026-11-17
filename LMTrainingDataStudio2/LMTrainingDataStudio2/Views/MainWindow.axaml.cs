@@ -476,6 +476,8 @@ public partial class MainWindow : Window
 
         if (string.IsNullOrWhiteSpace(path)) return false;
 
+        path = RecipeFileExtensions.EnsureRecipeExtension(path);
+
         try
         {
             await vm.SaveRecipeAsync(path);
@@ -536,7 +538,7 @@ public partial class MainWindow : Window
 
     private static FilePickerFileType RecipeFileType() => new(LocalizationService.L("dialog.file_type.recipe_json"))
     {
-        Patterns = new[] { "*.json" },
+        Patterns = RecipeFileExtensions.Patterns,
         MimeTypes = new[] { "application/json" }
     };
 
@@ -546,18 +548,6 @@ public partial class MainWindow : Window
         MimeTypes = new[] { "application/json" }
     };
 
-    private static string GetSuggestedFileName(string recipeName)
-    {
-        var invalid = Path.GetInvalidFileNameChars();
-        var name = new string(recipeName.Trim()
-            .Select(character => invalid.Contains(character) ? '_' : character)
-            .ToArray());
-
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            name = "recipe";
-        }
-
-        return name.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ? name : name + ".json";
-    }
+    private static string GetSuggestedFileName(string recipeName) =>
+        RecipeFileExtensions.GetSuggestedFileName(recipeName);
 }

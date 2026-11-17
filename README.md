@@ -15,7 +15,7 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - Avalonia 桌面应用与三栏式 Studio UI（Block Sheet / Canvas / Property Panel / Status Bar）
 - Recipe / 设置持久化：原子写入、camelCase 多态 JSON、schema 版本校验
 - Recipe 文件生命周期：新建（空白/示例）、打开、保存、另存为、最近文件、脏标记、关闭确认与重启恢复
-- 单实例与命令行打开：重复启动会复用已运行窗口，并把 Recipe 路径转发给主实例；支持 `.recipe.json` / `.recipe` 文件关联
+- 单实例与命令行打开：重复启动会复用已运行窗口，并把 Recipe 路径转发给主实例；支持 `.json` / `.recipe` 路径，安装包默认注册 `.recipe` 关联，并为 `.json` 添加“打开方式”项（`.recipe.json` 本质是 `.json`）
 - 诊断导出：Help → Export Diagnostics 生成 zip（日志、脱敏设置、最近运行摘要）；未处理异常自动写入崩溃报告
 - 按 BlockType 的端口契约与连接守卫：方向/类型/单输入/重复/环校验；校验问题列表与画布错误/警告徽标
 - Expression：Fluid 模板引擎（条件/循环/过滤器）、输出 JSON 校验、专属面板与样本预览
@@ -525,7 +525,7 @@ MSIX 清单位于 `packaging/msix/AppxManifest.xml`，Inno 脚本位于 `packagi
 LMTrainingDataStudio2.exe examples\agent_trajectory.recipe.json
 ```
 
-重复启动不会创建第二个窗口：后启动的进程通过命名管道把文件路径转发给主实例。应用也接受任意 `.json` Recipe 路径；安装包会注册 `.recipe` 关联。
+重复启动不会创建第二个窗口：后启动的进程通过命名管道把文件路径转发给主实例。应用接受 `.json` 与 `.recipe` Recipe 路径；安装包默认注册 `.recipe` 关联，并为 `.json` 添加“打开方式”项。
 
 ### 诊断与崩溃报告
 

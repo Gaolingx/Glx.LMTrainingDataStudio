@@ -27,21 +27,35 @@ internal sealed class Program
             e.SetObserved();
         };
 
-        var recipePath = Array.Find(args, IsRecipePath);
+        var recipePaths = Array.FindAll(args, RecipeFileExtensions.IsRecipePath);
+        var recipePath = recipePaths.Length > 0 ? recipePaths[0] : null;
 
         using var singleInstance = new SingleInstanceService();
         if (!singleInstance.IsFirstInstance)
         {
-            if (recipePath is not null)
+            if (recipePath is null)
             {
-                SingleInstanceService.TrySendToPrimary(recipePath);
+                return;
             }
 
-            return;
+            if (SingleInstanceService.TrySendToPrimary(recipePath))
+            {
+                return;
+            }
+
+            AppLog.Error(
+                $"Could not forward '{recipePath}' to the running instance; starting a separate instance.");
         }
 
         if (recipePath is not null)
         {
+            if (recipePaths.Length > 1)
+            {
+                AppLog.Error(
+                    $"Only the first recipe path is opened: '{recipePath}'. " +
+                    $"Ignored: {string.Join(", ", recipePaths.Skip(1).Select(path => $"'{path}'"))}.");
+            }
+
             App.QueueStartupRecipe(recipePath);
         }
 
@@ -58,10 +72,6 @@ internal sealed class Program
             throw;
         }
     }
-
-    private static bool IsRecipePath(string argument) =>
-        !string.IsNullOrWhiteSpace(argument) &&
-        string.Equals(Path.GetExtension(argument), ".json", StringComparison.OrdinalIgnoreCase);
 
     public static AppBuilder BuildAvaloniaApp()
         => AppBuilder.Configure<App>()
