@@ -317,6 +317,8 @@
   "property.parameter_tree": "Parameter tree",
   "property.add_parameter": "Add parameter",
   "property.req": "Req",
+  "property.enum_values": "Enum",
+  "property.default_value": "Default",
   "property.description": "description",
   "property.profile_json_import_export": "Profile JSON (import / export)",
   "property.import_json": "Import JSON",

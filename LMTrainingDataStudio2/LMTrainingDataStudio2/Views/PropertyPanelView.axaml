@@ -1215,20 +1215,32 @@
                         <TreeView.ItemTemplate>
                             <TreeDataTemplate x:DataType="vm:ToolParameterNodeViewModel"
                                               ItemsSource="{Binding Children}">
-                                <StackPanel Orientation="Horizontal" Spacing="4">
-                                    <TextBox Text="{Binding Name, Mode=TwoWay}" Width="90"
-                                             FontSize="10" Padding="4,2" />
-                                    <ComboBox ItemsSource="{Binding Types}"
-                                              SelectedItem="{Binding Type, Mode=TwoWay}"
-                                              Width="90" FontSize="10" />
-                                    <CheckBox Content="{loc:Loc property.req}" IsChecked="{Binding IsRequired, Mode=TwoWay}"
-                                              FontSize="10" Foreground="{DynamicResource TextPrimaryBrush}" />
-                                    <TextBox Text="{Binding Description, Mode=TwoWay}" Width="120"
-                                             FontSize="10" Padding="4,2" Watermark="{loc:Loc property.description}" />
-                                    <Button Content="+" Command="{Binding AddChildCommand}"
-                                            Padding="5,2" Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
-                                    <Button Content="×" Command="{Binding RemoveCommand}"
-                                            Padding="5,2" Background="{DynamicResource DangerSurfaceBrush}" Foreground="{DynamicResource DangerBrush}" />
+                                <StackPanel Spacing="2" Margin="0,2">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <TextBox Text="{Binding Name, Mode=TwoWay}" Width="90"
+                                                 FontSize="10" Padding="4,2" />
+                                        <ComboBox ItemsSource="{Binding Types}"
+                                                  SelectedItem="{Binding Type, Mode=TwoWay}"
+                                                  Width="90" FontSize="10" />
+                                        <CheckBox Content="{loc:Loc property.req}" IsChecked="{Binding IsRequired, Mode=TwoWay}"
+                                                  FontSize="10" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                        <TextBox Text="{Binding Description, Mode=TwoWay}" Width="120"
+                                                 FontSize="10" Padding="4,2" Watermark="{loc:Loc property.description}" />
+                                        <Button Content="+" Command="{Binding AddChildCommand}"
+                                                Padding="5,2" Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
+                                        <Button Content="×" Command="{Binding RemoveCommand}"
+                                                Padding="5,2" Background="{DynamicResource DangerSurfaceBrush}" Foreground="{DynamicResource DangerBrush}" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <TextBlock Text="{loc:Loc property.enum_values}" FontSize="9"
+                                                   Foreground="{DynamicResource TextFaintBrush}" VerticalAlignment="Center" />
+                                        <TextBox x:Name="ToolEnumBox" Text="{Binding EnumText, Mode=TwoWay}" Width="100"
+                                                 FontSize="10" Padding="4,2" Watermark="a, b, 1" />
+                                        <TextBlock Text="{loc:Loc property.default_value}" FontSize="9"
+                                                   Foreground="{DynamicResource TextFaintBrush}" VerticalAlignment="Center" />
+                                        <TextBox x:Name="ToolDefaultBox" Text="{Binding DefaultText, Mode=TwoWay}" Width="80"
+                                                 FontSize="10" Padding="4,2" Watermark="JSON" />
+                                    </StackPanel>
                                 </StackPanel>
                             </TreeDataTemplate>
                         </TreeView.ItemTemplate>

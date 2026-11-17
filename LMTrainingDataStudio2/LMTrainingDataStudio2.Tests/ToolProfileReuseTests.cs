@@ -197,6 +197,60 @@ public sealed class ToolProfileReuseTests
         Assert.That(editor.SelectedTool.Parameters, Has.Count.EqualTo(1));
     }
 
+    [Test]
+    public void ToolProfileEditor_EditsEnumAndDefaultValues()
+    {
+        var profile = new ToolProfile
+        {
+            Id = "p-enum",
+            Name = "Enum Tools",
+            Tools = new List<ToolDefinition>
+            {
+                new()
+                {
+                    Function = new ToolFunction
+                    {
+                        Name = "plan",
+                        Parameters = new Dictionary<string, object>
+                        {
+                            ["type"] = "object",
+                            ["properties"] = new Dictionary<string, object>
+                            {
+                                ["mode"] = new Dictionary<string, object>
+                                {
+                                    ["type"] = "string",
+                                    ["enum"] = new[] { "fast", "slow" },
+                                    ["default"] = "fast"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        var editor = new ToolProfileEditorViewModel(profile, _ => { });
+        var node = editor.SelectedTool!.Parameters.Single();
+
+        Assert.That(node.EnumText, Is.EqualTo("fast, slow"));
+        Assert.That(node.DefaultText, Is.EqualTo("\"fast\""));
+
+        node.EnumText = "low, high";
+        node.DefaultText = "1";
+
+        Assert.That(editor.SelectedTool.ParametersJson, Does.Contain("\"low\""));
+        Assert.That(editor.SelectedTool.ParametersJson, Does.Contain("\"default\": 1"));
+
+        var before = editor.SelectedTool.ParametersJson;
+        node.EnumText = "[broken";
+        Assert.That(editor.SelectedTool.ParametersError, Does.Contain("enum"));
+        Assert.That(editor.SelectedTool.ParametersJson, Is.EqualTo(before));
+
+        node.EnumText = "[]";
+        node.DefaultText = "foo";
+        Assert.That(editor.SelectedTool.ParametersError, Does.Contain("default"));
+    }
+
     private static ToolProfile CreateProfile() => new()
     {
         Id = "p1",

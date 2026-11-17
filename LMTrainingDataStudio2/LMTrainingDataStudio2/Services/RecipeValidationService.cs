@@ -39,6 +39,7 @@ public sealed class RecipeValidationService
         ValidateIsolatedBlocks(recipe, result);
         ValidateCycles(recipe, result);
         ValidateBlockConfigurations(recipe, result);
+        ValidateOutputTargets(recipe, result);
         ValidateLlmToolSettings(recipe, result);
         ValidateToolProfileReferences(recipe, result);
 
@@ -311,6 +312,81 @@ public sealed class RecipeValidationService
                 Message = $"Block '{block.Name}' is not connected to any edge.",
                 BlockId = block.Id
             });
+        }
+    }
+
+    /// <summary>
+    /// Rejects blocks that write to the same output file or the same sampler output
+    /// directory. Sampler splits are expanded to their concrete file paths first.
+    /// </summary>
+    private static void ValidateOutputTargets(Recipe recipe, ValidationResult result)
+    {
+        var targets = new List<(RecipeBlock Block, string Path, bool IsDirectory)>();
+        foreach (var block in recipe.Blocks)
+        {
+            switch (block.Config)
+            {
+                case LlmBlockConfig llm when !string.IsNullOrWhiteSpace(llm.FailureOutputPath):
+                    targets.Add((block, llm.FailureOutputPath, false));
+                    break;
+                case SimulationBlockConfig simulation when !string.IsNullOrWhiteSpace(simulation.FailureOutputPath):
+                    targets.Add((block, simulation.FailureOutputPath, false));
+                    break;
+                case ValidatorBlockConfig validator when !string.IsNullOrWhiteSpace(validator.RejectOutputPath):
+                    targets.Add((block, validator.RejectOutputPath, false));
+                    break;
+                case SftExportBlockConfig export when !string.IsNullOrWhiteSpace(export.OutputPath):
+                    targets.Add((block, export.OutputPath, false));
+                    break;
+                case SamplerBlockConfig sampler when !string.IsNullOrWhiteSpace(sampler.OutputDirectory):
+                    targets.Add((block, sampler.OutputDirectory, true));
+                    foreach (var split in sampler.Splits)
+                    {
+                        if (string.IsNullOrWhiteSpace(split)) continue;
+                        targets.Add((block, Path.Combine(sampler.OutputDirectory, $"{split}.jsonl"), false));
+                    }
+
+                    break;
+            }
+        }
+
+        for (var left = 0; left < targets.Count; left++)
+        {
+            for (var right = left + 1; right < targets.Count; right++)
+            {
+                if (targets[left].Block.Id == targets[right].Block.Id) continue;
+                if (!TargetsCollide(targets[left], targets[right])) continue;
+
+                AddError(result,
+                    $"Blocks '{targets[left].Block.Name}' and '{targets[right].Block.Name}' " +
+                    $"write to overlapping output targets ('{targets[left].Path}' / '{targets[right].Path}').",
+                    targets[right].Block.Id);
+            }
+        }
+    }
+
+    private static bool TargetsCollide(
+        (RecipeBlock Block, string Path, bool IsDirectory) left,
+        (RecipeBlock Block, string Path, bool IsDirectory) right)
+    {
+        if (left.IsDirectory != right.IsDirectory) return false;
+
+        return string.Equals(
+            NormalizePath(left.Path),
+            NormalizePath(right.Path),
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizePath(string path)
+    {
+        var trimmed = path.Trim();
+        try
+        {
+            return Path.GetFullPath(trimmed);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return trimmed;
         }
     }
 

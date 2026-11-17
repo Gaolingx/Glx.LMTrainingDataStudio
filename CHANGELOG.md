@@ -2,6 +2,28 @@
 
 本文件记录用户可见变更与工程化修复。完整未完成清单见 [PLAN/TODO/01-Bugfix1/HANDOFF.md](PLAN/TODO/01-Bugfix1/HANDOFF.md)。
 
+## [Unreleased] — 2026-11-18（Round 23 / Tool Profile 枚举与输出冲突校验）
+
+### Added
+
+- Tool Profile 参数树新增“枚举”与“默认值”编辑：枚举支持逗号分隔字符串或 JSON 数组，默认值按 JSON 解析，并与参数 JSON Schema 双向同步。
+- Recipe 校验新增输出目标冲突检测：SFT 输出、LLM/Simulation 失败样本、Validator reject 文件与 Sampler 分片文件（`<dir>/<split>.jsonl`）重复时直接报错；相同 Sampler 输出目录也视为冲突。
+
+### Changed
+
+- 非法枚举/默认值 JSON 在 Tool Profile 面板内提示，并保留上一次有效 Schema，不再静默丢弃。
+- 新增 zh-CN/en-US 本地化键（枚举、默认值）。
+
+### Tests
+
+- `--list-tests`：626 个用例；`dotnet test`：618 通过 / 0 失败 / 7 跳过（另 1 个 `[Explicit]`）。
+- 新增 Tool Profile 枚举/默认值读写与错误测试、输出目标冲突 4 项校验测试、参数树 Headless 检查。
+
+### Known Issues
+
+- 输出冲突检测只覆盖同一 Recipe 内的节点；两次独立运行同时写同一路径仍无跨进程锁。
+- SFT 仍无按比例拆片与输出路径存在性提示。
+
 ## [Unreleased] — 2026-11-18（Round 22 / 数据工作台 messages 结构化编辑）
 
 ### Added

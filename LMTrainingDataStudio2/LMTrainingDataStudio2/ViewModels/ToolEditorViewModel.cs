@@ -97,8 +97,10 @@ public partial class ToolEditorViewModel : ObservableObject
         }
         catch (JsonException)
         {
+            var fallback = TryBuildObjectSchema(out _) ??
+                           DefaultSchema().ToDictionary(pair => pair.Key, pair => (object?)pair.Value);
             parameters = JsonSerializer.Deserialize<Dictionary<string, object>>(
-                JsonSerializer.Serialize(BuildObjectSchema()));
+                JsonSerializer.Serialize(fallback));
         }
 
         return new ToolDefinition
@@ -165,7 +167,9 @@ public partial class ToolEditorViewModel : ObservableObject
             type,
             description,
             isRequired,
-            SyncFromTree);
+            SyncFromTree,
+            ReadEnumText(schema),
+            ReadDefaultText(schema));
 
         if (schema.ValueKind == JsonValueKind.Object &&
             schema.TryGetProperty("properties", out var properties) &&
@@ -194,10 +198,17 @@ public partial class ToolEditorViewModel : ObservableObject
     {
         if (_syncing) return;
 
+        var schema = TryBuildObjectSchema(out var error);
+        if (schema is null)
+        {
+            ParametersError = error;
+            return;
+        }
+
         _syncing = true;
         try
         {
-            _parametersJson = JsonSerializer.Serialize(BuildObjectSchema(), JsonOptions);
+            _parametersJson = JsonSerializer.Serialize(schema, JsonOptions);
             OnPropertyChanged(nameof(ParametersJson));
             ParametersError = null;
             NotifyChanged();
@@ -208,30 +219,43 @@ public partial class ToolEditorViewModel : ObservableObject
         }
     }
 
-    private Dictionary<string, object?> BuildObjectSchema() => new()
+    private Dictionary<string, object?>? TryBuildObjectSchema(out string? error)
     {
-        ["type"] = "object",
-        ["properties"] = BuildProperties(Parameters),
-        ["required"] = Parameters
-            .Where(node => node.IsRequired && !string.IsNullOrWhiteSpace(node.Name))
-            .Select(node => node.Name)
-            .ToList()
-    };
+        error = null;
+        var properties = BuildProperties(Parameters, ref error);
+        if (properties is null) return null;
 
-    private static Dictionary<string, object?> BuildProperties(
-        IEnumerable<ToolParameterNodeViewModel> nodes)
+        return new Dictionary<string, object?>
+        {
+            ["type"] = "object",
+            ["properties"] = properties,
+            ["required"] = Parameters
+                .Where(node => node.IsRequired && !string.IsNullOrWhiteSpace(node.Name))
+                .Select(node => node.Name)
+                .ToList()
+        };
+    }
+
+    private static Dictionary<string, object?>? BuildProperties(
+        IEnumerable<ToolParameterNodeViewModel> nodes,
+        ref string? error)
     {
         var properties = new Dictionary<string, object?>();
         foreach (var node in nodes)
         {
             if (string.IsNullOrWhiteSpace(node.Name)) continue;
-            properties[node.Name] = BuildNodeSchema(node);
+
+            var schema = BuildNodeSchema(node, ref error);
+            if (schema is null) return null;
+            properties[node.Name] = schema;
         }
 
         return properties;
     }
 
-    private static Dictionary<string, object?> BuildNodeSchema(ToolParameterNodeViewModel node)
+    private static Dictionary<string, object?>? BuildNodeSchema(
+        ToolParameterNodeViewModel node,
+        ref string? error)
     {
         var schema = new Dictionary<string, object?>
         {
@@ -243,9 +267,38 @@ public partial class ToolEditorViewModel : ObservableObject
             schema["description"] = node.Description;
         }
 
+        if (node.TryGetEnumValues(out var enumValues, out var enumError))
+        {
+            if (enumValues is not null)
+            {
+                schema["enum"] = enumValues;
+            }
+        }
+        else
+        {
+            error = $"{node.DisplayName}: {enumError}";
+            return null;
+        }
+
+        if (node.TryGetDefaultValue(out var hasDefault, out var defaultValue, out var defaultError))
+        {
+            if (hasDefault)
+            {
+                schema["default"] = defaultValue;
+            }
+        }
+        else
+        {
+            error = $"{node.DisplayName}: {defaultError}";
+            return null;
+        }
+
         if (node.Type == "object")
         {
-            schema["properties"] = BuildProperties(node.Children);
+            var properties = BuildProperties(node.Children, ref error);
+            if (properties is null) return null;
+            schema["properties"] = properties;
+
             var required = node.Children
                 .Where(child => child.IsRequired && !string.IsNullOrWhiteSpace(child.Name))
                 .Select(child => child.Name)
@@ -257,13 +310,44 @@ public partial class ToolEditorViewModel : ObservableObject
         }
         else if (node.Type == "array")
         {
-            schema["items"] = node.Children.Count > 0
-                ? BuildNodeSchema(node.Children[0])
-                : new Dictionary<string, object?> { ["type"] = "string" };
+            if (node.Children.Count > 0)
+            {
+                var items = BuildNodeSchema(node.Children[0], ref error);
+                if (items is null) return null;
+                schema["items"] = items;
+            }
+            else
+            {
+                schema["items"] = new Dictionary<string, object?> { ["type"] = "string" };
+            }
         }
 
         return schema;
     }
+
+    private static string ReadEnumText(JsonElement schema)
+    {
+        if (schema.ValueKind != JsonValueKind.Object ||
+            !schema.TryGetProperty("enum", out var enumElement) ||
+            enumElement.ValueKind != JsonValueKind.Array)
+        {
+            return string.Empty;
+        }
+
+        if (enumElement.EnumerateArray().All(item => item.ValueKind == JsonValueKind.String))
+        {
+            return string.Join(", ", enumElement.EnumerateArray()
+                .Select(item => item.GetString()));
+        }
+
+        return enumElement.GetRawText();
+    }
+
+    private static string ReadDefaultText(JsonElement schema) =>
+        schema.ValueKind == JsonValueKind.Object &&
+        schema.TryGetProperty("default", out var defaultElement)
+            ? defaultElement.GetRawText()
+            : string.Empty;
 
     private static HashSet<string> ReadRequiredNames(JsonElement schema)
     {

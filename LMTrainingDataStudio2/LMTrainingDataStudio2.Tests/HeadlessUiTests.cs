@@ -270,6 +270,39 @@ public sealed class HeadlessUiTests
     }
 
     [AvaloniaTest]
+    public void ToolProfilePanel_RendersEnumAndDefaultEditors()
+    {
+        var vm = new MainWindowViewModel(new SettingsStore(Path.Combine(_directory, "settings.json")));
+        var window = new MainWindow { DataContext = vm };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        try
+        {
+            vm.AddBlockCommand.Execute(BlockType.ToolProfile);
+            Dispatcher.UIThread.RunJobs();
+
+            var editor = vm.SelectedBlock?.ToolProfileEditor;
+            Assert.That(editor, Is.Not.Null);
+
+            editor!.AddToolCommand.Execute(null);
+            editor.SelectedTool!.AddParameterCommand.Execute(null);
+            Dispatcher.UIThread.RunJobs();
+
+            var names = window.GetVisualDescendants()
+                .OfType<Control>()
+                .Select(control => control.Name)
+                .ToArray();
+            Assert.That(names, Does.Contain("ToolEnumBox"));
+            Assert.That(names, Does.Contain("ToolDefaultBox"));
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaTest]
     public void HighlightBehavior_RendersMatchedRuns()
     {
         var block = new TextBlock();

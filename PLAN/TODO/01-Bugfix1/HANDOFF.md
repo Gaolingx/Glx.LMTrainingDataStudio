@@ -1,6 +1,6 @@
 # HANDOFF — 01-Bugfix1（全仓缺陷修复与门禁补齐）
 
-> 状态：进行中（Round 22）
+> 状态：进行中（Round 23）
 > 创建：2026-11-17
 > 基线：`895c08e feat(release): Round 16 发布与体验`
 > 上一阶段归档：[PLAN/Done/01-BuildALL/HANDOFF.md](../../Done/01-BuildALL/HANDOFF.md)
@@ -444,6 +444,7 @@
 | 2026-11-18 | Batch 10：SFT 导出与路径选择 | `dotnet build -c Release`；`dotnet test -c Release`；`dotnet format --verify-no-changes`；示例再生成 | 见第 12.3 节 | `SftExportExecutorTests`、`SftExportFieldSelectorTests`、`HeadlessUiTests` |
 | 2026-11-18 | Batch 11：LLM 工具回填与 Anthropic 结构化输出 | `dotnet build -c Release`；`dotnet test -c Release`；`dotnet format --verify-no-changes`；示例再生成 | 见第 13.3 节 | `LlmToolLoopTests`、`LlmApiClientTests`、`LlmConfigEditorTests`、校验与 Headless 测试 |
 | 2026-11-18 | Batch 12：数据工作台 `messages` 结构化编辑 | `dotnet build -c Release`；`dotnet test -c Release`；`dotnet format --verify-no-changes` | 见第 14.3 节 | `DatasetMessageEditorTests`、`DataWorkbenchEditTests`、Headless 面板测试 |
+| 2026-11-18 | Batch 13：Tool Profile Enum/Default 与输出冲突校验 | `dotnet build -c Release`；`dotnet test -c Release`；`dotnet format --verify-no-changes` | 见第 15.3 节 | `ToolProfileReuseTests`、`RecipeValidationServiceTests`、Headless 面板测试 |
 
 ---
 
@@ -550,7 +551,7 @@
 
 #### Tool Profile
 
-- [ ] **[节点/P2] Enum/Default 值 UI 未暴露**：模型已有 `EnumValues`/`DefaultValue`（`Models/ToolSchema.cs:15-16`），面板只编辑必填。
+- [x] **[节点/P2] Enum/Default 值 UI 未暴露**：Round 23 在参数树中新增枚举（逗号分隔字符串或 JSON 数组）与默认值（JSON）编辑，与 JSON Schema 双向同步；非法输入在面板显示错误且不覆盖上一次有效 Schema。
 - [ ] **[节点/P2] 无 MCP（stdio/HTTP）工具发现与调用**。
 - [ ] **[节点/P2] 无共享工具库/版本管理/鉴权**：profile 仍嵌在 Recipe 内。
 - [ ] **[节点/P3] 仅 schema 复用**：缺少工具调用请求侧复用与凭据管理。
@@ -579,7 +580,7 @@
 - [x] **[节点/P2] 无追加模式**：已支持安全追加（复制临时副本 → 追加 → 成功原子替换，失败保留原文件）。
 - [x] **[节点/P2] 无目标格式选择**：已支持 Auto/OpenAI/ShareGPT/Alpaca 转换；DPO/Pretrain 直出仍走数据工作台。
 - [部分] **[节点/P2] 无按数量/比例拆分多文件**：已支持按行数分片 `name.part001.jsonl`；比例拆分仍用前置 Sampler。
-- [ ] **[节点/P2] 无并发写同一目标文件的检测/提示**。
+- [x] **[节点/P2] 无并发写同一目标文件的检测/提示**：Round 23 在 Recipe 校验中收集 SFT 输出、LLM/Simulation 失败样本、Validator reject 文件与 Sampler 分片文件，大小写不敏感地拒绝重复目标；同一 Sampler 输出目录也视为冲突。
 
 ### 7.6 数据工作台与数据治理
 
@@ -604,7 +605,7 @@
 - [x] **[执行/P2] 恢复未做逐字节/哈希比对**：只验证行数与内容；Round 13 验收目标中的“哈希一致”未落地。
 - [ ] **[执行/P2] 溢写阈值只按行数**：无按字节阈值。
 - [ ] **[执行/P2] 检查点无磁盘配额**：失败/取消运行会保留节点输出。
-- [ ] **[执行/P2] 无并发写同一目标文件的检测**：两个节点/两次运行写同一路径时无提示。
+- [部分] **[执行/P2] 无并发写同一目标文件的检测**：同一 Recipe 内的节点级重复目标已在 Round 23 校验；两次独立运行同时写同一路径仍无跨进程锁。
 - [ ] **[执行/P2] 无执行历史批量清理/保留策略**：`ExecutionStore` 只追加，无删除/清理命令。
 - [ ] **[执行/P2] 取消 1s 断言依赖本机调度**：CI 未设性能门禁。
 - [ ] **[执行/P3] 10M 行执行/质量/转换基线未实测**：入口已有，结果未记录。
@@ -1050,3 +1051,37 @@
 - 非 `messages` 嵌套结构（如 ShareGPT `conversations`）的结构化表单。
 - SFT 按比例拆片、并发写检测与输出路径存在性提示（206）。
 - LLM 流式输出与模型列表、Tool Profile Enum/Default 编辑。
+
+---
+
+## 15. Round 23 执行记录（2026-11-18）
+
+### 15.1 已完成项
+
+| 项 | 范围 | 提交 |
+| --- | --- | --- |
+| Batch 13 | Tool Profile Enum/Default 编辑、跨节点输出目标冲突校验 | 本次提交 |
+
+### 15.2 具体改动
+
+- Tool Profile 参数树新增“枚举”和“默认值”两列：枚举支持逗号分隔字符串或 JSON 数组（保留数字/布尔/null 类型），默认值按 JSON 解析。
+- “枚举/默认值”与 `ParametersJson` 双向同步；非法 JSON 在面板内报错，并保留上一次有效 Schema。
+- Recipe 校验新增输出目标冲突检测：SFT `outputPath`、LLM/Simulation `failureOutputPath`、Validator `rejectOutputPath` 与 Sampler 分片文件（`<outputDirectory>/<split>.jsonl`）。
+- 冲突判定大小写不敏感，覆盖相同文件与相同 Sampler 输出目录；同一节点的多个目标不参与互相比较。
+- 新增 zh-CN/en-US 本地化键（枚举、默认值）。
+
+### 15.3 当前验证
+
+- `dotnet build -c Release`：0 警告，0 错误。
+- `dotnet test -c Release`：618 通过，0 失败，7 跳过（5 性能 gated + 2 provider gated）；`--list-tests` 626 个用例（含 1 个 `[Explicit]`）。
+- `dotnet format --verify-no-changes`：通过。
+- 新增测试：`ToolProfileReuseTests`（枚举/默认值读写与非法输入）、`RecipeValidationServiceTests` 4 项（重复文件、Sampler 分片冲突、同目录不冲突、不同文件不冲突）、参数树 Headless 控件检查。
+- 修复回归：输出目标校验最初把“Sampler 目录内的任意文件”视为冲突，导致 `Runner_RoutesSamplerSplitPortsToDownstreamBlocks` 误报；改为展开具体分片文件后通过。
+- UI 仅经 Headless 渲染与 ViewModel 验证，未在交互窗口中手工点击。
+
+### 15.4 本轮未做（保留在 7.x / 8.3）
+
+- 跨进程/跨运行的并发写锁（两次独立运行同时写同一路径）。
+- SFT 按比例拆片、输出路径存在性提示（206）。
+- LLM 流式输出与模型列表。
+- 数据工作台列排序/筛选/列宽持久化（191）。

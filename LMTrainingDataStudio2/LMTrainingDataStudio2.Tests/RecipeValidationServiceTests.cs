@@ -749,6 +749,70 @@ public sealed class RecipeValidationServiceTests
             ? BlockPortSchema.CreateInputPorts(type)[0]
             : BlockPortSchema.CreateOutputPorts(type)[0];
 
+    [Test]
+    public void Validate_DuplicateOutputFiles_ReportsError()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("llm", BlockType.Llm, "llm",
+            new LlmBlockConfig(
+                "openai-chat", "gpt-4o", 0.7, 128, "hi",
+                FailureOutputPath: "out/fail.jsonl")));
+        recipe.Blocks.Add(CreateBlock("sim", BlockType.Simulation, "sim",
+            new SimulationBlockConfig("gpt-4o", FailureOutputPath: "OUT/FAIL.JSONL")));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(issue =>
+            issue.Severity == ValidationSeverity.Error &&
+            issue.Message.Contains("overlapping output targets")), Is.True);
+    }
+
+    [Test]
+    public void Validate_SamplerSplitAndExportTargetCollide_ReportsError()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("sampler", BlockType.Sampler, "sampler",
+            new SamplerBlockConfig(10, null, 42, new[] { "train" }, OutputDirectory: "out/splits")));
+        recipe.Blocks.Add(CreateBlock("sft", BlockType.SftExport, "export",
+            new SftExportBlockConfig("out/splits/train.jsonl")));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(issue =>
+            issue.Severity == ValidationSeverity.Error &&
+            issue.Message.Contains("overlapping output targets")), Is.True);
+    }
+
+    [Test]
+    public void Validate_ExportInSamplerDirectoryWithDistinctName_NoOverlapError()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("sampler", BlockType.Sampler, "sampler",
+            new SamplerBlockConfig(10, null, 42, new[] { "train" }, OutputDirectory: "out/splits")));
+        recipe.Blocks.Add(CreateBlock("sft", BlockType.SftExport, "export",
+            new SftExportBlockConfig("out/splits/train-out.jsonl")));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(issue =>
+            issue.Message.Contains("overlapping output targets")), Is.False);
+    }
+
+    [Test]
+    public void Validate_DistinctOutputFiles_NoOverlapError()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("sft1", BlockType.SftExport, "export_a",
+            new SftExportBlockConfig("out/a.jsonl")));
+        recipe.Blocks.Add(CreateBlock("sft2", BlockType.SftExport, "export_b",
+            new SftExportBlockConfig("out/b.jsonl")));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(issue =>
+            issue.Message.Contains("overlapping output targets")), Is.False);
+    }
+
     private static RecipeBlock CreateBlock(string id, BlockType type, string name, BlockConfig? config = null) => new()
     {
         Id = id,

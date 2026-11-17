@@ -21,7 +21,7 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - Expression：Fluid 模板引擎（条件/循环/过滤器）、输出 JSON 校验、专属面板与样本预览
 - Validator：表达式 / JSON Schema / 正则 / Fluid 脚本多规则、超时、pass/reject 双端口、reject JSONL 与失败率日志
 - Sampler：确定性多文件切分、按 splits 生成多输出端口、分层采样与统计预览
-- Tool Profile：参数树编辑、JSON 导入导出，并被 Simulation/LLM 引用复用
+- Tool Profile：参数树编辑（含 Enum 与默认值）、JSON 导入导出，并被 Simulation/LLM 引用复用
 - 统一数据集 IO：JSONL / CSV / Parquet 分页读取与原子写出；Seed 支持三种格式
 - 数据工作台（Data 视图）：分页预览、行号跳转、页面大小切换、逐行 CRUD（插入/复制/删除/恢复）、字段级单元格编辑与整行 JSON 编辑、`messages` 角色/内容/tool_calls 结构化表单、撤销/重做、编辑另存或覆盖源文件
 - 搜索命中行内高亮；校验问题按级别/错误码筛选，并支持按级别/错误码分组树
@@ -227,11 +227,11 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 | Expression | Fluid 模板 + JSON 校验 | 有 | 沙箱/超时、外部函数 |
 | Validator | 多规则（表达式/Schema/正则/脚本）+ 超时 + pass/reject | 有 | 独立失败摘要 UI、任意代码沙箱 |
 | Sampler | 数量/比例 + 多文件 splits + 多端口 + 分层 + 统计预览 | 有 | count 模式分层、再混洗 |
-| Tool Profile | 参数树 + JSON 导入导出 + 复用 | 有 | MCP 适配 |
+| Tool Profile | 参数树（含 Enum/默认值）+ JSON 导入导出 + 复用 | 有 | MCP 适配 |
 | Query Source | 单组/多组 + 模板变量 + 外部 JSONL/CSV/Parquet | 有 | 随机/模型生成 query、去重/权重 |
 | Simulation | 脚本/真实 provider + 模拟/真实工具 + 可视化 Tools/Rules/Script | 有 | 非 OpenAI 流式、严格限速、容器隔离 |
 | Cleaner | 正则/格式/ANSI/reasoning/空消息 + 正则规则 UI + 预览 | 有 | 坏行报告、自定义 JSONPath |
-| SFT Export | 流式 + 原子替换 + 行透传 + 文件选择器 + 字段白名单 + 预览 + 安全追加 + 目标格式 + 按行数分片 | 有 | 按比例拆片、DPO/Pretrain 直出、并发写检测 |
+| SFT Export | 流式 + 原子替换 + 行透传 + 文件选择器 + 字段白名单 + 预览 + 安全追加 + 目标格式 + 按行数分片 | 有 | 按比例拆片、DPO/Pretrain 直出 |
 
 完整矩阵与逐项缺口见 [PLAN/STATUS.md](PLAN/STATUS.md)。
 

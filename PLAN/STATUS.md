@@ -18,7 +18,7 @@
 - 按 BlockType 生成端口 schema；连接前校验方向/类型/单输入/重复/环；校验问题列表与画布错误/警告徽标。
 - Expression 使用 Fluid 模板引擎（条件/循环/过滤器），带专属面板、语法校验与样本预览；输出 JSON 强校验。
 - Validator 支持表达式与 JSON Schema 规则、reject 文件、失败率日志；Sampler 支持确定性多文件切分。
-- Tool Profile 支持参数树编辑与 JSON 导入导出，并被 Simulation/LLM 复用。
+- Tool Profile 支持参数树编辑（含 Enum 与默认值）与 JSON 导入导出，并被 Simulation/LLM 复用。
 - 统一数据集 IO：JSONL / CSV / Parquet 随机分页读取与原子写出；Seed 节点支持三种格式。
 - 数据工作台（Data 视图）：分页预览、行号跳转、页面大小切换，JSONL 走 SQLite 索引，CSV 走记录边界索引，Parquet 按 row group 读取。
 - 数据逐行编辑：插入/复制/删除/恢复、字段级单元格编辑与整行 JSON 编辑、`messages` 角色/内容/tool_calls 结构化表单（保留其余消息字段）、跨页待保存编辑、撤销/重做、保存前差异摘要、另存或确认后覆盖源文件；流式重写与原子替换。
@@ -30,6 +30,7 @@
 - 1M 行质量操作验收通过：去重+混洗+切分 124.2s、统计 63.6s、托管内存增量 2MB（≤300MB）。
 - JSONL 流式读取、SQLite 行索引缓存、分页读取。
 - DAG 校验、拓扑分层、层内受控并行、顺序执行、fail-fast、下游 Skipped、取消、暂停/恢复、节点重试、进度、日志、执行记录持久化与 Executions UI。
+- Recipe 校验拒绝输出目标冲突：相同文件、相同 Sampler 输出目录，以及 Sampler 分片文件与其他节点输出同路径（大小写不敏感）。
 - 每次运行的输出目录与 `run-summary.json`；Executions UI 显示输出目录。
 - 节点间输出溢写磁盘：`SpillThresholdRows` 与运行临时目录可配置，下游流式读取，成功/失败/取消统一清理临时目录。
 - 节点级检查点与中断恢复：失败/取消运行保留已完成节点输出，Executions “恢复执行”从首个未完成节点继续；成功运行后清理检查点。
@@ -59,7 +60,7 @@
 - 发布：MSIX 清单/打包脚本、Inno Setup 安装脚本；`examples/` 6 个示例 Recipe；README Dark/Light 截图。
 - 工程质量：`.editorconfig`、.NET 分析器 `latest-recommended`、警告即错误；构建 0 警告。
 - 工程化：滚动日志与全局异常、GitHub Actions CI、win-x64 单文件发布脚本、Headless UI 测试、MIT LICENSE、应用图标。
-- 604 个自动化测试：596 个常规通过 + 7 个 gated（2 个真实 provider 冒烟 + 5 个性能 gated）+ 1 个 Explicit 示例生成。
+- 626 个自动化测试：618 个常规通过 + 7 个 gated（2 个真实 provider 冒烟 + 5 个性能 gated）+ 1 个 Explicit 示例生成。
 
 ### 1.2 当前最大缺口（按优先级）
 
@@ -224,7 +225,7 @@
 | Tool Schema 树形编辑器 | [x] | 参数树可增删/改名/改类型/必填；与 JSON Schema 双向同步 |
 | JSON 导入 / 导出 | [x] | 支持完整 profile、tool 数组或单个 tool |
 | 端口 / 校验 | [x] | 无数据端口；工具名/重复/引用校验在 RecipeValidationService |
-| Enum / Default 值 UI | [ ] | 模型支持，面板未暴露 |
+| Enum / Default 值 UI | [x] | 参数树支持枚举（逗号分隔字符串或 JSON 数组）与默认值（JSON），与 Schema 双向同步 |
 | 共享工具库 / 版本管理 | [ ] | profile 存在 Recipe 内 |
 | MCP 工具 | [ ] | 无 stdio/HTTP MCP 客户端与工具发现 |
 | 鉴权 / 工具调用请求侧复用 | [ ] | 仅 schema 复用 |
@@ -371,6 +372,7 @@
 - [ ] 消息/角色级表单编辑、匹配项导航、预览窗口分页。
 - [ ] CSV 类型推断与列类型展示；CSV/Parquet 1M 行质量基线；10M 行实测。
 - [ ] Seed 节点内过滤/列映射/多文件/目录/HuggingFace/HTTP 源。
+- [x] Tool Profile 参数 Enum 与默认值编辑。
 - [x] 字段白名单与输入校验。
 - [x] 输出文件安全追加、目标格式选择（OpenAI/ShareGPT/Alpaca）、按行数分片。
 - [ ] SFT Export 按比例拆片与 DPO/Pretrain 直出。
@@ -381,7 +383,7 @@
 - [x] 节点级中断恢复：记录已完成节点输出，从上次失败/中断节点继续。
 - [x] 取消 1s 内停止的定量验收；全链路临时文件清理验收。
 - [x] 恢复输出 SHA256 与 Recipe 指纹校验。
-- [ ] 执行竞态/并发写同一目标文件的检测与提示。
+- [x] 同一 Recipe 内输出目标冲突检测（相同文件/目录、Sampler 分片展开）；跨运行并发写仍由文件系统约束。
 - [ ] 10M 行执行/质量/转换基线。
 - [ ] 执行历史批量清理与保留策略。
 
@@ -432,7 +434,7 @@
 
 ---
 
-## 五、已完成轮次（Round 8–19）
+## 五、已完成轮次（Round 8–23）
 
 | Round | 主题 | 关键交付 | 结果 |
 | --- | --- | --- | --- |
@@ -449,6 +451,9 @@
 | 18 | 测试与 CI 门禁 | 单实例/命令行/打包一致性/本地化键测试、设置面板有界输入与目录选择、格式门禁、Debug/Release 矩阵、覆盖率门禁、示例漂移与发布冒烟 | 550 测试 + 7 gated |
 | 19 | 数据工作台与入口打磨 | 搜索匹配上一处/下一处、样本预览分页、最近文件清理与失效路径移除、执行输出目录打开 | 556 测试 + 7 gated |
 | 20 | SFT 导出与路径选择 | 安全追加、目标格式转换、按行数分片、样本字段选择器、失败/reject 路径 Browse | 590 用例（582 通过 + 7 gated + 1 Explicit） |
+| 21 | LLM 工具回填与 Anthropic 结构化输出 | tool_calls 回填循环、三家 provider 工具消息、Anthropic 强制结构化输出、编辑器与校验 | 604 用例（596 通过 + 7 gated + 1 Explicit） |
+| 22 | 数据工作台消息编辑 | `messages` 角色/内容/tool_calls 结构化表单、增删与上下移、字段/消息合并应用 | 620 用例（612 通过 + 7 gated + 1 Explicit） |
+| 23 | Tool Profile 与输出冲突 | Enum/默认值编辑、跨节点输出目标冲突校验（含 Sampler 分片展开） | 626 用例（618 通过 + 7 gated + 1 Explicit） |
 
 ---
 

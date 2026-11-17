@@ -317,6 +317,8 @@
   "property.parameter_tree": "参数树",
   "property.add_parameter": "添加参数",
   "property.req": "必填",
+  "property.enum_values": "枚举",
+  "property.default_value": "默认值",
   "property.description": "描述",
   "property.profile_json_import_export": "Profile JSON（导入 / 导出）",
   "property.import_json": "导入 JSON",
