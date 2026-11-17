@@ -36,6 +36,7 @@ public static class AppLog
             _maxFiles = Math.Max(1, maxFiles);
             _filePath = Path.Combine(_directory, "app.log");
             Directory.CreateDirectory(_directory);
+            AppDirectorySecurity.TryRestrictToCurrentUser(_directory);
         }
     }
 

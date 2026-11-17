@@ -1,6 +1,6 @@
 # HANDOFF — 01-Bugfix1（全仓缺陷修复与门禁补齐）
 
-> 状态：进行中（Round 25）
+> 状态：进行中（Round 26）
 > 创建：2026-11-17
 > 基线：`895c08e feat(release): Round 16 发布与体验`
 > 上一阶段归档：[PLAN/Done/01-BuildALL/HANDOFF.md](../../Done/01-BuildALL/HANDOFF.md)
@@ -447,6 +447,7 @@
 | 2026-11-18 | Batch 13：Tool Profile Enum/Default 与输出冲突校验 | `dotnet build -c Release`；`dotnet test -c Release`；`dotnet format --verify-no-changes` | 见第 15.3 节 | `ToolProfileReuseTests`、`RecipeValidationServiceTests`、Headless 面板测试 |
 | 2026-11-18 | Batch 14：API Key DPAPI 加密 | `dotnet build -c Release`；`dotnet test -c Release`；`dotnet format --verify-no-changes` | 见第 16.3 节 | `SettingsStoreTests`（6 项新增）、DPAPI 落盘与迁移断言 |
 | 2026-11-18 | Batch 15：web_fetch DNS 加固与设置通知 | `dotnet build -c Release`；`dotnet test -c Release`；`dotnet format --verify-no-changes` | 0 警告；630 通过 / 0 失败 / 7 跳过；格式通过 | 见第 17.3 节；`SandboxTests`、`AppSettingsServiceTests`、`DataWorkbenchViewModelTests`、`SettingsPanelTests` |
+| 2026-11-18 | Batch 16：诊断脱敏与目录 ACL | `dotnet build -c Release`；`dotnet test -c Release`；`dotnet format --verify-no-changes` | 0 警告；638 通过 / 0 失败 / 7 跳过；格式通过 | 见第 18.3 节；`DiagnosticSecurityTests` |
 
 ---
 
@@ -646,9 +647,9 @@
 
 - [x] **[安全/P1] API Key 明文落盘**：`settings.json` 未加密；诊断包已脱敏，但本机文件仍需保护。—Round 24 已用 Windows DPAPI（CurrentUser）加密，旧明文在加载时自动迁移；非 Windows 不持久化 Key。
 - [x] **[安全/P2] web_fetch 存在 DNS 重绑定窗口**：Round 25 改为解析一次并校验全部地址，随后用 `SocketsHttpHandler.ConnectCallback` 只连接这些 IP；主机名不再二次解析。任一解析结果为私网/回环即拒绝（含混合结果），仍禁跟随重定向。
-- [ ] **[安全/P2] 诊断包只脱敏设置**：日志/运行摘要原样打包，可能包含 prompt、模型响应或工具输出。
+- [x] **[安全/P2] 诊断包只脱敏设置**：Round 26 新增 `DiagnosticRedactor`，对 summary、日志与执行摘要统一脱敏：`Authorization`/`Bearer` 头、`apiKey`/`token`/`secret`/`password` 等 JSON 字段、查询参数、`sk-`/`gh*_`/`AKIA` 常见前缀，以及设置与环境变量中的 Key 字面量；主流程输出 `[REDACTED]`。
 - [ ] **[安全/P2] 沙箱是协作式隔离**：同用户运行，无容器/命名空间；非 Windows 无内存/进程数限制。
-- [ ] **[安全/P3] settings.json/日志目录 ACL 未收紧**：默认用户目录权限。
+- [x] **[安全/P3] settings.json/日志目录 ACL 未收紧**：Round 26 新增 `AppDirectorySecurity`，Windows 上首次创建目录时移除继承权限，仅保留当前用户、SYSTEM 与 Administrators 完全控制；已接入设置、日志与崩溃报告目录，非 Windows 与失败场景仅记录告警。
 - [ ] **[安全/P3] web_fetch 无域名白名单/代理策略**：仅阻断私网/回环。
 - [ ] **[安全/P3] 崩溃报告无保留/清理策略**：会持续累积。
 - [ ] **[安全/P3] 安装包默认未签名**：需证书与签名流程；MSIX Publisher 为占位 `CN=LMTrainingDataStudio`。
@@ -1157,3 +1158,36 @@
 - Settings/Index Cache schema 版本与迁移、“恢复默认设置”、日志级别/来源筛选（7.4）。
 - LLM 流式输出与模型列表。
 - 数据工作台列排序/筛选/列宽持久化（191）、CSV 类型推断。
+
+---
+
+## 18. Round 26 执行记录（2026-11-18）
+
+### 18.1 已完成项
+
+| 项 | 范围 | 提交 |
+| --- | --- | --- |
+| Batch 16 | 诊断包全文脱敏、设置/日志/崩溃目录 ACL 收紧 | 本次提交 |
+
+### 18.2 具体改动
+
+- 新增 `DiagnosticRedactor`：按模式清除 `Authorization` / `Proxy-Authorization`、`Bearer` 令牌、常见 JSON 密钥字段（`apiKey`、`openAiApiKey`、`anthropicApiKey`、`access_token`、`refresh_token`、`token`、`secret`、`password` 等）、查询参数，以及 `sk-`、`gh[pousr]_`、`AKIA` 前缀；同时按字面量替换设置与环境变量中的 Key。
+- `CrashReportService` 一次加载设置并收集已知密钥，`summary.txt`、`logs/*.log`、`executions/*.json` 与 `settings.redacted.json` 全部经脱敏后写出；日志读取改为共享读写，避免活动日志被锁时跳过。
+- 新增 `AppDirectorySecurity`：Windows 上首次创建目录时移除继承 ACL，仅保留当前用户、SYSTEM、Administrators 完全控制；失败时记录告警但不影响主流程，非 Windows 为无操作，已应用目录做进程内缓存。
+- 接入 `SettingsStore.SaveAsync` / API Key 迁移、`AppLog.Initialize` 与自动崩溃报告目录。
+- 未改变诊断包结构与其他公开 API。
+
+### 18.3 当前验证
+
+- `dotnet build -c Release`：0 警告，0 错误。
+- `dotnet test -c Release`：638 通过，0 失败，7 跳过（5 性能 gated + 2 provider gated）；`--list-tests` 646 个用例（含 1 个 `[Explicit]`）。
+- `dotnet format --verify-no-changes`：通过。
+- 新增测试：`DiagnosticSecurityTests` 8 项（Authorization/Bearer、JSON 字段、已知密钥字面量、普通文本不误伤、诊断包日志与 summary 不含密钥、空路径拒绝、Windows ACL 生效且无 Everyone 规则、设置保存收紧目录）。
+- ACL 测试仅在本机 Windows 执行；未在干净用户/其他机器验证权限继承行为。
+
+### 18.4 本轮未做（保留在 7.x / 8.3）
+
+- web_fetch 域名白名单/代理策略、崩溃报告保留策略、安装包签名（7.10 P3）。
+- Settings/Index Cache schema 版本与迁移、“恢复默认设置”、日志级别/来源筛选（7.4）。
+- LLM 流式输出与模型列表。
+- 数据工作台列排序/筛选/列宽持久化（191）、CSV 类型推断；SFT 比例拆片与输出路径存在性提示（206）。

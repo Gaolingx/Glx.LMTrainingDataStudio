@@ -8,7 +8,7 @@ namespace LMTrainingDataStudio2.Services;
 
 /// <summary>
 /// Builds a zip package with logs, redacted settings and execution summaries
-/// for bug reports. API keys are always removed before writing.
+/// for bug reports. Credentials are removed from every text entry.
 /// </summary>
 public static class CrashReportService
 {
@@ -45,10 +45,13 @@ public static class CrashReportService
 
         try
         {
-            WriteSummary(workingDirectory, reason, exception);
-            CopyLogs(workingDirectory);
-            WriteRedactedSettings(workingDirectory);
-            CopyExecutionSummaries(workingDirectory);
+            var settings = TryLoadSettings(out var settingsError);
+            var secrets = CollectKnownSecrets(settings);
+
+            WriteSummary(workingDirectory, reason, exception, secrets);
+            CopyLogs(workingDirectory, secrets);
+            WriteRedactedSettings(workingDirectory, settings, settingsError);
+            CopyExecutionSummaries(workingDirectory, secrets);
 
             var temporaryPath = fullPath + ".tmp";
             if (File.Exists(temporaryPath))
@@ -79,6 +82,7 @@ public static class CrashReportService
                 "LMTrainingDataStudio",
                 "crashes");
             Directory.CreateDirectory(directory);
+            AppDirectorySecurity.TryRestrictToCurrentUser(directory);
 
             var path = Path.Combine(
                 directory, $"crash-{DateTime.UtcNow:yyyyMMdd-HHmmss-fff}.zip");
@@ -91,7 +95,40 @@ public static class CrashReportService
         }
     }
 
-    private static void WriteSummary(string directory, string? reason, Exception? exception)
+    private static AppSettings? TryLoadSettings(out string? error)
+    {
+        try
+        {
+            error = null;
+            return new SettingsStore().Load().Settings;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or
+                                       JsonException or NotSupportedException)
+        {
+            error = ex.Message;
+            return null;
+        }
+    }
+
+    private static string[] CollectKnownSecrets(AppSettings? settings)
+    {
+        var secrets = new List<string?>
+        {
+            settings?.OpenAiApiKey,
+            settings?.AnthropicApiKey,
+            Environment.GetEnvironmentVariable("OPENAI_API_KEY"),
+            Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY")
+        };
+
+        return secrets
+            .Where(secret => !string.IsNullOrWhiteSpace(secret))
+            .Select(secret => secret!.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static void WriteSummary(
+        string directory, string? reason, Exception? exception, IReadOnlyCollection<string> secrets)
     {
         var version = typeof(CrashReportService).Assembly.GetName().Version?.ToString() ?? "unknown";
         var builder = new StringBuilder()
@@ -115,7 +152,8 @@ public static class CrashReportService
             builder.AppendLine().AppendLine("Exception:").AppendLine(exception.ToString());
         }
 
-        File.WriteAllText(Path.Combine(directory, "summary.txt"), builder.ToString(), Encoding.UTF8);
+        var text = DiagnosticRedactor.Redact(builder.ToString(), secrets);
+        File.WriteAllText(Path.Combine(directory, "summary.txt"), text, Encoding.UTF8);
     }
 
     /// <summary>
@@ -128,7 +166,7 @@ public static class CrashReportService
         settings.AnthropicApiKey = null;
     }
 
-    private static void CopyLogs(string directory)
+    private static void CopyLogs(string directory, IReadOnlyCollection<string> secrets)
     {
         if (!Directory.Exists(AppLog.LogDirectory)) return;
 
@@ -139,36 +177,46 @@ public static class CrashReportService
         {
             try
             {
-                File.Copy(file, Path.Combine(logsDirectory, Path.GetFileName(file)), overwrite: true);
+                var text = ReadShared(file);
+                File.WriteAllText(
+                    Path.Combine(logsDirectory, Path.GetFileName(file)),
+                    DiagnosticRedactor.Redact(text, secrets),
+                    new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
             }
-            catch (IOException)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 // The active log may be locked for a moment; skip it.
             }
         }
     }
 
-    private static void WriteRedactedSettings(string directory)
+    private static string ReadShared(string path)
     {
-        try
-        {
-            var settings = new SettingsStore().Load().Settings;
-            RedactSettingsForDiagnostics(settings);
-            File.WriteAllText(
-                Path.Combine(directory, "settings.redacted.json"),
-                JsonSerializer.Serialize(settings, SerializerOptions),
-                Encoding.UTF8);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-        {
-            File.WriteAllText(
-                Path.Combine(directory, "settings.redacted.json"),
-                $"{{\"error\": {JsonSerializer.Serialize(ex.Message)}}}",
-                Encoding.UTF8);
-        }
+        using var stream = new FileStream(
+            path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+        return reader.ReadToEnd();
     }
 
-    private static void CopyExecutionSummaries(string directory)
+    private static void WriteRedactedSettings(
+        string directory, AppSettings? settings, string? error)
+    {
+        var path = Path.Combine(directory, "settings.redacted.json");
+        if (settings is null)
+        {
+            File.WriteAllText(
+                path,
+                $"{{\"error\": {JsonSerializer.Serialize(error ?? "Settings could not be loaded.")}}}",
+                Encoding.UTF8);
+            return;
+        }
+
+        RedactSettingsForDiagnostics(settings);
+        var json = JsonSerializer.Serialize(settings, SerializerOptions);
+        File.WriteAllText(path, DiagnosticRedactor.Redact(json), Encoding.UTF8);
+    }
+
+    private static void CopyExecutionSummaries(string directory, IReadOnlyCollection<string> secrets)
     {
         var executionsDirectory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -188,9 +236,13 @@ public static class CrashReportService
         {
             try
             {
-                File.Copy(file.FullName, Path.Combine(target, file.Name), overwrite: true);
+                var text = ReadShared(file.FullName);
+                File.WriteAllText(
+                    Path.Combine(target, file.Name),
+                    DiagnosticRedactor.Redact(text, secrets),
+                    new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
             }
-            catch (IOException)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 // Best effort only.
             }

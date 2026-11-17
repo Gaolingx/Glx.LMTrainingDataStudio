@@ -2,6 +2,27 @@
 
 本文件记录用户可见变更与工程化修复。完整未完成清单见 [PLAN/TODO/01-Bugfix1/HANDOFF.md](PLAN/TODO/01-Bugfix1/HANDOFF.md)。
 
+## [Unreleased] — 2026-11-18（Round 26 / 诊断脱敏与目录 ACL）
+
+### Added
+
+- 新增 `DiagnosticRedactor`：对 `Authorization` / `Bearer` 头、`apiKey` / `token` / `secret` / `password` 等 JSON 字段、查询参数、`sk-` / `gh*_` / `AKIA` 前缀以及设置和环境变量中的 Key 字面量统一替换为 `[REDACTED]`。
+- 新增 `AppDirectorySecurity`：Windows 上把设置、日志与崩溃目录的 ACL 收紧为当前用户、SYSTEM 与 Administrators 完全控制。
+
+### Changed
+
+- 诊断包的 `summary.txt`、`logs/*.log`、`executions/*.json` 与 `settings.redacted.json` 全部经脱敏后写出；活动日志改为共享读取，避免导出时被跳过。
+- 设置保存、API Key 迁移、日志初始化与自动崩溃报告目录在首次创建时应用 ACL；失败仅记录告警，非 Windows 为无操作。
+
+### Tests
+
+- `--list-tests`：646 个用例；`dotnet test`：638 通过 / 0 失败 / 7 跳过（另 1 个 `[Explicit]`）。
+- 新增 `DiagnosticSecurityTests` 8 项：脱敏规则、普通文本不误伤、诊断包不含密钥、Windows ACL 生效与设置目录保护。
+
+### Known Issues
+
+- ACL 仅在 Windows 本机验证，未覆盖干净用户/其他机器；web_fetch 域名白名单与崩溃报告保留策略仍未做。
+
 ## [Unreleased] — 2026-11-18（Round 25 / web_fetch DNS 加固与设置通知）
 
 ### Added

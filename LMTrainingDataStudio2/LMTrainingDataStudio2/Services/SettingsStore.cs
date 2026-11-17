@@ -188,7 +188,9 @@ public sealed class SettingsStore : ISettingsStore
         ArgumentNullException.ThrowIfNull(settings);
         cancellationToken.ThrowIfCancellationRequested();
 
-        Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
+        var settingsDirectory = Path.GetDirectoryName(FilePath)!;
+        Directory.CreateDirectory(settingsDirectory);
+        AppDirectorySecurity.TryRestrictToCurrentUser(settingsDirectory);
 
         var persisted = PrepareForStorage(settings);
         var tempPath = FilePath + ".tmp";
@@ -300,7 +302,9 @@ public sealed class SettingsStore : ISettingsStore
         var tempPath = FilePath + ".tmp";
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
+            var settingsDirectory = Path.GetDirectoryName(FilePath)!;
+            Directory.CreateDirectory(settingsDirectory);
+            AppDirectorySecurity.TryRestrictToCurrentUser(settingsDirectory);
             var persisted = PrepareForStorage(settings);
             using (var stream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None))
             {

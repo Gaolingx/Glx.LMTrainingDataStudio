@@ -1,7 +1,7 @@
 # STATUS — 功能清单、节点能力矩阵与下一阶段规划
 
-> 最后核对：2026-11-18（Round 25 完成）
-> 验证基线：`dotnet build` 0 警告 0 错误（分析器开启）；`dotnet test` 630 通过 + 7 个 gated 测试（2 个真实 provider 冒烟 + 5 个性能 gated，默认跳过），另有 1 个 `[Explicit]` 示例生成；`--list-tests` 638 个用例；`dotnet format --verify-no-changes` 通过；覆盖率总行 74.64%、Services/Commands 84.32%；Headless UI 测试通过；1M 行 JSONL、1M 行质量操作与 1M 行编辑保存基线通过；10M 行链路与 CSV/Parquet 大规模基线入口已提供；win-x64 单文件发布与 Debug 启动冒烟通过。
+> 最后核对：2026-11-18（Round 26 完成）
+> 验证基线：`dotnet build` 0 警告 0 错误（分析器开启）；`dotnet test` 638 通过 + 7 个 gated 测试（2 个真实 provider 冒烟 + 5 个性能 gated，默认跳过），另有 1 个 `[Explicit]` 示例生成；`--list-tests` 646 个用例；`dotnet format --verify-no-changes` 通过；覆盖率总行 74.64%、Services/Commands 84.32%；Headless UI 测试通过；1M 行 JSONL、1M 行质量操作与 1M 行编辑保存基线通过；10M 行链路与 CSV/Parquet 大规模基线入口已提供；win-x64 单文件发布与 Debug 启动冒烟通过。
 >
 > 图例：`[x]` 已完成并有测试/验证；`[部分]` 可用但有明确缺口；`[ ]` 未实现。
 >
@@ -56,7 +56,7 @@
 - 完整 Dark/Light 主题：所有 Views 使用主题资源，无硬编码颜色字面量；主题切换即时刷新画布与窗口背景。
 - 状态栏内存占用定时刷新（2s）。
 - 单实例与命令行打开（命名互斥体 + 命名管道转发）；`.recipe` 文件关联清单与安装脚本。
-- 诊断与崩溃报告：Help → Export Diagnostics（脱敏设置 + 日志 + 最近运行摘要）；未处理异常自动写崩溃 zip。
+- 诊断与崩溃报告：Help → Export Diagnostics（脱敏设置 + 日志 + 最近运行摘要）；summary、日志与执行摘要统一清除 Authorization/Bearer、常见密钥字段与 Key 字面量；未处理异常自动写崩溃 zip；Windows 上设置、日志与崩溃目录仅保留当前用户/SYSTEM/Administrators 权限。
 - 发布：MSIX 清单/打包脚本、Inno Setup 安装脚本；`examples/` 6 个示例 Recipe；README Dark/Light 截图。
 - 工程质量：`.editorconfig`、.NET 分析器 `latest-recommended`、警告即错误；构建 0 警告。
 - 工程化：滚动日志与全局异常、GitHub Actions CI、win-x64 单文件发布脚本、Headless UI 测试、MIT LICENSE、应用图标。
@@ -105,7 +105,7 @@
 - Seed 多文件/目录、过滤/列映射、编码选项、HuggingFace/HTTP 数据源。
 - 10M 行实测与 CSV/Parquet 大规模基线按需运行（入口已提供）。
 - 单实例、命令行打开、文件关联、MSIX/Inno 脚本与诊断导出已完成；安装包未做本机安装验证。
-- 设置变更通知、运行日志/执行状态本地化、Tool Profile MCP。
+- 运行日志/执行状态本地化、Tool Profile MCP。
 
 ---
 
@@ -410,8 +410,9 @@
 - [ ] 10M 性能报告与 CSV/Parquet 基线。
 - [部分] MSIX/Inno 脚本、文件关联、单实例、命令行打开已完成；安装包未在干净机器实际安装验证。
 - [部分] README 截图与 6 个示例 Recipe 已完成；发布说明由 [CHANGELOG.md](CHANGELOG.md) 承担。
-- [ ] 崩溃报告导出；日志级别/来源筛选。
+- [部分] 崩溃报告导出与内容脱敏已完成；日志级别/来源筛选未做。
 - [x] API Key 使用 Windows DPAPI 加密保存，旧明文加载时自动迁移；非 Windows 只使用环境变量。
+- [x] 诊断包全文脱敏（日志、summary、执行摘要）与 Windows 设置/日志/崩溃目录 ACL 收紧。
 - [x] 设置变更通知（`AppSettingsService` 事件；数据工作台已接入，按需服务在创建时读取当前设置）。
 - [部分] 运行日志/执行状态/统计摘要本地化（静态 UI、节点说明与预设已支持 zh-CN / en-US）。
 - [x] `.editorconfig`、分析器、警告即错误。
@@ -457,6 +458,7 @@
 | 23 | Tool Profile 与输出冲突 | Enum/默认值编辑、跨节点输出目标冲突校验（含 Sampler 分片展开） | 626 用例（618 通过 + 7 gated + 1 Explicit） |
 | 24 | API Key 加密与迁移 | Windows DPAPI（CurrentUser）加密落盘、旧明文自动迁移、非 Windows 环境变量回退 | 632 用例（624 通过 + 7 gated + 1 Explicit） |
 | 25 | 网络安全与设置通知 | web_fetch 固定已校验解析地址（SocketsHttpHandler.ConnectCallback）、混合公网/私网结果拒绝、设置变更事件与数据工作台自动刷新 | 638 用例（630 通过 + 7 gated + 1 Explicit） |
+| 26 | 诊断脱敏与目录 ACL | 诊断包日志/summary/执行摘要全文脱敏；Windows 设置、日志与崩溃目录仅保留当前用户/SYSTEM/Administrators 权限 | 646 用例（638 通过 + 7 gated + 1 Explicit） |
 
 ---
 

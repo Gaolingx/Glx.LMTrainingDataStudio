@@ -16,7 +16,7 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - Recipe / 设置持久化：原子写入、camelCase 多态 JSON、schema 版本校验
 - Recipe 文件生命周期：新建（空白/示例）、打开、保存、另存为、最近文件、脏标记、关闭确认与重启恢复
 - 单实例与命令行打开：重复启动会复用已运行窗口，并把 Recipe 路径转发给主实例；支持 `.json` / `.recipe` 路径，安装包默认注册 `.recipe` 关联，并为 `.json` 添加“打开方式”项（`.recipe.json` 本质是 `.json`）
-- 诊断导出：Help → Export Diagnostics 生成 zip（日志、脱敏设置、最近运行摘要）；未处理异常自动写入崩溃报告
+- 诊断导出：Help → Export Diagnostics 生成 zip（日志、脱敏设置、最近运行摘要）；日志、summary 与执行摘要中的 Authorization/Bearer、常见 Key 字段与 Key 字面量统一替换为 `[REDACTED]`；未处理异常自动写入崩溃报告
 - 按 BlockType 的端口契约与连接守卫：方向/类型/单输入/重复/环校验；校验问题列表与画布错误/警告徽标
 - Expression：Fluid 模板引擎（条件/循环/过滤器）、输出 JSON 校验、专属面板与样本预览
 - Validator：表达式 / JSON Schema / 正则 / Fluid 脚本多规则、超时、pass/reject 双端口、reject JSONL 与失败率日志
@@ -534,7 +534,9 @@ LMTrainingDataStudio2.exe examples\agent_trajectory.recipe.json
 ### 诊断与崩溃报告
 
 - Help → Export Diagnostics：导出 zip，包含日志、脱敏后的设置（移除 API Key）和最近运行摘要。
+- 导出前统一脱敏：`Authorization` / `Bearer` 头、`apiKey` / `token` / `secret` / `password` 等 JSON 字段、查询参数、`sk-` / `gh*_` / `AKIA` 前缀，以及设置与环境变量中的 Key 字面量都会替换为 `[REDACTED]`。
 - 未处理异常：自动在 `%LOCALAPPDATA%\LMTrainingDataStudio\crashes` 写入崩溃报告，并在应用日志中记录路径。
+- Windows 上设置、日志与崩溃目录在首次创建时移除继承权限，仅保留当前用户、SYSTEM 与 Administrators 的完全控制。
 
 ### 真实 provider 冒烟测试（可选）
 
