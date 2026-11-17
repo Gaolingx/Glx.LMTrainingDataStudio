@@ -4,7 +4,7 @@
 > 创建：2026-11-17
 > 基线：`895c08e feat(release): Round 16 发布与体验`
 > 上一阶段归档：[PLAN/Done/01-BuildALL/HANDOFF.md](../../Done/01-BuildALL/HANDOFF.md)
-> 扫描基线：`dotnet build` 0 警告；`dotnet test --list-tests` 557 个用例（550 通过 + 7 gated + 1 Explicit）。
+> 扫描基线：`dotnet build` 0 警告；`dotnet test --list-tests` 563 个用例（556 通过 + 7 gated + 1 Explicit）。
 > 边界：本文件只记录 Round 17 及之后的修复/补齐工作；Round 0–16 的原始计划、验收标准与技术决策已冻结在归档文件中，不再回写。
 
 ---
@@ -582,8 +582,8 @@
 
 - [x] **[数据/P1] 跨格式保存未支持**：编辑保存只允许源格式，`DatasetEditService.SaveAsync` 对不同目标格式直接抛 `DatasetFormatException`。
 - [ ] **[数据/P2] 嵌套消息/角色级表单未做**：`messages` 等结构仍以整段 JSON 文本编辑。
-- [ ] **[数据/P2] 搜索匹配项导航未做**：只有命中高亮，没有上一处/下一处。
-- [ ] **[数据/P2] 预览窗口固定 50 行**：`SamplePreviewService.DefaultMaxRows = 50`，无分页/全文搜索。
+- [x] **[数据/P2] 搜索匹配项导航未做**：只有命中高亮，没有上一处/下一处。
+- [x] **[数据/P2] 预览窗口固定 50 行**：`SamplePreviewService.DefaultMaxRows = 50`，无分页/全文搜索。
 - [ ] **[数据/P2] CSV 类型推断与列类型展示未做**。
 - [ ] **[数据/P2] 多文件/目录数据源、HuggingFace/HTTP 未做**。
 - [ ] **[数据/P2] 字节级一致仅保证 LF JSONL**：CSV/Parquet 保存会重写整表。
@@ -767,8 +767,8 @@
 
 #### 8.3.8 编辑器 UI（194–196）
 
-- [ ] **194 [P3] 最近文件无清空/失效路径清理**：`File → Recent` 只追加/去重（`ViewModels/MainWindowViewModel.cs:696-706`），没有“清空最近文件”和失效路径自动移除。
-- [ ] **195 [P3] Executions 输出目录无“打开文件夹”**：只显示路径文本（`Views/ExecutionsView.axaml:126-129`），排障时需要手动复制路径。
+- [x] **194 [P3] 最近文件无清空/失效路径清理**：`File → Recent` 只追加/去重（`ViewModels/MainWindowViewModel.cs:696-706`），没有“清空最近文件”和失效路径自动移除。
+- [x] **195 [P3] Executions 输出目录无“打开文件夹”**：只显示路径文本（`Views/ExecutionsView.axaml:126-129`），排障时需要手动复制路径。
 - [ ] **196 [P3] 无节点分组/注释框**：画布没有 Group/Sticky Note/Comment 节点或分组框；大 Recipe 的可读性和布局维护成本高。
 
 #### 8.3.9 本地化与文档（197–199）
@@ -907,3 +907,32 @@
 - 7.2 自动崩溃入口、格式转换边界、索引缓存边界、节点面板逐项人工验收。
 - 7.1 Recipe 校验错误码、7.7 执行清理/配额、7.10 安全加固。
 - 7.3 nightly/gated job、依赖安全扫描、`Directory.Packages.props`/锁定依赖。
+
+---
+
+## 11. Round 19 执行记录（2026-11-18）
+
+### 11.1 已完成项
+
+| 项 | 范围 | 提交 |
+| --- | --- | --- |
+| Batch 9 | 搜索匹配导航、样本预览分页、最近文件清理、执行输出目录打开 | 本次提交 |
+
+### 11.2 具体改动
+
+- 搜索：新增上一处/下一处匹配命令与按钮，选中匹配即跳转，首尾循环。
+- 预览：`SamplePreviewService` 支持 `startRow`；预览窗口按 50 行分页，显示页码并支持上一页/下一页。
+- 最近文件：打开菜单时自动移除失效路径，新增“清空最近文件”并立即持久化。
+- 执行详情：输出目录存在时显示“打开文件夹”按钮，失败写入日志。
+
+### 11.3 当前验证
+
+- `dotnet build -c Release`：0 警告，0 错误。
+- `dotnet test -c Release`：556 通过，0 失败，7 跳过；`--list-tests` 563 个用例。
+- `dotnet format --verify-no-changes`：通过。
+
+### 11.4 本轮未做（保留在 7.x / 8.3）
+
+- 预览全文搜索（当前为分页 + 数据工作台搜索高亮）。
+- 7.5 节点能力（LLM tool_calls 回填、Anthropic 结构化输出、SFT 追加/目标格式/拆分）。
+- 7.7 执行清理/配额、7.10 安全加固、7.1 Recipe 校验错误码。

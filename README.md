@@ -465,7 +465,7 @@ dotnet test .\LMTrainingDataStudio2.slnx
 dotnet test .\LMTrainingDataStudio2.slnx --filter HeadlessUiTests
 ```
 
-当前基线：**550 个常规测试通过 + 7 个 gated 跳过**（2 个真实 provider 冒烟 + 5 个性能 gated），另有 1 个 `[Explicit]` 示例生成测试；`--list-tests` 共 557 个用例。构建启用 .NET 分析器与警告即错误，`dotnet build` 为 0 警告。CI 额外执行 `dotnet format --verify-no-changes`、Debug/Release 双配置、覆盖率门禁（总行 ≥60%、Services/Commands ≥70%）、示例漂移检查与发布版本冒烟。
+当前基线：**556 个常规测试通过 + 7 个 gated 跳过**（2 个真实 provider 冒烟 + 5 个性能 gated），另有 1 个 `[Explicit]` 示例生成测试；`--list-tests` 共 563 个用例。构建启用 .NET 分析器与警告即错误，`dotnet build` 为 0 警告。CI 额外执行 `dotnet format --verify-no-changes`、Debug/Release 双配置、覆盖率门禁（总行 ≥60%、Services/Commands ≥70%）、示例漂移检查与发布版本冒烟。
 
 ### 1M / 10M 行与 CSV/Parquet 基线（gated）
 
@@ -675,7 +675,7 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 - [x] 滚动日志、全局异常、CI、win-x64 单文件发布、Headless UI 测试、MIT LICENSE、应用图标
 - [x] 单实例、命令行打开、MSIX/Inno Setup 打包、文件关联、诊断/崩溃报告导出
 - [x] `.editorconfig`、.NET 分析器、警告即错误
-- [x] 单元测试与集成测试（557 个：550 常规通过 + 7 个 gated + 1 个 Explicit 示例生成）
+- [x] 单元测试与集成测试（563 个：556 常规通过 + 7 个 gated + 1 个 Explicit 示例生成）
 - [x] Round 8：Recipe 新建/打开/保存、脏标记、最近文件、按类型端口契约
 - [x] Round 9：Expression/Validator/Sampler/Tool Profile 节点能力补齐
 - [x] Round 10：数据预览、CSV/Parquet、格式转换、DPO/Pretrain

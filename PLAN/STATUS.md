@@ -1,7 +1,7 @@
 # STATUS — 功能清单、节点能力矩阵与下一阶段规划
 
 > 最后核对：2026-11-17（Round 16 完成）
-> 验证基线：`dotnet build` 0 警告 0 错误（分析器开启）；`dotnet test` 550 通过 + 7 个 gated 测试（2 个真实 provider 冒烟 + 5 个性能 gated，默认跳过），另有 1 个 `[Explicit]` 示例生成；`--list-tests` 557 个用例；`dotnet format --verify-no-changes` 通过；覆盖率总行 74.64%、Services/Commands 84.32%；Headless UI 测试通过；1M 行 JSONL、1M 行质量操作与 1M 行编辑保存基线通过；10M 行链路与 CSV/Parquet 大规模基线入口已提供；win-x64 单文件发布与 Debug 启动冒烟通过。
+> 验证基线：`dotnet build` 0 警告 0 错误（分析器开启）；`dotnet test` 556 通过 + 7 个 gated 测试（2 个真实 provider 冒烟 + 5 个性能 gated，默认跳过），另有 1 个 `[Explicit]` 示例生成；`--list-tests` 563 个用例；`dotnet format --verify-no-changes` 通过；覆盖率总行 74.64%、Services/Commands 84.32%；Headless UI 测试通过；1M 行 JSONL、1M 行质量操作与 1M 行编辑保存基线通过；10M 行链路与 CSV/Parquet 大规模基线入口已提供；win-x64 单文件发布与 Debug 启动冒烟通过。
 >
 > 图例：`[x]` 已完成并有测试/验证；`[部分]` 可用但有明确缺口；`[ ]` 未实现。
 >
@@ -59,7 +59,7 @@
 - 发布：MSIX 清单/打包脚本、Inno Setup 安装脚本；`examples/` 6 个示例 Recipe；README Dark/Light 截图。
 - 工程质量：`.editorconfig`、.NET 分析器 `latest-recommended`、警告即错误；构建 0 警告。
 - 工程化：滚动日志与全局异常、GitHub Actions CI、win-x64 单文件发布脚本、Headless UI 测试、MIT LICENSE、应用图标。
-- 557 个自动化测试：550 个常规通过 + 7 个 gated（2 个真实 provider 冒烟 + 5 个性能 gated）+ 1 个 Explicit 示例生成。
+- 563 个自动化测试：556 个常规通过 + 7 个 gated（2 个真实 provider 冒烟 + 5 个性能 gated）+ 1 个 Explicit 示例生成。
 
 ### 1.2 当前最大缺口（按优先级）
 
@@ -430,7 +430,7 @@
 
 ---
 
-## 五、已完成轮次（Round 8–18）
+## 五、已完成轮次（Round 8–19）
 
 | Round | 主题 | 关键交付 | 结果 |
 | --- | --- | --- | --- |
@@ -445,6 +445,7 @@
 | 16 | 发布与体验 | 画布尺寸/边动画/标签避让、Undo/Redo 菜单与属性撤销、完整浅色主题、内存定时刷新、单实例/命令行/诊断、MSIX/Inno、示例与截图、10M/CSV/Parquet 基线入口、分析器 | 505 测试 + 7 gated |
 | 17 | Bugfix1 一致性 | `.recipe` 全链路、版本单一来源与图标、打包参数、Seed/Cleaner/Validator/LLM/SFT 编辑缺口、跨格式保存、恢复哈希/指纹、文档同步 | 531 测试 + 7 gated |
 | 18 | 测试与 CI 门禁 | 单实例/命令行/打包一致性/本地化键测试、设置面板有界输入与目录选择、格式门禁、Debug/Release 矩阵、覆盖率门禁、示例漂移与发布冒烟 | 550 测试 + 7 gated |
+| 19 | 数据工作台与入口打磨 | 搜索匹配上一处/下一处、样本预览分页、最近文件清理与失效路径移除、执行输出目录打开 | 556 测试 + 7 gated |
 
 ---
 
