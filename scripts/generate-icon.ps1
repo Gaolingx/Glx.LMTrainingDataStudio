@@ -70,3 +70,28 @@ if ($directory -and !(Test-Path $directory)) {
 $bitmap.Save($Output, [System.Drawing.Imaging.ImageFormat]::Png)
 $bitmap.Dispose()
 Write-Host "Wrote $Output"
+
+$icoPath = [IO.Path]::ChangeExtension($Output, ".ico")
+$pngBytes = [IO.File]::ReadAllBytes($Output)
+$icoStream = [IO.File]::Create($icoPath)
+$icoWriter = New-Object IO.BinaryWriter($icoStream)
+try {
+    $icoWriter.Write([UInt16]0)
+    $icoWriter.Write([UInt16]1)
+    $icoWriter.Write([UInt16]1)
+    $icoWriter.Write([Byte]0)
+    $icoWriter.Write([Byte]0)
+    $icoWriter.Write([Byte]0)
+    $icoWriter.Write([Byte]0)
+    $icoWriter.Write([UInt16]1)
+    $icoWriter.Write([UInt16]32)
+    $icoWriter.Write([UInt32]$pngBytes.Length)
+    $icoWriter.Write([UInt32]22)
+    $icoWriter.Write($pngBytes)
+}
+finally {
+    $icoWriter.Dispose()
+    $icoStream.Dispose()
+}
+
+Write-Host "Wrote $icoPath"

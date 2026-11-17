@@ -1,10 +1,17 @@
 param(
     [string]$Runtime = "win-x64",
     [string]$Configuration = "Release",
-    [string]$Output = "artifacts/publish/win-x64"
+    [string]$Output = "artifacts/publish/win-x64",
+    [string]$Version
 )
 
 $ErrorActionPreference = "Stop"
+$root = Resolve-Path (Join-Path $PSScriptRoot "..")
+. (Join-Path $PSScriptRoot "version.ps1")
+if (-not $Version) {
+    $Version = Get-ProjectVersion -Root $root
+}
+
 $project = "LMTrainingDataStudio2/LMTrainingDataStudio2/LMTrainingDataStudio2.csproj"
 
 dotnet publish $project `
@@ -14,9 +21,10 @@ dotnet publish $project `
     -p:PublishSingleFile=true `
     -p:IncludeNativeLibrariesForSelfExtract=true `
     -p:EnableCompressionInSingleFile=true `
+    -p:Version=$Version `
     -o $Output
 
-$zip = "$Output.zip"
+$zip = "$Output-$Version.zip"
 if (Test-Path $zip) {
     Remove-Item $zip -Force
 }

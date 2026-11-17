@@ -503,21 +503,22 @@ README 截图位于 `docs/screenshots/`（Dark/Light 主题各一张）。
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/publish-win-x64.ps1
+powershell -ExecutionPolicy Bypass -File scripts/publish-win-x64.ps1 -Version 1.2.3
 ```
 
-输出在 `artifacts/publish/win-x64`，并生成同名 zip。CI 配置见 `.github/workflows/ci.yml`。
+输出在 `artifacts/publish/win-x64`，并生成 `win-x64-<version>.zip`。版本默认读取 `Directory.Build.props`。CI 配置见 `.github/workflows/ci.yml`。
 
 ### MSIX / 安装包
 
 ```powershell
 # MSIX（需要 Windows SDK 的 makeappx；可选 -CertificatePath 签名）
-powershell -ExecutionPolicy Bypass -File scripts/package-msix.ps1
+powershell -ExecutionPolicy Bypass -File scripts/package-msix.ps1 -Version 1.0.0.0
 
 # Inno Setup 安装包（需要 Inno Setup 6；包含 .recipe 文件关联）
-powershell -ExecutionPolicy Bypass -File scripts/package-inno.ps1
+powershell -ExecutionPolicy Bypass -File scripts/package-inno.ps1 -Version 1.2.3
 ```
 
-MSIX 清单位于 `packaging/msix/AppxManifest.xml`，Inno 脚本位于 `packaging/inno/LMTrainingDataStudio.iss`。
+版本默认读取 `Directory.Build.props`；MSIX 会自动补齐为四段版本。输出为 `LLMTrainingDataStudio-<version>.msix` 与 `LMTrainingDataStudio-Setup-<version>.exe`。MSIX 清单位于 `packaging/msix/AppxManifest.xml`，Inno 脚本位于 `packaging/inno/LMTrainingDataStudio.iss`。
 
 ### 命令行打开与单实例
 

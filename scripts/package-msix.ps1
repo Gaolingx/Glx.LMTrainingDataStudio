@@ -13,7 +13,7 @@
 #>
 param(
     [string]$Configuration = "Release",
-    [string]$Version = "1.0.0.0",
+    [string]$Version,
     [string]$CertificatePath,
     [string]$CertificatePassword
 )
@@ -21,12 +21,26 @@ param(
 $ErrorActionPreference = "Stop"
 
 $root = Resolve-Path (Join-Path $PSScriptRoot "..")
+. (Join-Path $PSScriptRoot "version.ps1")
+if (-not $Version) {
+    $Version = Get-ProjectVersion -Root $root
+}
+$versionParts = $Version.Split('.')
+if ($versionParts.Count -lt 3 -or $versionParts.Count -gt 4 -or
+    ($versionParts | Where-Object { $_ -notmatch '^\d+$' })) {
+    throw "MSIX version must have three or four numeric parts (for example 1.0.0 or 1.0.0.0); got '$Version'."
+}
+while ($versionParts.Count -lt 4) {
+    $versionParts += "0"
+}
+$Version = $versionParts -join '.'
+
 $solution = Join-Path $root "LMTrainingDataStudio2\LMTrainingDataStudio2.slnx"
 $project = Join-Path $root "LMTrainingDataStudio2\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj"
 $icon = Join-Path $root "LMTrainingDataStudio2\LMTrainingDataStudio2\Assets\app-icon.png"
 $publish = Join-Path $root "artifacts\msix\AppX"
 $outputDirectory = Join-Path $root "artifacts\msix"
-$msixPath = Join-Path $outputDirectory "LLMTrainingDataStudio.msix"
+$msixPath = Join-Path $outputDirectory "LLMTrainingDataStudio-$Version.msix"
 $manifest = Join-Path $root "packaging\msix\AppxManifest.xml"
 
 Write-Host "Publishing $Configuration win-x64..." -ForegroundColor Cyan
@@ -37,7 +51,15 @@ dotnet publish $project -c $Configuration -r win-x64 --self-contained true `
     -p:PublishSingleFile=true -p:Version=$Version -o $publish
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed." }
 
-Copy-Item $manifest (Join-Path $publish "AppxManifest.xml") -Force
+$manifestPath = Join-Path $publish "AppxManifest.xml"
+Copy-Item $manifest $manifestPath -Force
+[xml]$manifestXml = Get-Content -Path $manifestPath -Raw
+$identity = $manifestXml.SelectSingleNode("//*[local-name()='Identity']")
+if (-not $identity) {
+    throw "AppxManifest.xml does not contain an Identity element."
+}
+$identity.SetAttribute("Version", $Version)
+$manifestXml.Save($manifestPath)
 
 Write-Host "Generating MSIX assets..." -ForegroundColor Cyan
 Add-Type -AssemblyName System.Drawing

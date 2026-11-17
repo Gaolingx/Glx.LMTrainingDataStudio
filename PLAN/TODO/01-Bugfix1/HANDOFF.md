@@ -436,6 +436,7 @@
 | 2026-11-17 | 扫描与归档 | `git diff --check`；`dotnet test --list-tests` | 通过；513 用例 | 本文件与归档文件 |
 | 2026-11-17 | 二次扫描复核 | `dotnet test --list-tests`；`dotnet test --no-build`；全仓 grep 遗留标记 | 513 用例；505 通过 / 0 失败 / 7 跳过；生产代码 0 遗留标记 | 第 8 节 |
 | 2026-11-17 | Batch 1：`.recipe` 一致性 | `dotnet build -c Release`；`dotnet test -c Release --no-build` | 0 警告；522 通过 / 0 失败 / 7 跳过 | `RecipeFileExtensionsTests` |
+| 2026-11-17 | Batch 2：版本、图标、打包 | `dotnet build -c Release`；检查 Release deps.json 与 exe VersionInfo；PowerShell Parser 校验脚本 | 0 警告；FileVersion 1.0.0.0；Release 不含 Avalonia.Diagnostics；脚本语法通过 | 本文件 7.1/8.3.1 勾选 |
 
 ---
 
@@ -448,11 +449,11 @@
 - [x] **[缺陷][P1] `.recipe` 关联打不开**：`Program.IsRecipePath` 只接受扩展名 `.json`（`Program.cs:62`），但 MSIX 清单与 Inno 安装器注册的是 `.recipe`（`packaging/msix/AppxManifest.xml:47`、`packaging/inno/LMTrainingDataStudio.iss:48-53`），README 也宣称支持 `.recipe`。双击 `.recipe` 启动后不会加载文件。
 - [x] **[缺陷][P1] `.recipe` 不在文件选择器里**：打开/保存 Recipe 的过滤器只有 `*.json`（`Views/MainWindow.axaml.cs:537-540`、`549-561`），用户无法选择 `.recipe`。
 - [x] **[缺陷][P1] `.recipe.json` 关联宣传不实**：安装器只注册 `.recipe`；`.json` 仅加入 `OpenWithProgids`，不是默认关联；`README.md:18` 写“支持 `.recipe.json` / `.recipe` 文件关联”。
-- [ ] **[缺陷][P2] MSIX `-Version` 不生效**：`scripts/package-msix.ps1:16,37` 的版本只传给 `dotnet publish`，复制 `AppxManifest.xml` 时未替换 `Identity Version="1.0.0.0"`（`packaging/msix/AppxManifest.xml:13`）。
-- [ ] **[缺陷][P2] 版本号多源**：csproj 无 `Version`；`app.manifest:3`、`AppxManifest.xml:13`、`LMTrainingDataStudio.iss:7` 各自硬编码 1.0.0；诊断包中的 App version 也取自程序集默认版本。
-- [ ] **[缺陷][P2] Windows EXE 图标未嵌入**：csproj 没有 `<ApplicationIcon>`，只设置了 Avalonia 窗口图标（`Views/MainWindow.axaml:12`）；Inno 的快捷方式/文件关联图标指向 exe，会显示默认图标。
+- [x] **[缺陷][P2] MSIX `-Version` 不生效**：`scripts/package-msix.ps1:16,37` 的版本只传给 `dotnet publish`，复制 `AppxManifest.xml` 时未替换 `Identity Version="1.0.0.0"`（`packaging/msix/AppxManifest.xml:13`）。
+- [x] **[缺陷][P2] 版本号多源**：csproj 无 `Version`；`app.manifest:3`、`AppxManifest.xml:13`、`LMTrainingDataStudio.iss:7` 各自硬编码 1.0.0；诊断包中的 App version 也取自程序集默认版本。
+- [x] **[缺陷][P2] Windows EXE 图标未嵌入**：csproj 没有 `<ApplicationIcon>`，只设置了 Avalonia 窗口图标（`Views/MainWindow.axaml:12`）；Inno 的快捷方式/文件关联图标指向 exe，会显示默认图标。
 - [x] **[缺陷][P2] 安装器注释与代码相反**：`packaging/inno/LMTrainingDataStudio.iss:48` 写“command line accepts any .json/.recipe path”，但代码只接受 `.json`。
-- [ ] **[缺陷][P2] 发布包包含无用依赖**：`Avalonia.Diagnostics` 无条件引用（`LMTrainingDataStudio2.csproj:23`），代码未调用 `AttachDevTools`；建议改为 Debug 条件引用，减小发布体积。
+- [x] **[缺陷][P2] 发布包包含无用依赖**：`Avalonia.Diagnostics` 无条件引用（`LMTrainingDataStudio2.csproj:23`），代码未调用 `AttachDevTools`；建议改为 Debug 条件引用，减小发布体积。
 - [ ] **[缺陷][P2] 设置页路径输入无选择器/可写性检查**：CacheDirectory、RunOutputDirectory、RunTempDirectory 只能手输（`Views/MainWindow.axaml:398,442,448`），无 Browse 与可写性检查。
 - [ ] **[缺陷][P2] 数值设置无即时校验**：MaxCacheSizeMb、MaxParallelism、NodeRetryCount、SpillThresholdRows、GridSnapSize 均为 TextBox 直绑数值，非法输入无提示，只在 Apply 时 clamp（`ViewModels/MainWindowViewModel.cs:1345-1365`）。
 - [ ] **[缺陷][P2] 数据工作台在途分页不可取消**：`OpenDatasetAsync`/`LoadPageAsync` 使用 `CancellationToken.None`（`ViewModels/DataWorkbenchViewModel.cs:234,325`），切换/关闭文件无法取消旧分页请求。
@@ -717,9 +718,9 @@
 - [x] **168 [P1] 保存链强制 `.json`**：`DefaultExtension = "json"`（`Views/MainWindow.axaml.cs:529`）、`GetSuggestedFileName` 只判断 `.json` 并追加 `.json`（`Views/MainWindow.axaml.cs:549-561`）。用户输入 `foo.recipe` 会得到 `foo.recipe.json`；与 7.1 的 `.recipe` 打开/关联修复必须一起改。
 - [x] **169 [P2] 第二实例转发失败无反馈**：`Program.Main` 调用 `SingleInstanceService.TrySendToPrimary(recipePath)` 但忽略返回值（`Program.cs:35-41`）；主实例管道不可达时第二个进程直接退出，用户看不到任何错误。
 - [x] **170 [P3] 命令行只处理第一个 Recipe 参数**：`Array.Find(args, IsRecipePath)`（`Program.cs:30`）；多文件/批量打开会被静默忽略。
-- [ ] **171 [P3] MSIX 生成 `Wide310x150Logo.png` 但清单未引用**：脚本生成该资产（`scripts/package-msix.ps1:69`），`packaging/msix/AppxManifest.xml` 只引用 Square/StoreLogo；宽磁贴可能缺失或资产无效。
-- [ ] **172 [P3] 发布 zip 文件名不含版本**：`scripts/publish-win-x64.ps1:16-20` 固定输出 `win-x64.zip`；无法区分多个版本产物。
-- [ ] **173 [P2] Inno 打包脚本无 `-Version` 参数**：`scripts/package-inno.ps1` 只接收 `Configuration` / `SkipPublish`，版本继续由 `LMTrainingDataStudio.iss:7` 硬编码；与 7.1 的“版本单一来源”配套修复。
+- [x] **171 [P3] MSIX 生成 `Wide310x150Logo.png` 但清单未引用**：脚本生成该资产（`scripts/package-msix.ps1:69`），`packaging/msix/AppxManifest.xml` 只引用 Square/StoreLogo；宽磁贴可能缺失或资产无效。
+- [x] **172 [P3] 发布 zip 文件名不含版本**：`scripts/publish-win-x64.ps1:16-20` 固定输出 `win-x64.zip`；无法区分多个版本产物。
+- [x] **173 [P2] Inno 打包脚本无 `-Version` 参数**：`scripts/package-inno.ps1` 只接收 `Configuration` / `SkipPublish`，版本继续由 `LMTrainingDataStudio.iss:7` 硬编码；与 7.1 的“版本单一来源”配套修复。
 - [ ] **补充**：7.1 的 `.recipe` 打开/选择器/安装器/README 四项仍全部有效；`Program.IsRecipePath` 当前只比较 `.json`（`Program.cs:62-64`）。
 
 #### 8.3.2 测试缺口（174–179）

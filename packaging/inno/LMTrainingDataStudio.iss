@@ -4,7 +4,9 @@
 ; Then compile this script with ISCC.exe (scripts/package-inno.ps1 finds it).
 
 #define MyAppName "LLM Training Data Studio"
-#define MyAppVersion "1.0.0"
+#ifndef MyAppVersion
+  #define MyAppVersion "1.0.0"
+#endif
 #define MyAppPublisher "LMTrainingDataStudio"
 #define MyAppExeName "LMTrainingDataStudio2.exe"
 #define PublishDir "..\..\artifacts\publish\win-x64"

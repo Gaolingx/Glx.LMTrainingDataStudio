@@ -13,18 +13,24 @@
 #>
 param(
     [string]$Configuration = "Release",
+    [string]$Version,
     [switch]$SkipPublish
 )
 
 $ErrorActionPreference = "Stop"
 
 $root = Resolve-Path (Join-Path $PSScriptRoot "..")
+. (Join-Path $PSScriptRoot "version.ps1")
+if (-not $Version) {
+    $Version = Get-ProjectVersion -Root $root
+}
+
 $publishScript = Join-Path $PSScriptRoot "publish-win-x64.ps1"
 $iss = Join-Path $root "packaging\inno\LMTrainingDataStudio.iss"
 
 if (-not $SkipPublish) {
-    Write-Host "Publishing win-x64..." -ForegroundColor Cyan
-    & powershell -ExecutionPolicy Bypass -File $publishScript -Configuration $Configuration
+    Write-Host "Publishing win-x64 $Version..." -ForegroundColor Cyan
+    & powershell -ExecutionPolicy Bypass -File $publishScript -Configuration $Configuration -Version $Version
     if ($LASTEXITCODE -ne 0) { throw "publish script failed." }
 }
 
@@ -42,8 +48,8 @@ if (-not $iscc) {
     throw "ISCC.exe was not found. Install Inno Setup 6 from https://jrsoftware.org/isinfo.php."
 }
 
-Write-Host "Compiling installer..." -ForegroundColor Cyan
-& $iscc $iss
+Write-Host "Compiling installer $Version..." -ForegroundColor Cyan
+& $iscc "/DMyAppVersion=$Version" $iss
 if ($LASTEXITCODE -ne 0) { throw "ISCC failed." }
 
 Write-Host "Installer created under artifacts\installer." -ForegroundColor Green
