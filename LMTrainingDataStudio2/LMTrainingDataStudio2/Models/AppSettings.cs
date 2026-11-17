@@ -38,9 +38,21 @@ public sealed class AppSettings
     /// <summary>Rows kept in memory per inter-block buffer before spilling to disk.</summary>
     public long SpillThresholdRows { get; set; } = 10_000;
 
+    /// <summary>Bytes kept in memory per inter-block buffer before spilling to disk; 0 disables the byte limit.</summary>
+    public long SpillThresholdBytes { get; set; } = 64L * 1024 * 1024;
+
     /// <summary>Directory for temporary inter-block spill files.</summary>
     public string RunTempDirectory { get; set; } =
         Path.Combine(Path.GetTempPath(), "LMTrainingDataStudio", "run-temp");
+
+    /// <summary>Total resume-checkpoint size kept under the run output directory, in megabytes; 0 disables the quota.</summary>
+    public long CheckpointQuotaMb { get; set; } = 512;
+
+    /// <summary>Number of execution history entries kept; 0 keeps all.</summary>
+    public int ExecutionHistoryLimit { get; set; } = 200;
+
+    /// <summary>Days of execution history kept; 0 keeps all.</summary>
+    public int ExecutionHistoryRetentionDays { get; set; } = 30;
 
     /// <summary>
     /// OpenAI API key; falls back to OPENAI_API_KEY when empty.

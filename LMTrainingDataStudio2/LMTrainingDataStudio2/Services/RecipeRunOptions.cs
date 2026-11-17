@@ -9,6 +9,7 @@ public sealed record RecipeRunOptions(
     int NodeRetryCount = 0,
     string? OutputDirectory = null,
     long SpillThresholdRows = 10_000,
+    long SpillThresholdBytes = 64L * 1024 * 1024,
     string? SpillDirectory = null,
     bool PersistNodeOutputs = true)
 {
@@ -17,6 +18,9 @@ public sealed record RecipeRunOptions(
     public int EffectiveRetryCount => Math.Max(0, NodeRetryCount);
 
     public long EffectiveSpillThresholdRows => Math.Max(0, SpillThresholdRows);
+
+    /// <summary>Byte budget per buffer; zero disables the byte limit.</summary>
+    public long EffectiveSpillThresholdBytes => Math.Max(0, SpillThresholdBytes);
 
     public string EffectiveSpillDirectory => string.IsNullOrWhiteSpace(SpillDirectory)
         ? Path.Combine(Path.GetTempPath(), "LMTrainingDataStudio", "run-spill")

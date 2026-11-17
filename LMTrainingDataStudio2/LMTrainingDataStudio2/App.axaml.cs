@@ -35,11 +35,13 @@ public partial class App : Application
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            var viewModel = new MainWindowViewModel();
             _mainWindow = new MainWindow
             {
-                DataContext = new MainWindowViewModel()
+                DataContext = viewModel
             };
             desktop.MainWindow = _mainWindow;
+            _ = RunStartupMaintenanceAsync(viewModel);
 
             lock (PendingGate)
             {
@@ -52,6 +54,18 @@ public partial class App : Application
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private static async Task RunStartupMaintenanceAsync(MainWindowViewModel viewModel)
+    {
+        try
+        {
+            await viewModel.RunStartupMaintenanceAsync();
+        }
+        catch (Exception ex)
+        {
+            AppLog.Warning($"Startup maintenance failed: {ex.Message}");
+        }
     }
 
     /// <summary>

@@ -606,10 +606,10 @@
 ### 7.7 执行与恢复
 
 - [x] **[执行/P2] 恢复未做逐字节/哈希比对**：只验证行数与内容；Round 13 验收目标中的“哈希一致”未落地。
-- [ ] **[执行/P2] 溢写阈值只按行数**：无按字节阈值。
-- [ ] **[执行/P2] 检查点无磁盘配额**：失败/取消运行会保留节点输出。
+- [x] **[执行/P2] 溢写阈值只按行数**：已补 `SpillThresholdBytes`，与行数阈值取先到者（Round 27）。
+- [x] **[执行/P2] 检查点无磁盘配额**：启动与运行结束按运行输出目录大小清理最旧检查点，保护当前运行（Round 27）。
 - [部分] **[执行/P2] 无并发写同一目标文件的检测**：同一 Recipe 内的节点级重复目标已在 Round 23 校验；两次独立运行同时写同一路径仍无跨进程锁。
-- [ ] **[执行/P2] 无执行历史批量清理/保留策略**：`ExecutionStore` 只追加，无删除/清理命令。
+- [x] **[执行/P2] 无执行历史批量清理/保留策略**：`ExecutionStore.Prune` 按数量/天数清理，启动自动应用，Executions 提供手动入口（Round 27）。
 - [ ] **[执行/P2] 取消 1s 断言依赖本机调度**：CI 未设性能门禁。
 - [ ] **[执行/P3] 10M 行执行/质量/转换基线未实测**：入口已有，结果未记录。
 - [ ] **[执行/P3] 执行日志/状态/摘要未本地化**：保持英文技术文本。
@@ -1191,3 +1191,36 @@
 - Settings/Index Cache schema 版本与迁移、“恢复默认设置”、日志级别/来源筛选（7.4）。
 - LLM 流式输出与模型列表。
 - 数据工作台列排序/筛选/列宽持久化（191）、CSV 类型推断；SFT 比例拆片与输出路径存在性提示（206）。
+
+---
+
+## 19. Round 27 执行记录（2026-11-18）
+
+### 19.1 已完成项
+
+| 项 | 范围 | 提交 |
+| --- | --- | --- |
+| Batch 17 | 执行韧性收尾：溢写字节阈值、检查点磁盘配额、执行历史保留 | 本次提交 |
+
+### 19.2 具体改动
+
+- `RowSpillBuffer` 增加内存字节预算：按行序列化大小估算，行数或字节任一超限即溢写；`memoryLimitBytes: 0` 关闭字节限制。`RecipeRunOptions`、`AppSettings`、`SettingsStore` 校验、设置面板与运行入口全部接入（默认 64 MB，UI 以 MB 显示）。
+- 新增 `CheckpointQuota`：按运行输出目录统计各 run 的 `nodes` 检查点大小，从最旧目录开始删除直到满足配额；保护当前运行目录，只删除检查点，不删除 `run-summary.json` / 日志。配额为 0 时不执行。应用启动与每次运行结束（保护当前 run）各执行一次。
+- `ExecutionStore.Prune`：按最后写入时间保留最新 N 条与最近 D 天，删除对应 `.json` + `.log`；数量/天数为 0 表示该维度不限制，可保护指定 run。启动维护自动应用，Executions 视图新增“清理…”按钮（执行前确认）。
+- 设置新增 `checkpointQuotaMb`（默认 512）、`executionHistoryLimit`（默认 200）、`executionHistoryRetentionDays`（默认 30）；非法值回退默认并告警；本地化补齐 en-US / zh-CN 键。
+- `MainWindowViewModel` 支持注入 `ExecutionStore`，新增 `RunStartupMaintenanceAsync` 与 `CleanupExecutionsCommand`；启动维护在 `App` 创建主窗口后触发，异常仅告警不阻塞启动。
+
+### 19.3 当前验证
+
+- `dotnet build -c Release`：0 警告，0 错误。
+- `dotnet test -c Release`：651 通过，0 失败，7 跳过（5 性能 gated + 2 provider gated）；`--list-tests` 659 个用例（含 1 个 `[Explicit]`）。
+- `dotnet format --verify-no-changes`：通过。
+- 覆盖率（本地）：总行 76.4%，Services/Commands 行 84.87%。
+- 新增测试 13 项：`RowSpillBuffer` 字节预算 2 项、`RecipeRunner` 字节溢写 1 项、`CheckpointQuotaTests` 4 项、`ExecutionStore.Prune` 4 项、启动维护/手动清理 2 项；设置面板与设置往返/非法值测试同步扩展。
+
+### 19.4 本轮未做（保留在 7.x / 8.3）
+
+- 跨进程并发写同一目标文件的锁或检测（7.7 仍为部分）。
+- CI 取消性能门禁、10M 行执行/质量/转换结果按本机实测记录（7.7 P2/P3）。
+- 溢写目录启动清理（当前按运行临时目录前缀随运行结束删除，异常退出残留未单独处理）。
+- LLM 流式输出与模型列表；数据工作台列排序/筛选/列宽持久化（191）与 CSV 类型推断；SFT 比例拆片与输出路径存在性提示（206）。

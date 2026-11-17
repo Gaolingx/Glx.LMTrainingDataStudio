@@ -78,6 +78,10 @@ public sealed class SettingsPanelTests
         vm.MaxParallelism = 8;
         vm.NodeRetryCount = 2;
         vm.SpillThresholdRows = 20_000;
+        vm.SpillThresholdMb = 128;
+        vm.CheckpointQuotaMb = 256;
+        vm.ExecutionHistoryLimit = 50;
+        vm.ExecutionHistoryRetentionDays = 7;
         vm.GridSnapSize = 24;
 
         await vm.ApplySettingsCommand.ExecuteAsync(null);
@@ -90,6 +94,10 @@ public sealed class SettingsPanelTests
         Assert.That(saved.MaxParallelism, Is.EqualTo(8));
         Assert.That(saved.NodeRetryCount, Is.EqualTo(2));
         Assert.That(saved.SpillThresholdRows, Is.EqualTo(20_000));
+        Assert.That(saved.SpillThresholdBytes, Is.EqualTo(128L * 1024 * 1024));
+        Assert.That(saved.CheckpointQuotaMb, Is.EqualTo(256));
+        Assert.That(saved.ExecutionHistoryLimit, Is.EqualTo(50));
+        Assert.That(saved.ExecutionHistoryRetentionDays, Is.EqualTo(7));
         Assert.That(saved.GridSnapSize, Is.EqualTo(24));
         Assert.That(vm.SettingsService.Current.MaxParallelism, Is.EqualTo(8));
     }

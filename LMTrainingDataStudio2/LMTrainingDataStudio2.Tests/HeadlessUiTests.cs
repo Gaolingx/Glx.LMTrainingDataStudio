@@ -405,6 +405,10 @@ public sealed class HeadlessUiTests
             var parallelism = window.FindControl<NumericUpDown>("MaxParallelismInput");
             var retries = window.FindControl<NumericUpDown>("NodeRetryCountInput");
             var spill = window.FindControl<NumericUpDown>("SpillThresholdInput");
+            var spillBytes = window.FindControl<NumericUpDown>("SpillByteThresholdInput");
+            var checkpointQuota = window.FindControl<NumericUpDown>("CheckpointQuotaInput");
+            var historyLimit = window.FindControl<NumericUpDown>("ExecutionHistoryLimitInput");
+            var historyDays = window.FindControl<NumericUpDown>("ExecutionHistoryRetentionInput");
             var snap = window.FindControl<NumericUpDown>("GridSnapSizeInput");
             var cacheSize = window.FindControl<NumericUpDown>("MaxCacheSizeInput");
 
@@ -418,6 +422,20 @@ public sealed class HeadlessUiTests
 
             Assert.That(spill, Is.Not.Null);
             Assert.That(spill!.Maximum, Is.EqualTo(SettingsStore.MaxSpillThresholdRows));
+
+            Assert.That(spillBytes, Is.Not.Null);
+            Assert.That(spillBytes!.Minimum, Is.EqualTo(0));
+            Assert.That(spillBytes.Maximum, Is.EqualTo(SettingsStore.MaxSpillThresholdMb));
+
+            Assert.That(checkpointQuota, Is.Not.Null);
+            Assert.That(checkpointQuota!.Minimum, Is.EqualTo(0));
+            Assert.That(checkpointQuota.Maximum, Is.EqualTo(SettingsStore.MaxCheckpointQuotaMb));
+
+            Assert.That(historyLimit, Is.Not.Null);
+            Assert.That(historyLimit!.Maximum, Is.EqualTo(SettingsStore.MaxExecutionHistoryLimit));
+
+            Assert.That(historyDays, Is.Not.Null);
+            Assert.That(historyDays!.Maximum, Is.EqualTo(SettingsStore.MaxExecutionRetentionDays));
 
             Assert.That(snap, Is.Not.Null);
             Assert.That(snap!.Minimum, Is.EqualTo(SettingsStore.MinGridSnapSize));

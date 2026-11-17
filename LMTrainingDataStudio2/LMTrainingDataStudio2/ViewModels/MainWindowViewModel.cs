@@ -21,7 +21,7 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly AppSettingsService _settingsService;
     private readonly RecipeStore _recipeStore;
     private readonly RecipePresetStore _presetStore;
-    private readonly ExecutionStore _executionStore = new();
+    private readonly ExecutionStore _executionStore;
     private readonly HttpClient _llmHttpClient = new();
     private readonly List<string> _presetLoadWarnings = new();
     private CancellationTokenSource? _runCancellation;
@@ -135,7 +135,19 @@ public partial class MainWindowViewModel : ObservableObject
     private long _spillThresholdRows = 10_000;
 
     [ObservableProperty]
+    private long _spillThresholdMb = 64;
+
+    [ObservableProperty]
     private string _runTempDirectory = string.Empty;
+
+    [ObservableProperty]
+    private long _checkpointQuotaMb = 512;
+
+    [ObservableProperty]
+    private int _executionHistoryLimit = 200;
+
+    [ObservableProperty]
+    private int _executionHistoryRetentionDays = 30;
 
     [ObservableProperty]
     private bool _isDarkTheme;
@@ -194,11 +206,13 @@ public partial class MainWindowViewModel : ObservableObject
     public MainWindowViewModel(
         ISettingsStore settingsStore,
         RecipeStore? recipeStore = null,
-        RecipePresetStore? presetStore = null)
+        RecipePresetStore? presetStore = null,
+        ExecutionStore? executionStore = null)
     {
         _settingsStore = settingsStore ?? throw new ArgumentNullException(nameof(settingsStore));
         _recipeStore = recipeStore ?? new RecipeStore();
         _presetStore = presetStore ?? new RecipePresetStore();
+        _executionStore = executionStore ?? new ExecutionStore();
         var loadResult = _settingsStore.Load();
         _settingsService = new AppSettingsService(loadResult.Settings);
         LocalizationService.Instance.SetLanguage(Settings.Language);
@@ -239,7 +253,11 @@ public partial class MainWindowViewModel : ObservableObject
         NodeRetryCount = Settings.NodeRetryCount;
         RunOutputDirectory = Settings.RunOutputDirectory ?? string.Empty;
         SpillThresholdRows = Settings.SpillThresholdRows;
+        SpillThresholdMb = Settings.SpillThresholdBytes / (1024 * 1024);
         RunTempDirectory = Settings.RunTempDirectory;
+        CheckpointQuotaMb = Settings.CheckpointQuotaMb;
+        ExecutionHistoryLimit = Settings.ExecutionHistoryLimit;
+        ExecutionHistoryRetentionDays = Settings.ExecutionHistoryRetentionDays;
         IsDarkTheme = Settings.IsDarkTheme;
         OpenAiApiKey = Settings.OpenAiApiKey ?? string.Empty;
         AnthropicApiKey = Settings.AnthropicApiKey ?? string.Empty;
@@ -1112,6 +1130,7 @@ public partial class MainWindowViewModel : ObservableObject
                 LogMessages.Add($"[Error] Failed to save execution record: {ex.Message}");
             }
 
+            EnforceCheckpointQuota(run.OutputDirectory);
             Progress = 1.0;
             StatusText = run.Status switch
             {
@@ -1133,6 +1152,78 @@ public partial class MainWindowViewModel : ObservableObject
             _runPause = null;
             IsRunPaused = false;
             IsRunning = false;
+        }
+    }
+
+    /// <summary>
+    /// Applies execution retention and the checkpoint quota at startup. Failures are
+    /// logged but never block startup.
+    /// </summary>
+    public async Task RunStartupMaintenanceAsync()
+    {
+        try
+        {
+            var removed = _executionStore.Prune(
+                Settings.ExecutionHistoryLimit, Settings.ExecutionHistoryRetentionDays);
+            if (removed > 0)
+            {
+                LogMessages.Add(
+                    $"[Info] Removed {removed} execution record(s) outside the retention policy.");
+            }
+
+            await Executions.RefreshAsync();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            LogMessages.Add($"[Warning] Could not clean execution history: {ex.Message}");
+        }
+
+        EnforceCheckpointQuota();
+    }
+
+    [RelayCommand]
+    private async Task CleanupExecutionsAsync()
+    {
+        try
+        {
+            var removed = _executionStore.Prune(
+                Settings.ExecutionHistoryLimit, Settings.ExecutionHistoryRetentionDays);
+            await Executions.RefreshAsync();
+            StatusText = removed == 0
+                ? "No execution records matched the retention policy."
+                : $"Removed {removed} execution record(s).";
+            LogMessages.Add($"[Info] {StatusText}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            StatusText = "Failed to clean execution history";
+            LogMessages.Add($"[Error] Failed to clean execution history: {ex.Message}");
+        }
+    }
+
+    private void EnforceCheckpointQuota(string? protectedRunDirectory = null)
+    {
+        if (Settings.CheckpointQuotaMb <= 0)
+        {
+            return;
+        }
+
+        try
+        {
+            var result = CheckpointQuota.Enforce(
+                Settings.RunOutputDirectory,
+                Settings.CheckpointQuotaMb * 1024L * 1024L,
+                protectedRunDirectory);
+            if (result.DeletedCheckpoints > 0)
+            {
+                var freedMb = result.FreedBytes / (1024.0 * 1024.0);
+                LogMessages.Add(
+                    $"[Info] Removed {result.DeletedCheckpoints} obsolete checkpoint(s) ({freedMb:F1} MB).");
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            LogMessages.Add($"[Warning] Could not enforce the checkpoint quota: {ex.Message}");
         }
     }
 
@@ -1215,6 +1306,7 @@ public partial class MainWindowViewModel : ObservableObject
             NodeRetryCount,
             RunOutputDirectory,
             SpillThresholdRows,
+            SpillThresholdMb * 1024L * 1024L,
             RunTempDirectory));
 
     private void OnExecutionProgress(ExecutionProgress progress)
@@ -1415,9 +1507,17 @@ public partial class MainWindowViewModel : ObservableObject
                 : RunOutputDirectory.Trim(),
             SpillThresholdRows = Math.Clamp(
                 SpillThresholdRows, 0, SettingsStore.MaxSpillThresholdRows),
+            SpillThresholdBytes = Math.Clamp(
+                SpillThresholdMb, 0, SettingsStore.MaxSpillThresholdMb) * 1024L * 1024L,
             RunTempDirectory = string.IsNullOrWhiteSpace(RunTempDirectory)
                 ? defaults.RunTempDirectory
                 : RunTempDirectory.Trim(),
+            CheckpointQuotaMb = Math.Clamp(
+                CheckpointQuotaMb, 0, SettingsStore.MaxCheckpointQuotaMb),
+            ExecutionHistoryLimit = Math.Clamp(
+                ExecutionHistoryLimit, 0, SettingsStore.MaxExecutionHistoryLimit),
+            ExecutionHistoryRetentionDays = Math.Clamp(
+                ExecutionHistoryRetentionDays, 0, SettingsStore.MaxExecutionRetentionDays),
             IsDarkTheme = IsDarkTheme,
             Language = SelectedLanguageOption.Code,
             OpenAiApiKey = NullIfBlank(OpenAiApiKey),
@@ -1478,6 +1578,35 @@ public partial class MainWindowViewModel : ObservableObject
             errors.Add(
                 $"Spill threshold must be between 0 and {SettingsStore.MaxSpillThresholdRows} rows; " +
                 $"found {SpillThresholdRows}.");
+        }
+
+        if (SpillThresholdMb < 0 || SpillThresholdMb > SettingsStore.MaxSpillThresholdMb)
+        {
+            errors.Add(
+                $"Spill byte threshold must be between 0 and {SettingsStore.MaxSpillThresholdMb} MB; " +
+                $"found {SpillThresholdMb}.");
+        }
+
+        if (CheckpointQuotaMb < 0 || CheckpointQuotaMb > SettingsStore.MaxCheckpointQuotaMb)
+        {
+            errors.Add(
+                $"Checkpoint quota must be between 0 and {SettingsStore.MaxCheckpointQuotaMb} MB; " +
+                $"found {CheckpointQuotaMb}.");
+        }
+
+        if (ExecutionHistoryLimit < 0 || ExecutionHistoryLimit > SettingsStore.MaxExecutionHistoryLimit)
+        {
+            errors.Add(
+                $"Execution history limit must be between 0 and {SettingsStore.MaxExecutionHistoryLimit}; " +
+                $"found {ExecutionHistoryLimit}.");
+        }
+
+        if (ExecutionHistoryRetentionDays < 0 ||
+            ExecutionHistoryRetentionDays > SettingsStore.MaxExecutionRetentionDays)
+        {
+            errors.Add(
+                $"Execution history retention must be between 0 and " +
+                $"{SettingsStore.MaxExecutionRetentionDays} days; found {ExecutionHistoryRetentionDays}.");
         }
 
         AddPathError(errors, "Cache directory", CacheDirectory, allowDefault: true);

@@ -68,6 +68,44 @@ public sealed class RowSpillBufferTests
     }
 
     [Test]
+    public async Task Append_ExceedingByteBudget_SpillsBelowRowLimit()
+    {
+        var payload = new string('x', 100);
+        await using var buffer = new RowSpillBuffer(
+            memoryLimitRows: 100, _directory, memoryLimitBytes: 220);
+
+        for (var i = 0; i < 3; i++)
+        {
+            await buffer.AppendAsync(new DatasetRow(i, $"{{\"value\":\"{payload}\"}}"));
+        }
+
+        await buffer.SealAsync();
+
+        Assert.That(buffer.IsSpilled, Is.True);
+        Assert.That(buffer.Count, Is.EqualTo(3));
+        var rows = await CollectAsync(buffer.ReadAsync());
+        Assert.That(rows, Has.Count.EqualTo(3));
+        Assert.That(rows[2].Json, Does.Contain(payload));
+    }
+
+    [Test]
+    public async Task Append_UnderByteAndRowBudgets_StaysInMemory()
+    {
+        await using var buffer = new RowSpillBuffer(
+            memoryLimitRows: 100, _directory, memoryLimitBytes: 10_000);
+
+        for (var i = 0; i < 5; i++)
+        {
+            await buffer.AppendAsync(new DatasetRow(i, $"{{\"value\":{i}}}"));
+        }
+
+        await buffer.SealAsync();
+
+        Assert.That(buffer.IsSpilled, Is.False);
+        Assert.That(buffer.Count, Is.EqualTo(5));
+    }
+
+    [Test]
     public async Task Append_ZeroThreshold_SpillsImmediately()
     {
         await using var buffer = new RowSpillBuffer(memoryLimitRows: 0, _directory);

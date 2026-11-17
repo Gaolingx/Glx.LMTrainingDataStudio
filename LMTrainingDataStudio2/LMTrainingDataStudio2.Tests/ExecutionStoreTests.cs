@@ -148,6 +148,69 @@ public sealed class ExecutionStoreTests
         Assert.That(loaded!.Logs, Is.Empty);
     }
 
+    [Test]
+    public async Task Prune_ByMaxRuns_DeletesOldestRecordsAndLogs()
+    {
+        await _store.SaveAsync(CreateRun("old", DateTimeOffset.UtcNow.AddHours(-3)));
+        await _store.SaveAsync(CreateRun("mid", DateTimeOffset.UtcNow.AddHours(-2)));
+        await _store.SaveAsync(CreateRun("new", DateTimeOffset.UtcNow.AddHours(-1)));
+        SetLastWrite("old", DateTimeOffset.UtcNow.AddHours(-3));
+        SetLastWrite("mid", DateTimeOffset.UtcNow.AddHours(-2));
+        SetLastWrite("new", DateTimeOffset.UtcNow.AddHours(-1));
+
+        var removed = _store.Prune(maxRuns: 2, maxAgeDays: 0);
+
+        Assert.That(removed, Is.EqualTo(1));
+        Assert.That(File.Exists(Path.Combine(_directory, "old.json")), Is.False);
+        Assert.That(File.Exists(Path.Combine(_directory, "old.log")), Is.False);
+        Assert.That(File.Exists(Path.Combine(_directory, "mid.json")), Is.True);
+        Assert.That(File.Exists(Path.Combine(_directory, "new.json")), Is.True);
+    }
+
+    [Test]
+    public async Task Prune_ByAge_DeletesExpiredRuns()
+    {
+        await _store.SaveAsync(CreateRun("expired", DateTimeOffset.UtcNow.AddDays(-20)));
+        await _store.SaveAsync(CreateRun("fresh", DateTimeOffset.UtcNow));
+        SetLastWrite("expired", DateTimeOffset.UtcNow.AddDays(-20));
+        SetLastWrite("fresh", DateTimeOffset.UtcNow);
+
+        var removed = _store.Prune(maxRuns: 0, maxAgeDays: 7);
+
+        Assert.That(removed, Is.EqualTo(1));
+        Assert.That(File.Exists(Path.Combine(_directory, "expired.json")), Is.False);
+        Assert.That(File.Exists(Path.Combine(_directory, "fresh.json")), Is.True);
+    }
+
+    [Test]
+    public async Task Prune_ProtectsSelectedRun()
+    {
+        await _store.SaveAsync(CreateRun("protected", DateTimeOffset.UtcNow.AddHours(-3)));
+        await _store.SaveAsync(CreateRun("mid", DateTimeOffset.UtcNow.AddHours(-2)));
+        await _store.SaveAsync(CreateRun("new", DateTimeOffset.UtcNow.AddHours(-1)));
+        SetLastWrite("protected", DateTimeOffset.UtcNow.AddHours(-3));
+        SetLastWrite("mid", DateTimeOffset.UtcNow.AddHours(-2));
+        SetLastWrite("new", DateTimeOffset.UtcNow.AddHours(-1));
+
+        var removed = _store.Prune(maxRuns: 1, maxAgeDays: 0, protectedRunId: "protected");
+
+        Assert.That(removed, Is.EqualTo(1));
+        Assert.That(File.Exists(Path.Combine(_directory, "protected.json")), Is.True);
+        Assert.That(File.Exists(Path.Combine(_directory, "mid.json")), Is.False);
+        Assert.That(File.Exists(Path.Combine(_directory, "new.json")), Is.True);
+    }
+
+    [Test]
+    public void Prune_WithNoLimits_IsNoOp()
+    {
+        Assert.That(_store.Prune(maxRuns: 0, maxAgeDays: 0), Is.EqualTo(0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => _store.Prune(maxRuns: -1, maxAgeDays: 0));
+    }
+
+    private void SetLastWrite(string runId, DateTimeOffset value) =>
+        File.SetLastWriteTimeUtc(
+            Path.Combine(_directory, $"{runId}.json"), value.UtcDateTime);
+
     private static ExecutionRun CreateRun(string runId, DateTimeOffset startedAt, params string[] logs)
     {
         var run = new ExecutionRun

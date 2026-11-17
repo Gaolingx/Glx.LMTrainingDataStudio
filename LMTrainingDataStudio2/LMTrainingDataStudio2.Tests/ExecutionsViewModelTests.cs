@@ -123,6 +123,77 @@ public sealed class ExecutionsViewModelTests
         Assert.That(_viewModel.SelectedRunSummary?.RunId, Is.EqualTo("first"));
     }
 
+    [Test]
+    public async Task CleanupExecutionsCommand_RemovesRunsOutsideRetention()
+    {
+        var settingsPath = CreateSettingsFile(historyLimit: 1, retentionDays: 0, checkpointQuotaMb: 0);
+        var start = DateTimeOffset.UtcNow;
+        await _store.SaveAsync(CreateRun("old", start.AddHours(-2), RunStatus.Succeeded));
+        await _store.SaveAsync(CreateRun("new", start.AddHours(-1), RunStatus.Succeeded));
+        SetLastWrite("old", start.AddHours(-2));
+        SetLastWrite("new", start.AddHours(-1));
+        var viewModel = new MainWindowViewModel(
+            new SettingsStore(settingsPath), executionStore: _store);
+
+        await viewModel.CleanupExecutionsCommand.ExecuteAsync(null);
+
+        var remaining = await _store.GetRecentAsync(10);
+        Assert.That(remaining.Select(run => run.RunId), Is.EqualTo(new[] { "new" }));
+        Assert.That(viewModel.StatusText, Does.Contain("1"));
+    }
+
+    [Test]
+    public async Task RunStartupMaintenance_PrunesHistoryAndOldCheckpoints()
+    {
+        var runs = Path.Combine(_directory, "runs");
+        var settingsPath = CreateSettingsFile(historyLimit: 1, retentionDays: 0, checkpointQuotaMb: 1);
+        var start = DateTimeOffset.UtcNow;
+        await _store.SaveAsync(CreateRun("old", start.AddHours(-2), RunStatus.Succeeded));
+        await _store.SaveAsync(CreateRun("new", start.AddHours(-1), RunStatus.Succeeded));
+        SetLastWrite("old", start.AddHours(-2));
+        SetLastWrite("new", start.AddHours(-1));
+        var oldCheckpoint = CreateCheckpoint(runs, "old", 1024 * 1024, start.AddHours(-2));
+        var newCheckpoint = CreateCheckpoint(runs, "new", 1024 * 1024, start.AddHours(-1));
+        var viewModel = new MainWindowViewModel(
+            new SettingsStore(settingsPath), executionStore: _store);
+
+        await viewModel.RunStartupMaintenanceAsync();
+
+        Assert.That(File.Exists(Path.Combine(_directory, "old.json")), Is.False);
+        Assert.That(File.Exists(Path.Combine(_directory, "new.json")), Is.True);
+        Assert.That(Directory.Exists(oldCheckpoint), Is.False);
+        Assert.That(Directory.Exists(newCheckpoint), Is.True);
+    }
+
+    private string CreateSettingsFile(int historyLimit, int retentionDays, long checkpointQuotaMb)
+    {
+        var path = Path.Combine(_directory, "config", "settings.json");
+        new SettingsStore(path).SaveAsync(new AppSettings
+        {
+            CacheDirectory = Path.Combine(_directory, "cache"),
+            RunOutputDirectory = Path.Combine(_directory, "runs"),
+            RunTempDirectory = Path.Combine(_directory, "temp"),
+            ExecutionHistoryLimit = historyLimit,
+            ExecutionHistoryRetentionDays = retentionDays,
+            CheckpointQuotaMb = checkpointQuotaMb
+        }).GetAwaiter().GetResult();
+        return path;
+    }
+
+    private static string CreateCheckpoint(
+        string runsDirectory, string runId, int bytes, DateTimeOffset lastWrite)
+    {
+        var directory = Path.Combine(runsDirectory, runId, "nodes");
+        Directory.CreateDirectory(directory);
+        File.WriteAllBytes(Path.Combine(directory, "block.rows"), new byte[bytes]);
+        Directory.SetLastWriteTimeUtc(directory, lastWrite.UtcDateTime);
+        return directory;
+    }
+
+    private void SetLastWrite(string runId, DateTimeOffset value) =>
+        File.SetLastWriteTimeUtc(
+            Path.Combine(_directory, $"{runId}.json"), value.UtcDateTime);
+
     private static ExecutionRun CreateRun(
         string runId, DateTimeOffset startedAt, RunStatus status, params string[] logs)
     {

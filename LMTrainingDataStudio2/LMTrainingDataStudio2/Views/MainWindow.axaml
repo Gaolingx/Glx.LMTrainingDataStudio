@@ -443,7 +443,7 @@
                         <Border Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
                             <StackPanel Spacing="12">
                                 <TextBlock Text="{loc:Loc main.execution}" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextBrightBrush}" />
-                                <Grid ColumnDefinitions="180,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="12">
+                                <Grid ColumnDefinitions="180,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="12">
                                     <TextBlock Grid.Row="0" Grid.Column="0" Text="{loc:Loc main.layer_parallelism}" VerticalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}" />
                                     <NumericUpDown Grid.Row="0" Grid.Column="1"
                                                    x:Name="MaxParallelismInput"
@@ -476,8 +476,15 @@
                                                    Minimum="0" Maximum="10000000" Increment="1000"
                                                    FormatString="0" />
 
-                                    <TextBlock Grid.Row="4" Grid.Column="0" Text="{loc:Loc main.run_temp_directory}" VerticalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}" />
-                                    <Grid Grid.Row="4" Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                    <TextBlock Grid.Row="4" Grid.Column="0" Text="{loc:Loc main.spill_threshold_mb}" VerticalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                    <NumericUpDown Grid.Row="4" Grid.Column="1"
+                                                   x:Name="SpillByteThresholdInput"
+                                                   Value="{Binding SpillThresholdMb, Mode=TwoWay}"
+                                                   Minimum="0" Maximum="4096" Increment="16"
+                                                   FormatString="0" />
+
+                                    <TextBlock Grid.Row="5" Grid.Column="0" Text="{loc:Loc main.run_temp_directory}" VerticalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                    <Grid Grid.Row="5" Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
                                         <TextBox Grid.Column="0" Text="{Binding RunTempDirectory, Mode=TwoWay}" Watermark="%TEMP%\LMTrainingDataStudio\run-temp" />
                                         <Button Grid.Column="1" x:Name="BrowseRunTempDirectoryButton"
                                                 Content="{loc:Loc property.browse}"
@@ -486,6 +493,27 @@
                                                 Background="{DynamicResource ButtonSurfaceBrush}"
                                                 Foreground="{DynamicResource TextBrightBrush}" />
                                     </Grid>
+
+                                    <TextBlock Grid.Row="6" Grid.Column="0" Text="{loc:Loc main.checkpoint_quota_mb}" VerticalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                    <NumericUpDown Grid.Row="6" Grid.Column="1"
+                                                   x:Name="CheckpointQuotaInput"
+                                                   Value="{Binding CheckpointQuotaMb, Mode=TwoWay}"
+                                                   Minimum="0" Maximum="1000000" Increment="64"
+                                                   FormatString="0" />
+
+                                    <TextBlock Grid.Row="7" Grid.Column="0" Text="{loc:Loc main.execution_history_limit}" VerticalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                    <NumericUpDown Grid.Row="7" Grid.Column="1"
+                                                   x:Name="ExecutionHistoryLimitInput"
+                                                   Value="{Binding ExecutionHistoryLimit, Mode=TwoWay}"
+                                                   Minimum="0" Maximum="10000" Increment="10"
+                                                   FormatString="0" />
+
+                                    <TextBlock Grid.Row="8" Grid.Column="0" Text="{loc:Loc main.execution_history_days}" VerticalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}" />
+                                    <NumericUpDown Grid.Row="8" Grid.Column="1"
+                                                   x:Name="ExecutionHistoryRetentionInput"
+                                                   Value="{Binding ExecutionHistoryRetentionDays, Mode=TwoWay}"
+                                                   Minimum="0" Maximum="3650" Increment="1"
+                                                   FormatString="0" />
                                 </Grid>
                             </StackPanel>
                         </Border>

@@ -264,7 +264,8 @@ public sealed class RecipeRunner
                     {
                         var buffer = new RowSpillBuffer(
                             _options.EffectiveSpillThresholdRows,
-                            Path.Combine(spillRoot, "buffers"));
+                            Path.Combine(spillRoot, "buffers"),
+                            _options.EffectiveSpillThresholdBytes);
                         buffers[port] = buffer;
                         outputs[GetOutputKey(block.Id, port)] = buffer;
                     }

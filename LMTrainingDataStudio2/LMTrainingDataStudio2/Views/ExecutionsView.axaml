@@ -21,7 +21,7 @@
                         Background="{DynamicResource HeaderBackgroundBrush}"
                         BorderBrush="{DynamicResource PanelBorderBrush}"
                         BorderThickness="0,0,0,1">
-                    <Grid ColumnDefinitions="*,Auto,Auto" Margin="12,0">
+                    <Grid ColumnDefinitions="*,Auto,Auto,Auto" Margin="12,0">
                         <TextBlock Text="{loc:Loc common.executions}" FontSize="12" FontWeight="SemiBold"
                                    VerticalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}" />
                         <ComboBox Grid.Column="1"
@@ -29,7 +29,12 @@
                                   SelectedItem="{Binding Executions.StatusFilter, Mode=TwoWay}"
                                   MinWidth="110" FontSize="11" VerticalAlignment="Center"
                                   Margin="0,0,6,0" />
-                        <Button Grid.Column="2" Content="↻"
+                        <Button Grid.Column="2" Content="{loc:Loc executions.cleanup}"
+                                Click="OnCleanupExecutionsClick"
+                                IsEnabled="{Binding !Executions.IsBusy}"
+                                Background="Transparent" Foreground="{DynamicResource TextMutedBrush}"
+                                FontSize="11" Padding="8,4" Margin="0,0,4,0" />
+                        <Button Grid.Column="3" Content="↻"
                                 Command="{Binding Executions.RefreshExecutionsCommand}"
                                 IsEnabled="{Binding !Executions.IsBusy}"
                                 Background="Transparent" Foreground="{DynamicResource TextMutedBrush}"

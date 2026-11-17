@@ -1,7 +1,7 @@
 # STATUS — 功能清单、节点能力矩阵与下一阶段规划
 
-> 最后核对：2026-11-18（Round 26 完成）
-> 验证基线：`dotnet build` 0 警告 0 错误（分析器开启）；`dotnet test` 638 通过 + 7 个 gated 测试（2 个真实 provider 冒烟 + 5 个性能 gated，默认跳过），另有 1 个 `[Explicit]` 示例生成；`--list-tests` 646 个用例；`dotnet format --verify-no-changes` 通过；覆盖率总行 74.64%、Services/Commands 84.32%；Headless UI 测试通过；1M 行 JSONL、1M 行质量操作与 1M 行编辑保存基线通过；10M 行链路与 CSV/Parquet 大规模基线入口已提供；win-x64 单文件发布与 Debug 启动冒烟通过。
+> 最后核对：2026-11-18（Round 27 完成）
+> 验证基线：`dotnet build` 0 警告 0 错误（分析器开启）；`dotnet test` 651 通过 + 7 个 gated 测试（2 个真实 provider 冒烟 + 5 个性能 gated，默认跳过），另有 1 个 `[Explicit]` 示例生成；`--list-tests` 659 个用例；`dotnet format --verify-no-changes` 通过；覆盖率总行 76.4%、Services/Commands 84.87%；Headless UI 测试通过；1M 行 JSONL、1M 行质量操作与 1M 行编辑保存基线通过；10M 行链路与 CSV/Parquet 大规模基线入口已提供；win-x64 单文件发布与 Debug 启动冒烟通过。
 >
 > 图例：`[x]` 已完成并有测试/验证；`[部分]` 可用但有明确缺口；`[ ]` 未实现。
 >
@@ -32,8 +32,9 @@
 - DAG 校验、拓扑分层、层内受控并行、顺序执行、fail-fast、下游 Skipped、取消、暂停/恢复、节点重试、进度、日志、执行记录持久化与 Executions UI。
 - Recipe 校验拒绝输出目标冲突：相同文件、相同 Sampler 输出目录，以及 Sampler 分片文件与其他节点输出同路径（大小写不敏感）。
 - 每次运行的输出目录与 `run-summary.json`；Executions UI 显示输出目录。
-- 节点间输出溢写磁盘：`SpillThresholdRows` 与运行临时目录可配置，下游流式读取，成功/失败/取消统一清理临时目录。
-- 节点级检查点与中断恢复：失败/取消运行保留已完成节点输出，Executions “恢复执行”从首个未完成节点继续；成功运行后清理检查点。
+- 节点间输出溢写磁盘：`SpillThresholdRows` / `SpillThresholdBytes`（取先到者，字节阈值 0 关闭）与运行临时目录可配置，下游流式读取，成功/失败/取消统一清理临时目录。
+- 节点级检查点与中断恢复：失败/取消运行保留已完成节点输出，Executions “恢复执行”从首个未完成节点继续；成功运行后清理检查点；启动与运行结束按目录大小配额清理最旧检查点（保护当前运行）。
+- 执行历史保留：`ExecutionStore` 支持按数量/天数清理，启动时自动应用，Executions 视图提供带确认的手动清理入口。
 - SFT Export：文件选择器、运行前覆盖确认、可选字段白名单、写出行数与首行预览日志。
 - 1M 行 Seed → Expression → SFT Export 基线：17.2s，托管内存增量 1MB；取消后 1s 内停止的测试通过。
 - 10M 行 Seed → Expression → SFT Export 基线：生成 5.0s、运行 154.0s、托管内存增量 1MB、输出 10,000,000 行。
@@ -60,11 +61,11 @@
 - 发布：MSIX 清单/打包脚本、Inno Setup 安装脚本；`examples/` 6 个示例 Recipe；README Dark/Light 截图。
 - 工程质量：`.editorconfig`、.NET 分析器 `latest-recommended`、警告即错误；构建 0 警告。
 - 工程化：滚动日志与全局异常、GitHub Actions CI、win-x64 单文件发布脚本、Headless UI 测试、MIT LICENSE、应用图标。
-- 638 个自动化测试：630 个常规通过 + 7 个 gated（2 个真实 provider 冒烟 + 5 个性能 gated）+ 1 个 Explicit 示例生成。
+- 651 个自动化测试：644 个常规通过 + 7 个 gated（2 个真实 provider 冒烟 + 5 个性能 gated）+ 1 个 Explicit 示例生成。
 
 ### 1.2 当前最大缺口（按优先级）
 
-1. **执行韧性残余**：已补输出 SHA256 与 Recipe 指纹校验；溢写阈值仍按行数计；检查点无磁盘配额、无启动清理。
+1. **执行韧性残余**：已补输出 SHA256、Recipe 指纹、溢写行/字节双阈值、检查点磁盘配额与启动清理、执行历史按数量/天数保留；剩余缺口为跨进程并发写锁、CI 取消门禁与 10M 行结果记录。
 2. **数据编辑残余**：已支持跨格式保存；`messages` 已有角色/内容/tool_calls 结构化表单并保留其他字段；非 `messages` 嵌套结构仍按 JSON 文本编辑；列排序/筛选/列宽持久化未做。
 3. **节点能力残余**：LLM 已支持 tool_calls 回填与 Anthropic 结构化输出；Validator script 为 Fluid 布尔表达式而非任意脚本；Sampler 分层仅对 ratio/splits 生效；Tool Profile 无 MCP。
 4. **发布残余**：MSIX/Inno 安装包未在本机实际安装验证；单实例管道未做双进程自动化测试；10M 行结果需按本机实测记录。
@@ -459,6 +460,7 @@
 | 24 | API Key 加密与迁移 | Windows DPAPI（CurrentUser）加密落盘、旧明文自动迁移、非 Windows 环境变量回退 | 632 用例（624 通过 + 7 gated + 1 Explicit） |
 | 25 | 网络安全与设置通知 | web_fetch 固定已校验解析地址（SocketsHttpHandler.ConnectCallback）、混合公网/私网结果拒绝、设置变更事件与数据工作台自动刷新 | 638 用例（630 通过 + 7 gated + 1 Explicit） |
 | 26 | 诊断脱敏与目录 ACL | 诊断包日志/summary/执行摘要全文脱敏；Windows 设置、日志与崩溃目录仅保留当前用户/SYSTEM/Administrators 权限 | 646 用例（638 通过 + 7 gated + 1 Explicit） |
+| 27 | 执行韧性收尾 | 溢写行/字节双阈值、检查点磁盘配额与启动/运行结束清理、执行历史按数量/天数保留与手动清理 | 659 用例（651 通过 + 7 gated + 1 Explicit） |
 
 ---
 

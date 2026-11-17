@@ -58,8 +58,8 @@ public sealed class ExecutionStore
         }
         catch
         {
-            TryDelete(jsonTempPath);
-            TryDelete(logTempPath);
+            TryDeleteFile(jsonTempPath);
+            TryDeleteFile(logTempPath);
             throw;
         }
     }
@@ -116,6 +116,64 @@ public sealed class ExecutionStore
             .ToList();
     }
 
+    /// <summary>
+    /// Deletes execution records outside the retention policy. A limit of zero disables that
+    /// dimension; the protected run is always kept. Returns the number of records removed.
+    /// </summary>
+    public int Prune(
+        int maxRuns,
+        int maxAgeDays,
+        string? protectedRunId = null,
+        DateTimeOffset? now = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(maxRuns);
+        ArgumentOutOfRangeException.ThrowIfNegative(maxAgeDays);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if ((maxRuns == 0 && maxAgeDays == 0) || !Directory.Exists(DirectoryPath))
+        {
+            return 0;
+        }
+
+        var entries = new List<RetainedRun>();
+        foreach (var jsonPath in Directory.GetFiles(DirectoryPath, "*.json"))
+        {
+            var runId = Path.GetFileNameWithoutExtension(jsonPath);
+            if (!IsValidRunId(runId) ||
+                (protectedRunId is not null &&
+                 string.Equals(runId, protectedRunId, StringComparison.Ordinal)))
+            {
+                continue;
+            }
+
+            entries.Add(new RetainedRun(runId, jsonPath, File.GetLastWriteTimeUtc(jsonPath)));
+        }
+
+        var cutoff = (now ?? DateTimeOffset.UtcNow).UtcDateTime.AddDays(-maxAgeDays);
+        var newestFirst = entries.OrderByDescending(entry => entry.LastWrite).ToList();
+        var deleted = 0;
+        for (var index = 0; index < newestFirst.Count; index++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var entry = newestFirst[index];
+            var beyondLimit = maxRuns > 0 && index >= maxRuns;
+            var tooOld = maxAgeDays > 0 && entry.LastWrite < cutoff;
+            if (!beyondLimit && !tooOld)
+            {
+                continue;
+            }
+
+            if (TryDeleteFile(entry.JsonPath))
+            {
+                TryDeleteFile(GetLogPath(entry.RunId));
+                deleted++;
+            }
+        }
+
+        return deleted;
+    }
+
     private string GetRunPath(string runId) => Path.Combine(DirectoryPath, $"{runId}.json");
 
     private string GetLogPath(string runId) => Path.Combine(DirectoryPath, $"{runId}.log");
@@ -154,17 +212,22 @@ public sealed class ExecutionStore
         !runId.Contains(Path.DirectorySeparatorChar) &&
         !runId.Contains(Path.AltDirectorySeparatorChar);
 
-    private static void TryDelete(string path)
+    private static bool TryDeleteFile(string path)
     {
         try
         {
             File.Delete(path);
+            return true;
         }
         catch (IOException)
         {
+            return false;
         }
         catch (UnauthorizedAccessException)
         {
+            return false;
         }
     }
+
+    private readonly record struct RetainedRun(string RunId, string JsonPath, DateTime LastWrite);
 }

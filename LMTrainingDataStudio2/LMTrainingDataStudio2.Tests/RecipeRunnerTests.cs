@@ -216,6 +216,24 @@ public sealed class RecipeRunnerTests
     }
 
     [Test]
+    public async Task RunAsync_LowSpillByteThreshold_SpillsRowsAndCleansTempDirectory()
+    {
+        await WriteRowsAsync(25);
+        var spillDirectory = Path.Combine(_directory, "spill");
+        var (recipe, seed, _, _) = CreatePipeline(sampleCount: 5);
+        var runner = CreateRunner(new RecipeRunOptions(
+            SpillThresholdRows: 1_000_000,
+            SpillThresholdBytes: 64,
+            SpillDirectory: spillDirectory));
+
+        var run = await runner.RunAsync(recipe);
+
+        Assert.That(run.Status, Is.EqualTo(RunStatus.Succeeded));
+        Assert.That(Node(run, seed).OutputRows, Is.EqualTo(25));
+        Assert.That(GetFiles(spillDirectory), Is.Empty);
+    }
+
+    [Test]
     public async Task RunAsync_FailedRun_KeepsCheckpointsAndResumeReusesCompletedBlock()
     {
         var (recipe, seed, expression) = CreateTwoBlockRecipe();

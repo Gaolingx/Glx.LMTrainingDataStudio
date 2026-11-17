@@ -58,7 +58,11 @@ public sealed class SettingsStoreTests
         var settings = new AppSettings
         {
             SpillThresholdRows = 12_345,
-            RunTempDirectory = Path.Combine(_directory, "run-temp")
+            SpillThresholdBytes = 32L * 1024 * 1024,
+            RunTempDirectory = Path.Combine(_directory, "run-temp"),
+            CheckpointQuotaMb = 256,
+            ExecutionHistoryLimit = 50,
+            ExecutionHistoryRetentionDays = 7
         };
 
         await _store.SaveAsync(settings);
@@ -66,20 +70,32 @@ public sealed class SettingsStoreTests
 
         Assert.That(result.Warnings, Is.Empty);
         Assert.That(result.Settings.SpillThresholdRows, Is.EqualTo(12_345));
+        Assert.That(result.Settings.SpillThresholdBytes, Is.EqualTo(32L * 1024 * 1024));
         Assert.That(result.Settings.RunTempDirectory, Is.EqualTo(settings.RunTempDirectory));
+        Assert.That(result.Settings.CheckpointQuotaMb, Is.EqualTo(256));
+        Assert.That(result.Settings.ExecutionHistoryLimit, Is.EqualTo(50));
+        Assert.That(result.Settings.ExecutionHistoryRetentionDays, Is.EqualTo(7));
     }
 
     [Test]
     public void Load_InvalidRuntimeBufferSettings_FallBackToDefaults()
     {
-        File.WriteAllText(_path, """{"spillThresholdRows":-1,"runTempDirectory":"  "}""");
+        File.WriteAllText(_path, """
+            {"spillThresholdRows":-1,"spillThresholdBytes":-1,"runTempDirectory":"  ",
+             "checkpointQuotaMb":-1,"executionHistoryLimit":-1,"executionHistoryRetentionDays":-1}
+            """);
 
         var result = _store.Load();
         var defaults = new AppSettings();
 
         Assert.That(result.Settings.SpillThresholdRows, Is.EqualTo(defaults.SpillThresholdRows));
+        Assert.That(result.Settings.SpillThresholdBytes, Is.EqualTo(defaults.SpillThresholdBytes));
         Assert.That(result.Settings.RunTempDirectory, Is.EqualTo(defaults.RunTempDirectory));
-        Assert.That(result.Warnings, Has.Count.GreaterThanOrEqualTo(2));
+        Assert.That(result.Settings.CheckpointQuotaMb, Is.EqualTo(defaults.CheckpointQuotaMb));
+        Assert.That(result.Settings.ExecutionHistoryLimit, Is.EqualTo(defaults.ExecutionHistoryLimit));
+        Assert.That(result.Settings.ExecutionHistoryRetentionDays,
+            Is.EqualTo(defaults.ExecutionHistoryRetentionDays));
+        Assert.That(result.Warnings, Has.Count.GreaterThanOrEqualTo(6));
     }
 
     [Test]

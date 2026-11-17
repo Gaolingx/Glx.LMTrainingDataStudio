@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text;
 using LMTrainingDataStudio2.Models;
@@ -5,22 +6,26 @@ using LMTrainingDataStudio2.Models;
 namespace LMTrainingDataStudio2.Services.Executors;
 
 /// <summary>
-/// Holds inter-block rows in memory up to a configurable row limit, then spills the
-/// remainder to a temporary file so large pipelines stay memory bounded.
+/// Holds inter-block rows in memory up to a configurable row and byte limit, then
+/// spills the remainder to a temporary file so large pipelines stay memory bounded.
+/// Whichever limit is reached first triggers the spill; a byte limit of zero disables it.
 /// </summary>
 public sealed class RowSpillBuffer : IAsyncDisposable
 {
     private readonly long _memoryLimitRows;
+    private readonly long _memoryLimitBytes;
     private readonly string? _directory;
     private readonly List<DatasetRow> _memory = new();
     private StreamWriter? _writer;
     private string? _path;
     private long _count;
+    private long _memoryBytes;
 
-    public RowSpillBuffer(long memoryLimitRows, string? directory = null)
+    public RowSpillBuffer(long memoryLimitRows, string? directory = null, long memoryLimitBytes = 0)
     {
         _memoryLimitRows = Math.Max(0, memoryLimitRows);
         _directory = directory;
+        _memoryLimitBytes = Math.Max(0, memoryLimitBytes);
     }
 
     private RowSpillBuffer(string path, long count)
@@ -28,6 +33,7 @@ public sealed class RowSpillBuffer : IAsyncDisposable
         _path = path;
         _count = count;
         _memoryLimitRows = 0;
+        _memoryLimitBytes = 0;
         PersistsFile = true;
     }
 
@@ -53,14 +59,22 @@ public sealed class RowSpillBuffer : IAsyncDisposable
             throw new InvalidOperationException("Cannot append to a read-only row buffer.");
         }
 
-        if (_writer is null && _memory.Count >= _memoryLimitRows)
+        var rowBytes = EstimateBytes(row);
+        if (_writer is null)
         {
-            await StartSpillAsync(cancellationToken);
+            var rowsExhausted = _memory.Count >= _memoryLimitRows;
+            var bytesExhausted = _memoryLimitBytes > 0 &&
+                                 _memoryBytes + rowBytes > _memoryLimitBytes;
+            if (rowsExhausted || bytesExhausted)
+            {
+                await StartSpillAsync(cancellationToken);
+            }
         }
 
         if (_writer is null)
         {
             _memory.Add(row);
+            _memoryBytes += rowBytes;
         }
         else
         {
@@ -155,7 +169,14 @@ public sealed class RowSpillBuffer : IAsyncDisposable
 
         _memory.Clear();
         _memory.TrimExcess();
+        _memoryBytes = 0;
     }
+
+    /// <summary>
+    /// Approximate serialized size of a row (line number, tab, JSON, newline).
+    /// </summary>
+    private static long EstimateBytes(DatasetRow row) =>
+        Encoding.UTF8.GetByteCount(row.Json) + row.LineNumber.ToString(CultureInfo.InvariantCulture).Length + 2;
 
     private static async ValueTask WriteRowAsync(
         StreamWriter writer, DatasetRow row, CancellationToken cancellationToken)

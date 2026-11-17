@@ -20,6 +20,10 @@ public sealed class SettingsStore : ISettingsStore
     public const int MaxNodeRetries = 10;
     public const int MaxRecentFiles = 10;
     public const long MaxSpillThresholdRows = 10_000_000;
+    public const long MaxSpillThresholdMb = 4_096;
+    public const long MaxCheckpointQuotaMb = 1_000_000;
+    public const int MaxExecutionHistoryLimit = 10_000;
+    public const int MaxExecutionRetentionDays = 3_650;
 
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -147,6 +151,15 @@ public sealed class SettingsStore : ISettingsStore
             settings.SpillThresholdRows = defaults.SpillThresholdRows;
         }
 
+        if (settings.SpillThresholdBytes < 0 ||
+            settings.SpillThresholdBytes > MaxSpillThresholdMb * 1024L * 1024L)
+        {
+            warnings.Add(
+                $"spillThresholdBytes must be between 0 and {MaxSpillThresholdMb * 1024L * 1024L}; " +
+                $"found {settings.SpillThresholdBytes}. Using default {defaults.SpillThresholdBytes}.");
+            settings.SpillThresholdBytes = defaults.SpillThresholdBytes;
+        }
+
         if (string.IsNullOrWhiteSpace(settings.RunTempDirectory))
         {
             warnings.Add(
@@ -156,6 +169,33 @@ public sealed class SettingsStore : ISettingsStore
         else
         {
             settings.RunTempDirectory = settings.RunTempDirectory.Trim();
+        }
+
+        if (settings.CheckpointQuotaMb < 0 || settings.CheckpointQuotaMb > MaxCheckpointQuotaMb)
+        {
+            warnings.Add(
+                $"checkpointQuotaMb must be between 0 and {MaxCheckpointQuotaMb}; " +
+                $"found {settings.CheckpointQuotaMb}. Using default {defaults.CheckpointQuotaMb}.");
+            settings.CheckpointQuotaMb = defaults.CheckpointQuotaMb;
+        }
+
+        if (settings.ExecutionHistoryLimit < 0 ||
+            settings.ExecutionHistoryLimit > MaxExecutionHistoryLimit)
+        {
+            warnings.Add(
+                $"executionHistoryLimit must be between 0 and {MaxExecutionHistoryLimit}; " +
+                $"found {settings.ExecutionHistoryLimit}. Using default {defaults.ExecutionHistoryLimit}.");
+            settings.ExecutionHistoryLimit = defaults.ExecutionHistoryLimit;
+        }
+
+        if (settings.ExecutionHistoryRetentionDays < 0 ||
+            settings.ExecutionHistoryRetentionDays > MaxExecutionRetentionDays)
+        {
+            warnings.Add(
+                $"executionHistoryRetentionDays must be between 0 and {MaxExecutionRetentionDays}; " +
+                $"found {settings.ExecutionHistoryRetentionDays}. " +
+                $"Using default {defaults.ExecutionHistoryRetentionDays}.");
+            settings.ExecutionHistoryRetentionDays = defaults.ExecutionHistoryRetentionDays;
         }
 
         settings.RecentFiles = settings.RecentFiles?
