@@ -268,6 +268,31 @@
                              Watermark="{loc:Loc property.tool_profile_block_name}" />
                 </StackPanel>
 
+                <Grid ColumnDefinitions="*,8,*">
+                    <StackPanel Grid.Column="0" Spacing="4">
+                        <TextBlock Text="{loc:Loc property.max_tool_rounds}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
+                        <NumericUpDown x:Name="LlmMaxToolRoundsBox"
+                                       Value="{Binding SelectedBlock.LlmEditor.MaxToolRounds, Mode=TwoWay}"
+                                       Minimum="0" Maximum="32" Increment="1" FormatString="0"
+                                       FontSize="11" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Spacing="4">
+                        <TextBlock Text="{loc:Loc property.tool_execution}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
+                        <ComboBox x:Name="LlmToolModeBox"
+                                  ItemsSource="{Binding SelectedBlock.LlmEditor.ToolModes}"
+                                  SelectedItem="{Binding SelectedBlock.LlmEditor.SelectedToolMode, Mode=TwoWay}"
+                                  FontSize="11" HorizontalAlignment="Stretch">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ToolExecutionModeOption">
+                                    <TextBlock Text="{Binding DisplayName}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+                </Grid>
+                <TextBlock Text="{loc:Loc property.max_tool_rounds_hint}"
+                           FontSize="10" Foreground="{DynamicResource TextFaintBrush}" TextWrapping="Wrap" />
+
                 <StackPanel Spacing="4">
                     <TextBlock Text="{loc:Loc property.system_prompt}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.LlmEditor.SystemPrompt, Mode=TwoWay}"

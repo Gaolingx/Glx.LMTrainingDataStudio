@@ -43,6 +43,7 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - 真实 RecipeRunner：Seed / Expression / Validator / Sampler / LLM 执行器，执行记录与 Executions UI
 - OpenAI Chat Completions / Responses、Anthropic Messages 客户端；密钥从设置或环境变量读取，支持节点级超时与指数退避重试
 - LLM 请求侧 tools（Tool Profile）、多轮行内 messages、`response_format` JSON Schema、并发与输出保序、token/成本日志、失败样本 JSONL
+- LLM 节点工具回填：`MaxToolRounds` 内执行 tool_calls（模拟或真实沙箱），把结果作为 tool 消息回灌模型并输出完整轨迹；Anthropic 结构化输出通过强制 `structured_output` 工具实现
 - Simulation Tools / Harness Rules / Script 回合可视化编辑器；OpenAI Chat SSE 流式 delta、requests-per-minute 限速与价格预设
 - Query Source 支持 Fluid 模板变量（含 `index`）与外部 JSONL/CSV/Parquet query 源、查询/系统字段映射
 - 模拟 API 测试：Query Source → Simulation（mini harness）→ Cleaner → SFT Export，多轮 tool 轨迹与 OpenAI messages JSONL 导出
@@ -55,7 +56,7 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - 中英文界面本地化（zh-CN / en-US，可在设置中切换），节点库、属性面板与画布悬停提示包含完整节点说明
 - 通用 Block Config JSON 编辑器，可直接配置所有节点类型
 
-> 注意：当前仍是开发版。**LLM tool_calls 回填、Anthropic 结构化输出约束、Sampler count 模式分层、Tool Profile MCP 适配、容器级隔离尚未实现**；应用默认启动空白 Recipe，可通过 File → New from Sample 加载 4 节点示例，或恢复上次打开的文件。
+> 注意：当前仍是开发版。**Sampler count 模式分层、Tool Profile MCP 适配、容器级隔离尚未实现**；应用默认启动空白 Recipe，可通过 File → New from Sample 加载 4 节点示例，或恢复上次打开的文件。
 >
 > - 完整功能清单与节点能力矩阵：[PLAN/STATUS.md](PLAN/STATUS.md)
 > - 当前修复计划与验收标准：[PLAN/TODO/01-Bugfix1/HANDOFF.md](PLAN/TODO/01-Bugfix1/HANDOFF.md)
@@ -222,7 +223,7 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 | 节点 | 执行状态 | 专属面板 | 主要缺口 |
 | --- | --- | --- | --- |
 | Seed | JSONL / CSV / Parquet 可用 | 有 | Streaming 开关、节点内过滤/列映射 |
-| LLM | 三种 provider + tools/多轮/结构化输出/并发/成本 | 有 | tool_calls 回填、Anthropic structured output |
+| LLM | 三种 provider + tools/多轮/结构化输出/并发/成本 + 工具回填与 Anthropic 强制 JSON | 有 | 流式输出、模型列表 |
 | Expression | Fluid 模板 + JSON 校验 | 有 | 沙箱/超时、外部函数 |
 | Validator | 多规则（表达式/Schema/正则/脚本）+ 超时 + pass/reject | 有 | 独立失败摘要 UI、任意代码沙箱 |
 | Sampler | 数量/比例 + 多文件 splits + 多端口 + 分层 + 统计预览 | 有 | count 模式分层、再混洗 |

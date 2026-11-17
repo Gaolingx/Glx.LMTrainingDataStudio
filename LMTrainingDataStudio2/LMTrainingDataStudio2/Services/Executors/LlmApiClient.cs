@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using LMTrainingDataStudio2.Models;
 
@@ -82,7 +83,18 @@ public sealed class LlmApiClient : ILlmClient
         {
             model = config.ModelAlias,
             messages = request.Messages
-                .Select(message => new { role = message.Role, content = message.Content ?? string.Empty })
+                .Select(message => new
+                {
+                    role = message.Role,
+                    content = message.Content ?? string.Empty,
+                    tool_calls = message.ToolCalls?.Select(call => new
+                    {
+                        id = call.Id,
+                        type = "function",
+                        function = new { name = call.Name, arguments = call.ArgumentsJson }
+                    }).ToArray(),
+                    tool_call_id = message.ToolCallId
+                })
                 .ToArray(),
             temperature = config.Temperature,
             max_tokens = config.MaxTokens,
@@ -132,10 +144,7 @@ public sealed class LlmApiClient : ILlmClient
                 .Where(message => message.Role is "system" or "developer")
                 .Select(message => message.Content)
                 .Where(content => !string.IsNullOrWhiteSpace(content)));
-        var input = request.Messages
-            .Where(message => message.Role is not ("system" or "developer"))
-            .Select(message => new { role = message.Role, content = message.Content ?? string.Empty })
-            .ToArray();
+        var input = BuildOpenAiResponsesInput(request.Messages);
         var tools = request.Tools?.Select(tool => new
         {
             type = "function",
@@ -233,6 +242,8 @@ public sealed class LlmApiClient : ILlmClient
             ParseUsage(root, "input_tokens", "output_tokens"));
     }
 
+    private const string AnthropicStructuredOutputTool = "structured_output";
+
     private async Task<LlmCompletionResult> CompleteAnthropicAsync(
         LlmCompletionRequest request, LlmBlockConfig config, CancellationToken ct)
     {
@@ -241,23 +252,33 @@ public sealed class LlmApiClient : ILlmClient
         var systemText = string.Join(
             "\n\n",
             request.Messages
-                .Where(message => message.Role == "system")
+                .Where(message => message.Role is "system" or "developer")
                 .Select(message => message.Content)
                 .Where(content => !string.IsNullOrWhiteSpace(content)));
-        var messages = request.Messages
-            .Where(message => message.Role != "system")
-            .Select(message => new
-            {
-                role = message.Role == "assistant" ? "assistant" : "user",
-                content = message.Content ?? string.Empty
-            })
-            .ToArray();
-        var tools = request.Tools?.Select(tool => new
+        var messages = BuildAnthropicMessages(request.Messages);
+        var tools = request.Tools?.Select(tool => (object)new
         {
             name = tool.Function.Name,
             description = tool.Function.Description,
-            input_schema = tool.Function.Parameters
-        }).ToArray();
+            input_schema = tool.Function.Parameters ?? new Dictionary<string, object>
+            {
+                ["type"] = "object",
+                ["properties"] = new Dictionary<string, object>()
+            }
+        }).ToList() ?? new List<object>();
+
+        object? toolChoice = null;
+        if (!string.IsNullOrWhiteSpace(request.ResponseSchema))
+        {
+            tools.Add(new
+            {
+                name = AnthropicStructuredOutputTool,
+                description = "Return the answer as one JSON object that matches the response schema.",
+                input_schema = ParseSchema(request.ResponseSchema!)
+            });
+            toolChoice = new { type = "tool", name = AnthropicStructuredOutputTool };
+        }
+
         var payload = new
         {
             model = config.ModelAlias,
@@ -265,7 +286,8 @@ public sealed class LlmApiClient : ILlmClient
             temperature = config.Temperature,
             system = string.IsNullOrWhiteSpace(systemText) ? null : systemText,
             messages,
-            tools
+            tools = tools.Count > 0 ? tools : null,
+            tool_choice = toolChoice
         };
 
         var body = await SendWithRetryAsync(
@@ -287,6 +309,7 @@ public sealed class LlmApiClient : ILlmClient
         var root = document.RootElement;
         var text = new List<string>();
         var toolCalls = new List<LlmToolCall>();
+        string? structuredOutput = null;
 
         foreach (var block in root.GetProperty("content").EnumerateArray())
         {
@@ -303,23 +326,190 @@ public sealed class LlmApiClient : ILlmClient
                     break;
 
                 case "tool_use":
+                    var name = block.TryGetProperty("name", out var nameElement)
+                        ? nameElement.GetString() ?? string.Empty
+                        : string.Empty;
+                    var input = block.TryGetProperty("input", out var inputElement)
+                        ? inputElement.GetRawText()
+                        : "{}";
+
+                    if (string.Equals(name, AnthropicStructuredOutputTool, StringComparison.Ordinal))
+                    {
+                        structuredOutput = input;
+                        break;
+                    }
+
                     toolCalls.Add(new LlmToolCall(
                         block.TryGetProperty("id", out var id) ? id.GetString() ?? string.Empty : string.Empty,
-                        block.TryGetProperty("name", out var name) ? name.GetString() ?? string.Empty : string.Empty,
-                        block.TryGetProperty("input", out var input) ? input.GetRawText() : "{}"));
+                        name,
+                        input));
                     break;
             }
         }
 
-        if (text.Count == 0 && toolCalls.Count == 0)
+        var content = structuredOutput ?? (text.Count == 0 ? null : string.Concat(text));
+        if (content is null && toolCalls.Count == 0)
         {
-            throw new InvalidOperationException("Anthropic Messages API returned no text content.");
+            var stopReason = root.TryGetProperty("stop_reason", out var stop)
+                ? stop.GetString()
+                : null;
+            throw new InvalidOperationException(
+                $"Anthropic Messages API returned no text content (stop_reason: {stopReason ?? "none"}).");
         }
 
         return new LlmCompletionResult(
-            string.Concat(text),
+            content ?? string.Empty,
             toolCalls.Count == 0 ? null : toolCalls,
             ParseUsage(root, "input_tokens", "output_tokens"));
+    }
+
+    private static List<AnthropicOutboundMessage> BuildAnthropicMessages(
+        IReadOnlyList<LlmChatTurn> messages)
+    {
+        var result = new List<AnthropicOutboundMessage>();
+        foreach (var message in messages)
+        {
+            switch (message.Role)
+            {
+                case "system":
+                case "developer":
+                    continue;
+
+                case "assistant":
+                    var blocks = new List<object>();
+                    if (!string.IsNullOrWhiteSpace(message.Content))
+                    {
+                        blocks.Add(new { type = "text", text = message.Content });
+                    }
+
+                    if (message.ToolCalls is { Count: > 0 } toolCalls)
+                    {
+                        foreach (var call in toolCalls)
+                        {
+                            blocks.Add(new
+                            {
+                                type = "tool_use",
+                                id = call.Id,
+                                name = call.Name,
+                                input = ParseArgumentsNode(call.ArgumentsJson)
+                            });
+                        }
+                    }
+
+                    if (blocks.Count > 0)
+                    {
+                        AddAnthropicMessage(result, "assistant", blocks);
+                    }
+
+                    break;
+
+                case "tool":
+                    AddAnthropicMessage(result, "user", new List<object>
+                    {
+                        new
+                        {
+                            type = "tool_result",
+                            tool_use_id = message.ToolCallId ?? string.Empty,
+                            content = message.Content ?? string.Empty
+                        }
+                    });
+                    break;
+
+                default:
+                    AddAnthropicMessage(result, "user", message.Content ?? string.Empty);
+                    break;
+            }
+        }
+
+        return result;
+    }
+
+    private static void AddAnthropicMessage(
+        List<AnthropicOutboundMessage> messages,
+        string role,
+        object content)
+    {
+        if (messages.Count > 0 && messages[^1].Role == role)
+        {
+            var merged = ToAnthropicBlocks(messages[^1].Content);
+            merged.AddRange(ToAnthropicBlocks(content));
+            messages[^1] = new AnthropicOutboundMessage(role, merged);
+            return;
+        }
+
+        messages.Add(new AnthropicOutboundMessage(role, content));
+    }
+
+    private static List<object> ToAnthropicBlocks(object content) => content switch
+    {
+        List<object> blocks => [.. blocks],
+        string text => new List<object> { new { type = "text", text } },
+        _ => new List<object> { content }
+    };
+
+    private static JsonNode ParseArgumentsNode(string argumentsJson)
+    {
+        if (string.IsNullOrWhiteSpace(argumentsJson))
+        {
+            return new JsonObject();
+        }
+
+        try
+        {
+            return JsonNode.Parse(argumentsJson) ?? new JsonObject();
+        }
+        catch (JsonException)
+        {
+            return new JsonObject { ["raw"] = argumentsJson };
+        }
+    }
+
+    private static object[] BuildOpenAiResponsesInput(IReadOnlyList<LlmChatTurn> messages)
+    {
+        var items = new List<object>();
+        foreach (var message in messages)
+        {
+            switch (message.Role)
+            {
+                case "system":
+                case "developer":
+                    continue;
+
+                case "tool":
+                    items.Add(new
+                    {
+                        type = "function_call_output",
+                        call_id = message.ToolCallId ?? string.Empty,
+                        output = message.Content ?? string.Empty
+                    });
+                    break;
+
+                case "assistant" when message.ToolCalls is { Count: > 0 } toolCalls:
+                    if (!string.IsNullOrWhiteSpace(message.Content))
+                    {
+                        items.Add(new { role = "assistant", content = message.Content });
+                    }
+
+                    foreach (var call in toolCalls)
+                    {
+                        items.Add(new
+                        {
+                            type = "function_call",
+                            call_id = call.Id,
+                            name = call.Name,
+                            arguments = call.ArgumentsJson
+                        });
+                    }
+
+                    break;
+
+                default:
+                    items.Add(new { role = message.Role, content = message.Content ?? string.Empty });
+                    break;
+            }
+        }
+
+        return items.ToArray();
     }
 
     private static object[]? BuildOpenAiChatTools(IReadOnlyList<ToolDefinition>? tools) =>
@@ -497,4 +687,5 @@ public sealed class LlmApiClient : ILlmClient
         return baseUrl.TrimEnd('/');
     }
 
+    private sealed record AnthropicOutboundMessage(string Role, object Content);
 }

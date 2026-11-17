@@ -1,6 +1,6 @@
 # HANDOFF — 01-Bugfix1（全仓缺陷修复与门禁补齐）
 
-> 状态：进行中（Round 20）
+> 状态：进行中（Round 21）
 > 创建：2026-11-17
 > 基线：`895c08e feat(release): Round 16 发布与体验`
 > 上一阶段归档：[PLAN/Done/01-BuildALL/HANDOFF.md](../../Done/01-BuildALL/HANDOFF.md)
@@ -442,6 +442,7 @@
 | 2026-11-18 | Batch 7：启动/打包/设置 | `dotnet build -c Release`；`dotnet test -c Release`；`dotnet format --verify-no-changes` | 0 警告；550 通过 / 0 失败 / 7 跳过；格式通过 | `StartupLaunchTests`、`PackagingConsistencyTests`、`LocalizationConsistencyTests`、`SettingsPanelTests` |
 | 2026-11-18 | Batch 8：CI 门禁 | 本地 `check-coverage.ps1`；发布脚本 `-Version 0.0.0`；示例再生成 + `git diff` | 总行 74.64%、Services/Commands 84.32%；FileVersion 0.0.0.0；示例无漂移 | `.github/workflows/ci.yml`、`scripts/check-coverage.ps1` |
 | 2026-11-18 | Batch 10：SFT 导出与路径选择 | `dotnet build -c Release`；`dotnet test -c Release`；`dotnet format --verify-no-changes`；示例再生成 | 见第 12.3 节 | `SftExportExecutorTests`、`SftExportFieldSelectorTests`、`HeadlessUiTests` |
+| 2026-11-18 | Batch 11：LLM 工具回填与 Anthropic 结构化输出 | `dotnet build -c Release`；`dotnet test -c Release`；`dotnet format --verify-no-changes`；示例再生成 | 见第 13.3 节 | `LlmToolLoopTests`、`LlmApiClientTests`、`LlmConfigEditorTests`、校验与 Headless 测试 |
 
 ---
 
@@ -522,8 +523,8 @@
 
 #### LLM
 
-- [ ] **[节点/P1] `tool_calls` 只记录不执行**：LLM 节点不回填工具结果；多轮工具执行仍由 Simulation 承担。
-- [ ] **[节点/P2] Anthropic 无结构化输出约束**：仅 OpenAI Chat/Responses 发送 `response_format`。
+- [x] **[节点/P1] `tool_calls` 只记录不执行**：已加 `MaxToolRounds`（默认 0 保持只记录）与 `ToolMode`（模拟/真实沙箱）；工具结果作为 tool 消息回灌并再次调用模型，超轮次该行记失败，未知工具/执行错误以 JSON 错误回灌。输出完整 assistant/tool 轨迹；OpenAI Chat/Responses 与 Anthropic 均支持工具消息往返。
+- [x] **[节点/P2] Anthropic 无结构化输出约束**：`ResponseSchema` 在 Anthropic 下通过强制 `structured_output` 工具实现，响应 input 作为内容返回；同时配置 tools + schema + 工具回填时校验给出警告。
 - [ ] **[节点/P2] LLM 节点无流式输出**：仅 Simulation 的 OpenAI Chat 支持 SSE delta。
 - [ ] **[节点/P2] 无模型列表/探测**：ModelAlias 纯手输。
 - [ ] **[节点/P3] 编辑期无 Prompt 语法校验与渲染预览**：仅在执行期校验。
@@ -977,3 +978,41 @@
 - LLM `tool_calls` 回填、Anthropic 结构化输出。
 - 数据工作台 `messages` 结构化表单、列排序/筛选/列宽持久化（191）。
 - 7.7 执行清理/配额、7.10 安全加固、7.1 Recipe 校验错误码。
+
+---
+
+## 13. Round 21 执行记录（2026-11-18）
+
+### 13.1 已完成项
+
+| 项 | 范围 | 提交 |
+| --- | --- | --- |
+| Batch 11 | LLM tool_calls 回填、Anthropic 结构化输出、编辑器与校验 | 本次提交 |
+
+### 13.2 具体改动
+
+- `LlmBlockConfig` 新增 `MaxToolRounds`（默认 0 = 只记录）、`ToolMode`（Simulated/Real）、`Sandbox`；旧 Recipe 按默认值加载。
+- `LlmBlockExecutor` 新增工具回填循环：按 `MaxToolRounds` 执行 tool_calls，复用 `IToolRuntime`（Simulated 返回确定性 JSON，Real 走沙箱），未知工具与执行错误以错误 JSON 回灌；超过轮次该行失败；usage 跨轮累加；工具轨迹输出为完整 messages（含 `tool_calls` 与 `tool_call_id`）。
+- `LlmChatTurn` 增加 `ToolCallId`/`ToolCalls`；`LlmApiClient` 三家 provider 支持工具消息：
+  - OpenAI Chat：`tool_calls` + `tool_call_id`；
+  - OpenAI Responses：`function_call` / `function_call_output` 输入项；
+  - Anthropic：`tool_use` / `tool_result` 内容块，连续同角色块自动合并。
+- Anthropic 结构化输出：`ResponseSchema` 转为强制 `structured_output` 工具（`tool_choice`），解析 `tool_use.input` 作为内容。
+- 校验：负轮数、启用轮数但无 Tool Profile、Anthropic 结构化输出 + 工具回填组合。
+- LLM 面板新增工具回填轮数与工具执行方式；编辑器改用 `with` 推送以保留未编辑的 Sandbox 配置。
+- 本地化新增 2 个键；示例 Recipe 重新生成（仅新增默认字段）。
+
+### 13.3 当前验证
+
+- `dotnet build -c Release`：0 警告，0 错误。
+- `dotnet test -c Release`：596 通过，0 失败，7 跳过（5 性能 gated + 2 provider gated）；`--list-tests` 604 个用例（含 1 个 `[Explicit]`）。
+- `dotnet format --verify-no-changes`：通过。
+- 示例再生成后 `git diff -- examples/`：仅 `llm_batch.recipe.json` 新增 `maxToolRounds`/`toolMode` 默认字段。
+- 新增测试：`LlmToolLoopTests`（回填往返、0 轮只记录、超轮失败、工具异常回灌、未知工具回灌）、`LlmApiClientTests` 4 项（Chat/Responses/Anthropic 工具序列化、Anthropic 强制工具）、编辑器 2 项、校验 3 项、序列化与 Headless 面板检查。
+
+### 13.4 本轮未做（保留在 7.x / 8.3）
+
+- LLM 流式输出、模型列表/探测（7.5 P2）。
+- Tool Profile Enum/Default 编辑、MCP（7.5 P2）。
+- 数据工作台 `messages` 结构化表单、列排序/筛选/列宽持久化（191）。
+- SFT 按比例拆片、并发写检测与路径存在性提示（206）。

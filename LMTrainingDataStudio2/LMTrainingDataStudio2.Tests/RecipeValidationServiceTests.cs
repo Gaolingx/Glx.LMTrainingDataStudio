@@ -147,6 +147,64 @@ public sealed class RecipeValidationServiceTests
     }
 
     [Test]
+    public void Validate_LlmWithNegativeToolRounds_ReportsWarning()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("llm1", BlockType.Llm, "generator",
+            new LlmBlockConfig("openai_chat", "gpt-4o", Temperature: 0.7, MaxTokens: 2048, Prompt: null,
+                MaxToolRounds: -1)));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Severity == ValidationSeverity.Warning && i.Message.Contains("max tool rounds")), Is.True);
+    }
+
+    [Test]
+    public void Validate_LlmToolRoundsWithoutProfile_ReportsWarning()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("llm1", BlockType.Llm, "generator",
+            new LlmBlockConfig("openai_chat", "gpt-4o", Temperature: 0.7, MaxTokens: 2048, Prompt: null,
+                MaxToolRounds: 2)));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Severity == ValidationSeverity.Warning && i.Message.Contains("no tool profile")), Is.True);
+    }
+
+    [Test]
+    public void Validate_AnthropicStructuredOutputWithToolRounds_ReportsWarning()
+    {
+        var recipe = new Recipe();
+        var llm = CreateBlock("llm1", BlockType.Llm, "generator",
+            new LlmBlockConfig("anthropic", "claude-sonnet-4-5", Temperature: 0.7, MaxTokens: 2048,
+                Prompt: null,
+                ToolProfileName: "tools",
+                ResponseSchema: """{"type":"object"}""",
+                MaxToolRounds: 2));
+        recipe.Blocks.Add(llm);
+        recipe.Blocks.Add(CreateBlock("tools", BlockType.ToolProfile, "tools",
+            new ToolProfileBlockConfig(new ToolProfile
+            {
+                Name = "tools",
+                Tools =
+                {
+                    new ToolDefinition
+                    {
+                        Function = new ToolFunction { Name = "python" }
+                    }
+                }
+            })));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Severity == ValidationSeverity.Warning && i.Message.Contains("structured output")), Is.True);
+    }
+
+    [Test]
     public void Validate_SeedWithCsvFile_AcceptsSupportedFileType()
     {
         var recipe = new Recipe();

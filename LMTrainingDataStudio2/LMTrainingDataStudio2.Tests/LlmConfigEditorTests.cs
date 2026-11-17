@@ -21,6 +21,8 @@ public sealed class LlmConfigEditorTests
         editor.Endpoint = "https://proxy.example/v1";
         editor.TimeoutSeconds = 30;
         editor.MaxRetries = 5;
+        editor.MaxToolRounds = 4;
+        editor.SelectedToolMode = editor.ToolModes.Single(option => option.Mode == ToolExecutionMode.Real);
 
         var config = (LlmBlockConfig)block.Config;
         Assert.That(config.Provider, Is.EqualTo(LlmProviderIds.Anthropic));
@@ -31,7 +33,22 @@ public sealed class LlmConfigEditorTests
         Assert.That(config.Endpoint, Is.EqualTo("https://proxy.example/v1"));
         Assert.That(config.TimeoutSeconds, Is.EqualTo(30));
         Assert.That(config.MaxRetries, Is.EqualTo(5));
+        Assert.That(config.MaxToolRounds, Is.EqualTo(4));
+        Assert.That(config.ToolMode, Is.EqualTo(ToolExecutionMode.Real));
         Assert.That(block.LlmEditor, Is.SameAs(editor));
+    }
+
+    [Test]
+    public void EditingFields_PreservesUneditedSandboxSettings()
+    {
+        var sandbox = new SandboxLimits { TimeoutMs = 1234, AllowNetwork = true };
+        var block = CreateLlmBlock(new LlmBlockConfig(
+            LlmProviderIds.OpenAiChat, "gpt-4o", Temperature: 0.7, MaxTokens: 2048, Prompt: null,
+            Sandbox: sandbox));
+
+        block.LlmEditor!.MaxToolRounds = 2;
+
+        Assert.That(((LlmBlockConfig)block.Config).Sandbox, Is.EqualTo(sandbox));
     }
 
     [Test]

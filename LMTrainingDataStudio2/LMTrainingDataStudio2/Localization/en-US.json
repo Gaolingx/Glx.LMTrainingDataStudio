@@ -423,6 +423,8 @@
   "property.input_cost": "Input cost / 1M tokens",
   "property.output_cost": "Output cost / 1M tokens",
   "property.continue_on_error": "Continue and collect failure samples",
+  "property.max_tool_rounds": "Tool rounds (0 = record only)",
+  "property.max_tool_rounds_hint": "Above 0, returned tool calls run through the tool runtime and their results are fed back to the model; exceeding the limit fails the row. Real mode uses the default sandbox limits, adjustable via the recipe JSON sandbox field.",
   "property.match_all_rules": "Require all rules to pass",
   "property.validator_timeout_ms": "Rule timeout (ms, 0 = none)",
   "property.additional_rules": "Additional rules",

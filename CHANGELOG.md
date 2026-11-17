@@ -2,6 +2,32 @@
 
 本文件记录用户可见变更与工程化修复。完整未完成清单见 [PLAN/TODO/01-Bugfix1/HANDOFF.md](PLAN/TODO/01-Bugfix1/HANDOFF.md)。
 
+## [Unreleased] — 2026-11-18（Round 21 / LLM 工具回填与 Anthropic 结构化输出）
+
+### Added
+
+- LLM 节点支持工具回填：`MaxToolRounds` 内执行模型返回的 `tool_calls`，将结果作为 tool 消息回灌后再次调用，并输出完整 assistant/tool 轨迹。
+- LLM 工具执行方式可选模拟工具（确定性 JSON）或真实沙箱（python / PowerShell / bash / web_fetch）。
+- Anthropic Messages 结构化输出：`ResponseSchema` 通过强制 `structured_output` 工具返回 JSON。
+- LLM 面板新增工具回填轮数与工具执行方式；校验新增负轮数、无 Tool Profile、Anthropic 结构化输出与工具回填组合警告。
+
+### Changed
+
+- `LlmBlockConfig` 新增 `maxToolRounds`、`toolMode`、`sandbox`；默认 `maxToolRounds=0` 保持“只记录 tool_calls”的旧行为。
+- OpenAI Chat/Responses 与 Anthropic 的请求构造支持工具消息往返（`tool_call_id`、`function_call_output`、`tool_result`）。
+- 示例 Recipe 重新生成以包含新增默认字段。
+
+### Tests
+
+- `--list-tests`：604 个用例；`dotnet test`：596 通过 / 0 失败 / 7 跳过（另 1 个 `[Explicit]`）。
+- 新增 `LlmToolLoopTests`、provider 工具序列化与 Anthropic 强制工具测试、编辑器/校验/Headless 回归。
+
+### Known Issues
+
+- LLM 节点仍无流式输出与模型列表。
+- Tool Profile 仍无 MCP 适配与 Enum/Default 可视化编辑。
+- Anthropic 结构化输出与工具回填不能同时生效（强制工具会占用本轮调用），校验会给出警告。
+
 ## [Unreleased] — 2026-11-18（Round 20 / SFT 导出能力与路径选择）
 
 ### Added

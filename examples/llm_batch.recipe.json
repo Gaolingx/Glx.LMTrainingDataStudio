@@ -67,7 +67,9 @@
         "maxFailureSamples": 100,
         "inputCostPerMillionTokens": 0,
         "outputCostPerMillionTokens": 0,
-        "continueOnError": false
+        "continueOnError": false,
+        "maxToolRounds": 0,
+        "toolMode": "Simulated"
       }
     },
     {

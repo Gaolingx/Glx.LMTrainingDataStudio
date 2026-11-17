@@ -126,6 +126,142 @@ public sealed class LlmApiClientTests
     }
 
     [Test]
+    public async Task OpenAiChat_SerializesToolCallsAndToolResults()
+    {
+        string? body = null;
+        var client = CreateClient((_, content) =>
+        {
+            body = content;
+            return JsonResponse(HttpStatusCode.OK, """{"choices":[{"message":{"content":"ok"}}]}""");
+        });
+
+        await client.CompleteAsync(
+            CreateToolConversation(),
+            CreateConfig(LlmProviderIds.OpenAiChat));
+
+        using var document = JsonDocument.Parse(body!);
+        var messages = document.RootElement.GetProperty("messages");
+        Assert.That(messages[1].GetProperty("role").GetString(), Is.EqualTo("assistant"));
+        var call = messages[1].GetProperty("tool_calls")[0];
+        Assert.That(call.GetProperty("id").GetString(), Is.EqualTo("call_1"));
+        Assert.That(call.GetProperty("function").GetProperty("name").GetString(), Is.EqualTo("python"));
+        Assert.That(call.GetProperty("function").GetProperty("arguments").GetString(),
+            Is.EqualTo("""{"code":"1"}"""));
+        Assert.That(messages[2].GetProperty("role").GetString(), Is.EqualTo("tool"));
+        Assert.That(messages[2].GetProperty("tool_call_id").GetString(), Is.EqualTo("call_1"));
+        Assert.That(messages[2].GetProperty("content").GetString(), Is.EqualTo("done"));
+    }
+
+    [Test]
+    public async Task OpenAiResponses_SerializesFunctionCallItemsAndOutputs()
+    {
+        string? body = null;
+        var client = CreateClient((_, content) =>
+        {
+            body = content;
+            return JsonResponse(
+                HttpStatusCode.OK,
+                """{"output":[{"content":[{"type":"output_text","text":"done"}]}]}""");
+        });
+
+        await client.CompleteAsync(
+            CreateToolConversation(),
+            CreateConfig(LlmProviderIds.OpenAiResponses));
+
+        using var document = JsonDocument.Parse(body!);
+        var input = document.RootElement.GetProperty("input");
+        Assert.That(input[0].GetProperty("role").GetString(), Is.EqualTo("user"));
+        Assert.That(input[1].GetProperty("type").GetString(), Is.EqualTo("function_call"));
+        Assert.That(input[1].GetProperty("call_id").GetString(), Is.EqualTo("call_1"));
+        Assert.That(input[1].GetProperty("name").GetString(), Is.EqualTo("python"));
+        Assert.That(input[2].GetProperty("type").GetString(), Is.EqualTo("function_call_output"));
+        Assert.That(input[2].GetProperty("call_id").GetString(), Is.EqualTo("call_1"));
+        Assert.That(input[2].GetProperty("output").GetString(), Is.EqualTo("done"));
+    }
+
+    [Test]
+    public async Task Anthropic_SerializesToolUseAndToolResultBlocks()
+    {
+        string? body = null;
+        var client = CreateClient((_, content) =>
+        {
+            body = content;
+            return JsonResponse(
+                HttpStatusCode.OK,
+                """{"content":[{"type":"text","text":"done"}]}""");
+        });
+
+        await client.CompleteAsync(
+            CreateToolConversation(),
+            CreateConfig(LlmProviderIds.Anthropic));
+
+        using var document = JsonDocument.Parse(body!);
+        var messages = document.RootElement.GetProperty("messages");
+        Assert.That(messages[0].GetProperty("role").GetString(), Is.EqualTo("user"));
+        Assert.That(messages[1].GetProperty("role").GetString(), Is.EqualTo("assistant"));
+        var toolUse = messages[1].GetProperty("content")[0];
+        Assert.That(toolUse.GetProperty("type").GetString(), Is.EqualTo("tool_use"));
+        Assert.That(toolUse.GetProperty("id").GetString(), Is.EqualTo("call_1"));
+        Assert.That(toolUse.GetProperty("name").GetString(), Is.EqualTo("python"));
+        Assert.That(toolUse.GetProperty("input").GetProperty("code").GetString(), Is.EqualTo("1"));
+
+        Assert.That(messages[2].GetProperty("role").GetString(), Is.EqualTo("user"));
+        var toolResult = messages[2].GetProperty("content")[0];
+        Assert.That(toolResult.GetProperty("type").GetString(), Is.EqualTo("tool_result"));
+        Assert.That(toolResult.GetProperty("tool_use_id").GetString(), Is.EqualTo("call_1"));
+        Assert.That(toolResult.GetProperty("content").GetString(), Is.EqualTo("done"));
+    }
+
+    [Test]
+    public async Task Anthropic_StructuredOutput_UsesForcedToolAndReturnsInputJson()
+    {
+        string? body = null;
+        var client = CreateClient((_, content) =>
+        {
+            body = content;
+            return JsonResponse(
+                HttpStatusCode.OK,
+                """
+                {"content":[{"type":"tool_use","id":"toolu_1","name":"structured_output","input":{"ok":true}}],
+                 "usage":{"input_tokens":3,"output_tokens":5}}
+                """);
+        });
+        var request = new LlmCompletionRequest(
+            [new LlmChatTurn("user", "Return JSON")],
+            Tools: null,
+            ResponseSchema: """{"type":"object","required":["ok"]}""");
+
+        var result = await client.CompleteAsync(
+            request, CreateConfig(LlmProviderIds.Anthropic));
+
+        using (var document = JsonDocument.Parse(body!))
+        {
+            var root = document.RootElement;
+            var tool = root.GetProperty("tools")[0];
+            Assert.That(tool.GetProperty("name").GetString(), Is.EqualTo("structured_output"));
+            Assert.That(tool.GetProperty("input_schema").GetProperty("type").GetString(),
+                Is.EqualTo("object"));
+            Assert.That(root.GetProperty("tool_choice").GetProperty("type").GetString(), Is.EqualTo("tool"));
+            Assert.That(root.GetProperty("tool_choice").GetProperty("name").GetString(),
+                Is.EqualTo("structured_output"));
+        }
+
+        using var resultDocument = JsonDocument.Parse(result.Content);
+        Assert.That(resultDocument.RootElement.GetProperty("ok").GetBoolean(), Is.True);
+        Assert.That(result.ToolCalls, Is.Null);
+        Assert.That(result.Usage!.PromptTokens, Is.EqualTo(3));
+        Assert.That(result.Usage.CompletionTokens, Is.EqualTo(5));
+    }
+
+    private static LlmCompletionRequest CreateToolConversation() => new(
+    [
+        new LlmChatTurn("user", "hi"),
+        new LlmChatTurn("assistant", string.Empty, ToolCalls:
+            [new LlmToolCall("call_1", "python", """{"code":"1"}""")]),
+        new LlmChatTurn("tool", "done", ToolCallId: "call_1")
+    ]);
+
+    [Test]
     public void MissingApiKey_ThrowsWithEnvironmentVariableName()
     {
         var client = CreateClient(

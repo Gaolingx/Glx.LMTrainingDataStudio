@@ -2,7 +2,15 @@ using LMTrainingDataStudio2.Models;
 
 namespace LMTrainingDataStudio2.Services.Executors;
 
-public sealed record LlmChatTurn(string Role, string? Content);
+/// <summary>
+/// One outbound chat turn. Assistant turns can carry tool calls; tool turns carry the
+/// id of the call they answer. Providers serialize these into their native tool formats.
+/// </summary>
+public sealed record LlmChatTurn(
+    string Role,
+    string? Content,
+    string? ToolCallId = null,
+    IReadOnlyList<LlmToolCall>? ToolCalls = null);
 
 public sealed record LlmToolCall(string Id, string Name, string ArgumentsJson);
 

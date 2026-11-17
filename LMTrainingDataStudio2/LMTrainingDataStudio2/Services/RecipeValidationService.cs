@@ -39,6 +39,7 @@ public sealed class RecipeValidationService
         ValidateIsolatedBlocks(recipe, result);
         ValidateCycles(recipe, result);
         ValidateBlockConfigurations(recipe, result);
+        ValidateLlmToolSettings(recipe, result);
         ValidateToolProfileReferences(recipe, result);
 
         return result;
@@ -828,6 +829,54 @@ public sealed class RecipeValidationService
                         BlockId = block.Id
                     });
                     break;
+            }
+        }
+    }
+
+    private static void ValidateLlmToolSettings(Recipe recipe, ValidationResult result)
+    {
+        foreach (var block in recipe.Blocks)
+        {
+            if (block.Config is not LlmBlockConfig llm)
+            {
+                continue;
+            }
+
+            if (llm.MaxToolRounds < 0)
+            {
+                result.Issues.Add(new ValidationIssue
+                {
+                    Severity = ValidationSeverity.Warning,
+                    Message = $"LLM block '{block.Name}' max tool rounds must not be negative.",
+                    BlockId = block.Id
+                });
+                continue;
+            }
+
+            if (llm.MaxToolRounds == 0)
+            {
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(llm.ToolProfileName))
+            {
+                result.Issues.Add(new ValidationIssue
+                {
+                    Severity = ValidationSeverity.Warning,
+                    Message = $"LLM block '{block.Name}' enables tool rounds but has no tool profile configured.",
+                    BlockId = block.Id
+                });
+            }
+            else if (!string.IsNullOrWhiteSpace(llm.ResponseSchema) &&
+                     LlmProviderIds.Normalize(llm.Provider) == LlmProviderIds.Anthropic)
+            {
+                result.Issues.Add(new ValidationIssue
+                {
+                    Severity = ValidationSeverity.Warning,
+                    Message = $"LLM block '{block.Name}' uses Anthropic structured output, which forces the " +
+                              "'structured_output' tool and prevents tool rounds from running.",
+                    BlockId = block.Id
+                });
             }
         }
     }

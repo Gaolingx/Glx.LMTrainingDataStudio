@@ -423,6 +423,8 @@
   "property.input_cost": "输入成本 / 百万 token",
   "property.output_cost": "输出成本 / 百万 token",
   "property.continue_on_error": "出错继续并收集失败样本",
+  "property.max_tool_rounds": "工具回填轮数（0 = 只记录）",
+  "property.max_tool_rounds_hint": "大于 0 时，模型返回的 tool_calls 会经工具运行器执行并把结果回填给模型，超过轮数该行记为失败；真实模式使用默认沙箱参数，可在 Recipe JSON 的 sandbox 字段中调整。",
   "property.match_all_rules": "要求所有规则通过",
   "property.validator_timeout_ms": "规则超时（毫秒，0 表示不限制）",
   "property.additional_rules": "附加规则",

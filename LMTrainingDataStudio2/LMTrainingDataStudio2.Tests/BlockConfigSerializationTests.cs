@@ -30,7 +30,10 @@ public sealed class BlockConfigSerializationTests
             "openai", "gpt-4o",
             Temperature: 0.2, MaxTokens: 4096,
             Prompt: "Rewrite {{ content }}",
-            ToolProfileName: "agent_tools");
+            ToolProfileName: "agent_tools",
+            MaxToolRounds: 3,
+            ToolMode: ToolExecutionMode.Real,
+            Sandbox: new SandboxLimits { TimeoutMs = 5000, AllowNetwork = true });
 
         var loaded = RoundTrip(config);
 

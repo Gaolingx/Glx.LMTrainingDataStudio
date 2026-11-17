@@ -140,6 +140,11 @@ public sealed record SeedBlockConfig(
     bool Streaming,
     bool UseIndexCache) : BlockConfig;
 
+/// <summary>
+/// Calls an LLM per row. When <see cref="MaxToolRounds"/> is greater than zero and a tool
+/// profile is referenced, returned tool calls are executed and fed back to the model
+/// instead of only being recorded in the output sample.
+/// </summary>
 public sealed record LlmBlockConfig(
     string Provider,
     string ModelAlias,
@@ -158,7 +163,10 @@ public sealed record LlmBlockConfig(
     int MaxFailureSamples = 100,
     double InputCostPerMillionTokens = 0,
     double OutputCostPerMillionTokens = 0,
-    bool ContinueOnError = false) : BlockConfig;
+    bool ContinueOnError = false,
+    int MaxToolRounds = 0,
+    ToolExecutionMode ToolMode = ToolExecutionMode.Simulated,
+    SandboxLimits? Sandbox = null) : BlockConfig;
 
 public sealed record ExpressionBlockConfig(
     string Template,

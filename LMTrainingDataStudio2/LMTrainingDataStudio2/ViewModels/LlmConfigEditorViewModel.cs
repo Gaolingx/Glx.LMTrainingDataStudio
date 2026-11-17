@@ -14,6 +14,7 @@ public sealed record LlmProviderOption(string Id, string DisplayName);
 public partial class LlmConfigEditorViewModel : ObservableObject
 {
     private readonly Action<LlmBlockConfig> _apply;
+    private readonly LlmBlockConfig _base;
 
     [ObservableProperty]
     private LlmProviderOption _selectedProvider;
@@ -72,9 +73,16 @@ public partial class LlmConfigEditorViewModel : ObservableObject
     [ObservableProperty]
     private bool _continueOnError;
 
+    [ObservableProperty]
+    private int _maxToolRounds;
+
+    [ObservableProperty]
+    private ToolExecutionModeOption _selectedToolMode;
+
     public LlmConfigEditorViewModel(LlmBlockConfig config, Action<LlmBlockConfig> apply)
     {
         _apply = apply;
+        _base = config;
         _modelAlias = config.ModelAlias;
         _temperature = config.Temperature;
         _maxTokens = config.MaxTokens;
@@ -92,6 +100,8 @@ public partial class LlmConfigEditorViewModel : ObservableObject
         _inputCostPerMillionTokens = config.InputCostPerMillionTokens;
         _outputCostPerMillionTokens = config.OutputCostPerMillionTokens;
         _continueOnError = config.ContinueOnError;
+        _maxToolRounds = config.MaxToolRounds;
+        _selectedToolMode = ToolModes.FirstOrDefault(option => option.Mode == config.ToolMode) ?? ToolModes[0];
         _selectedProvider = Providers.FirstOrDefault(option =>
             option.Id == LlmProviderIds.Normalize(config.Provider)) ?? Providers[0];
     }
@@ -101,6 +111,12 @@ public partial class LlmConfigEditorViewModel : ObservableObject
         new LlmProviderOption(LlmProviderIds.OpenAiChat, "OpenAI Chat Completions"),
         new LlmProviderOption(LlmProviderIds.OpenAiResponses, "OpenAI Responses"),
         new LlmProviderOption(LlmProviderIds.Anthropic, "Anthropic Messages")
+    };
+
+    public IReadOnlyList<ToolExecutionModeOption> ToolModes { get; } = new[]
+    {
+        new ToolExecutionModeOption(ToolExecutionMode.Simulated, "Simulated tools"),
+        new ToolExecutionModeOption(ToolExecutionMode.Real, "Real sandbox tools")
     };
 
     partial void OnSelectedProviderChanged(LlmProviderOption value) => Push();
@@ -143,6 +159,10 @@ public partial class LlmConfigEditorViewModel : ObservableObject
 
     partial void OnContinueOnErrorChanged(bool value) => Push();
 
+    partial void OnMaxToolRoundsChanged(int value) => Push();
+
+    partial void OnSelectedToolModeChanged(ToolExecutionModeOption value) => Push();
+
     [RelayCommand]
     private void ValidateSchema()
     {
@@ -162,23 +182,27 @@ public partial class LlmConfigEditorViewModel : ObservableObject
         }
     }
 
-    private void Push() => _apply(new LlmBlockConfig(
-        SelectedProvider.Id,
-        ModelAlias ?? string.Empty,
-        Temperature,
-        MaxTokens,
-        string.IsNullOrWhiteSpace(Prompt) ? null : Prompt,
-        string.IsNullOrWhiteSpace(Endpoint) ? null : Endpoint.Trim(),
-        TimeoutSeconds,
-        MaxRetries,
-        string.IsNullOrWhiteSpace(ToolProfileName) ? null : ToolProfileName.Trim(),
-        string.IsNullOrWhiteSpace(SystemPrompt) ? null : SystemPrompt,
-        UseRowMessages,
-        MaxConcurrency,
-        string.IsNullOrWhiteSpace(ResponseSchema) ? null : ResponseSchema,
-        string.IsNullOrWhiteSpace(FailureOutputPath) ? null : FailureOutputPath.Trim(),
-        MaxFailureSamples,
-        InputCostPerMillionTokens,
-        OutputCostPerMillionTokens,
-        ContinueOnError));
+    private void Push() => _apply(_base with
+    {
+        Provider = SelectedProvider.Id,
+        ModelAlias = ModelAlias ?? string.Empty,
+        Temperature = Temperature,
+        MaxTokens = MaxTokens,
+        Prompt = string.IsNullOrWhiteSpace(Prompt) ? null : Prompt,
+        Endpoint = string.IsNullOrWhiteSpace(Endpoint) ? null : Endpoint.Trim(),
+        TimeoutSeconds = TimeoutSeconds,
+        MaxRetries = MaxRetries,
+        ToolProfileName = string.IsNullOrWhiteSpace(ToolProfileName) ? null : ToolProfileName.Trim(),
+        SystemPrompt = string.IsNullOrWhiteSpace(SystemPrompt) ? null : SystemPrompt,
+        UseRowMessages = UseRowMessages,
+        MaxConcurrency = MaxConcurrency,
+        ResponseSchema = string.IsNullOrWhiteSpace(ResponseSchema) ? null : ResponseSchema,
+        FailureOutputPath = string.IsNullOrWhiteSpace(FailureOutputPath) ? null : FailureOutputPath.Trim(),
+        MaxFailureSamples = MaxFailureSamples,
+        InputCostPerMillionTokens = InputCostPerMillionTokens,
+        OutputCostPerMillionTokens = OutputCostPerMillionTokens,
+        ContinueOnError = ContinueOnError,
+        MaxToolRounds = MaxToolRounds,
+        ToolMode = SelectedToolMode.Mode
+    });
 }

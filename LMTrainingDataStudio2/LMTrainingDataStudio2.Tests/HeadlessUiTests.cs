@@ -122,6 +122,38 @@ public sealed class HeadlessUiTests
     }
 
     [AvaloniaTest]
+    public void LlmPanel_RendersToolRoundsAndExecutionMode()
+    {
+        var vm = new MainWindowViewModel(new SettingsStore(Path.Combine(_directory, "settings.json")));
+        var window = new MainWindow { DataContext = vm };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        try
+        {
+            vm.AddBlockCommand.Execute(BlockType.Llm);
+            Dispatcher.UIThread.RunJobs();
+
+            var editor = vm.SelectedBlock!.LlmEditor!;
+            editor.MaxToolRounds = 3;
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.That(((LlmBlockConfig)vm.SelectedBlock.Config).MaxToolRounds, Is.EqualTo(3));
+
+            var names = window.GetVisualDescendants()
+                .OfType<Control>()
+                .Select(control => control.Name)
+                .ToArray();
+            Assert.That(names, Does.Contain("LlmMaxToolRoundsBox"));
+            Assert.That(names, Does.Contain("LlmToolModeBox"));
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaTest]
     public void SftExportEditor_UpdatesFieldWhitelist()
     {
         var vm = new MainWindowViewModel(new SettingsStore(Path.Combine(_directory, "settings.json")));
