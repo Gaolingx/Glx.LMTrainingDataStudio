@@ -1,10 +1,10 @@
 # HANDOFF — 01-Bugfix1（全仓缺陷修复与门禁补齐）
 
-> 状态：进行中（Round 17）
+> 状态：进行中（Round 18）
 > 创建：2026-11-17
 > 基线：`895c08e feat(release): Round 16 发布与体验`
 > 上一阶段归档：[PLAN/Done/01-BuildALL/HANDOFF.md](../../Done/01-BuildALL/HANDOFF.md)
-> 扫描基线：`dotnet build` 0 警告；`dotnet test --list-tests` 513 个用例（505 通过 + 7 gated + 1 Explicit）。
+> 扫描基线：`dotnet build` 0 警告；`dotnet test --list-tests` 557 个用例（550 通过 + 7 gated + 1 Explicit）。
 > 边界：本文件只记录 Round 17 及之后的修复/补齐工作；Round 0–16 的原始计划、验收标准与技术决策已冻结在归档文件中，不再回写。
 
 ---
@@ -439,6 +439,8 @@
 | 2026-11-17 | Batch 2：版本、图标、打包 | `dotnet build -c Release`；检查 Release deps.json 与 exe VersionInfo；PowerShell Parser 校验脚本 | 0 警告；FileVersion 1.0.0.0；Release 不含 Avalonia.Diagnostics；脚本语法通过 | 本文件 7.1/8.3.1 勾选 |
 | 2026-11-17 | Batch 4：节点编辑器 | `dotnet build -c Release`；`dotnet test -c Release --no-build` | 0 警告；528 通过 / 0 失败 / 7 跳过 | `NodeEditorTests`、Cleanup 共享模板 Headless 测试 |
 | 2026-11-17 | Batch 5：数据与恢复 | `dotnet build -c Release`；`dotnet test -c Release --no-build` | 0 警告；531 通过 / 0 失败 / 7 跳过 | 分页取消、跨格式保存、恢复哈希/指纹测试 |
+| 2026-11-18 | Batch 7：启动/打包/设置 | `dotnet build -c Release`；`dotnet test -c Release`；`dotnet format --verify-no-changes` | 0 警告；550 通过 / 0 失败 / 7 跳过；格式通过 | `StartupLaunchTests`、`PackagingConsistencyTests`、`LocalizationConsistencyTests`、`SettingsPanelTests` |
+| 2026-11-18 | Batch 8：CI 门禁 | 本地 `check-coverage.ps1`；发布脚本 `-Version 0.0.0`；示例再生成 + `git diff` | 总行 74.64%、Services/Commands 84.32%；FileVersion 0.0.0.0；示例无漂移 | `.github/workflows/ci.yml`、`scripts/check-coverage.ps1` |
 
 ---
 
@@ -456,40 +458,40 @@
 - [x] **[缺陷][P2] Windows EXE 图标未嵌入**：csproj 没有 `<ApplicationIcon>`，只设置了 Avalonia 窗口图标（`Views/MainWindow.axaml:12`）；Inno 的快捷方式/文件关联图标指向 exe，会显示默认图标。
 - [x] **[缺陷][P2] 安装器注释与代码相反**：`packaging/inno/LMTrainingDataStudio.iss:48` 写“command line accepts any .json/.recipe path”，但代码只接受 `.json`。
 - [x] **[缺陷][P2] 发布包包含无用依赖**：`Avalonia.Diagnostics` 无条件引用（`LMTrainingDataStudio2.csproj:23`），代码未调用 `AttachDevTools`；建议改为 Debug 条件引用，减小发布体积。
-- [ ] **[缺陷][P2] 设置页路径输入无选择器/可写性检查**：CacheDirectory、RunOutputDirectory、RunTempDirectory 只能手输（`Views/MainWindow.axaml:398,442,448`），无 Browse 与可写性检查。
-- [ ] **[缺陷][P2] 数值设置无即时校验**：MaxCacheSizeMb、MaxParallelism、NodeRetryCount、SpillThresholdRows、GridSnapSize 均为 TextBox 直绑数值，非法输入无提示，只在 Apply 时 clamp（`ViewModels/MainWindowViewModel.cs:1345-1365`）。
+- [x] **[缺陷][P2] 设置页路径输入无选择器/可写性检查**：CacheDirectory、RunOutputDirectory、RunTempDirectory 只能手输（`Views/MainWindow.axaml:398,442,448`），无 Browse 与可写性检查。
+- [x] **[缺陷][P2] 数值设置无即时校验**：MaxCacheSizeMb、MaxParallelism、NodeRetryCount、SpillThresholdRows、GridSnapSize 均为 TextBox 直绑数值，非法输入无提示，只在 Apply 时 clamp（`ViewModels/MainWindowViewModel.cs:1345-1365`）。
 - [x] **[缺陷][P2] 数据工作台在途分页不可取消**：`OpenDatasetAsync`/`LoadPageAsync` 使用 `CancellationToken.None`（`ViewModels/DataWorkbenchViewModel.cs:234,325`），切换/关闭文件无法取消旧分页请求。
 - [ ] **[缺陷][P2] Recipe 校验问题无错误码**：`RecipeValidationService` 创建的 `ValidationIssue` 只有 Message/BlockId，未填 Code/Path（数据集校验已有错误码），问题列表无法稳定筛选/分组。
 
 ### 7.2 测试缺口
 
-- [ ] **[测试][P1] `SingleInstanceService` 无任何自动化测试**：双进程端到端、管道超时、外部路径转发、脏文档确认均未覆盖。
-- [ ] **[测试][P1] 命令行/文件关联无测试**：`.json` 与 `.recipe` 参数解析、启动恢复、第二次实例转发无测试。
-- [ ] **[测试][P1] 打包脚本/清单无自动校验**：版本一致性、MSIX 必需资产、Inno 关联项、发布产物启动冒烟均未纳入测试或 CI。
-- [ ] **[测试][P2] 本地化键无一致性测试**：zh-CN/en-US 的 key 集合、占位符与动态拼接 key（`node.*`、`dialog.*`）未自动比对；当前为人工核对 432/432。
+- [x] **[测试][P1] `SingleInstanceService` 无任何自动化测试**：双进程端到端、管道超时、外部路径转发、脏文档确认均未覆盖。
+- [x] **[测试][P1] 命令行/文件关联无测试**：`.json` 与 `.recipe` 参数解析、启动恢复、第二次实例转发无测试。
+- [x] **[测试][P1] 打包脚本/清单无自动校验**：版本一致性、MSIX 必需资产、Inno 关联项、发布产物启动冒烟均未纳入测试或 CI。
+- [x] **[测试][P2] 本地化键无一致性测试**：zh-CN/en-US 的 key 集合、占位符与动态拼接 key（`node.*`、`dialog.*`）未自动比对；当前为人工核对 432/432。
 - [ ] **[测试][P2] 自动崩溃入口无测试**：仅覆盖 `CrashReportService.CreateReport` 与设置脱敏；AppDomain/TaskScheduler/UI 三个未处理异常入口未验证。
 - [ ] **[测试][P2] 中断恢复无逐字节/哈希比对**：现有测试只校验行数与内容。
 - [ ] **[测试][P2] 格式转换边界测试不足**：DPO/Pretrain 往返、多轮 Alpaca、额外字段保留/丢弃策略、ShareGPT tool_call 解析失败未覆盖（现有为 Alpaca 基础转换 + DPO/Pretrain 基础矩阵）。
 - [ ] **[测试][P2] 索引缓存边界不足**：并发打开、非法指纹、超长行与容量清理后的读取行为覆盖较少。
 - [ ] **[测试][P2] 10 类节点编辑器无逐项验收**：Headless/手工只覆盖主窗口、画布、主题、高亮、SFT 字段白名单；其余节点面板未逐项点击。
 - [ ] **[测试][P2] 数据工作台大文件操作无手工验收**：跨页编辑/撤销/覆盖/另存/预览在 1M 行上的交互未逐项验证。
-- [ ] **[测试][P2] 覆盖率无采集与门禁**：DoD 中 `Services/`+`Commands/` ≥70%、全仓 ≥60% 的目标未度量。
+- [x] **[测试][P2] 覆盖率无采集与门禁**：DoD 中 `Services/`+`Commands/` ≥70%、全仓 ≥60% 的目标未度量。
 - [ ] **[测试][P2] Gated 性能/真实 provider 测试未进入 CI**：仅手动通过环境变量运行，无 nightly/可选 job。
 - [ ] **[测试][P3] 画布逐帧性能未测**：500 节点布局有测试，但 resize、边动画、拖拽的 UI 帧级耗时未计时。
 - [ ] **[测试][P3] 无视觉回归基线**：截图由 Headless+Skia 一次性生成，未纳入常规测试，UI 改动的视觉回归无自动保障。
 
 ### 7.3 CI 与工程化
 
-- [ ] **[CI][P1] 无格式门禁**：CI 未运行 `dotnet format --verify-no-changes` 或等价检查。
-- [ ] **[CI][P1] 无覆盖率采集/上传/阈值**：与 7.2 的覆盖率目标对应。
-- [ ] **[CI][P1] 无打包/安装冒烟**：CI 不构建 MSIX/Inno，也不验证发布产物可启动。
+- [x] **[CI][P1] 无格式门禁**：CI 未运行 `dotnet format --verify-no-changes` 或等价检查。
+- [x] **[CI][P1] 无覆盖率采集/上传/阈值**：与 7.2 的覆盖率目标对应。
+- [x] **[CI][P1] 无打包/安装冒烟**：CI 不构建 MSIX/Inno，也不验证发布产物可启动。
 - [ ] **[CI][P2] 无发布工作流**：无 tag → 构建 → 签名 → 发布（GitHub Release/安装包）的自动化。
 - [ ] **[CI][P2] 无 nightly/gated job**：性能与真实 provider 冒烟只能在开发机手动跑。
 - [ ] **[CI][P2] 无依赖安全扫描**：无 Dependabot、CodeQL 或 `dotnet list package --vulnerable`。
 - [ ] **[CI][P2] 依赖版本可重复性弱**：版本分散在两个 csproj，无 `Directory.Packages.props`、`packages.lock.json` 或 `RestoreLockedMode`。
-- [ ] **[CI][P2] 版本号未单一来源**：见 7.1；构建、MSIX、Inno、诊断包各自取值。
+- [x] **[CI][P2] 版本号未单一来源**：见 7.1；构建、MSIX、Inno、诊断包各自取值。
 - [ ] **[CI][P3] 无 PR 测试摘要/注解**：仅上传 TRX artifact，PR 页面看不到失败用例摘要。
-- [ ] **[CI][P3] 无 concurrency/timeout/cache**：重复推送会并行跑完整流程，NuGet 未缓存。
+- [x] **[CI][P3] 无 concurrency/timeout/cache**：重复推送会并行跑完整流程，NuGet 未缓存。
 - [ ] **[CI][P3] 无 PR/Issue 模板与贡献指南**（低优先）。
 - [ ] **[工程][P2] 分析器 `NoWarn` 清单较大**：`Directory.Build.props` 集中抑制了 CA1001/CA1068/CA1863 等，未逐条评估/修复。
 - [ ] **[工程][P3] Release 仍引用 `Avalonia.Diagnostics`**：见 7.1。
@@ -730,15 +732,15 @@
 - [x] **174 [P2] 数据工作台分页取消/过期结果无测试**：`OpenDatasetAsync` / `LoadPageAsync` 使用 `CancellationToken.None`（`ViewModels/DataWorkbenchViewModel.cs:234,325`），且没有请求代际标识；切换文件时旧页可能回写新文件。需要“取消旧请求 + 忽略过期结果”的测试。
 - [x] **175 [P2] 中断恢复未校验 Recipe/节点配置指纹**：`RehydrateCompletedNodes` 只按 block ID、输出文件存在和行数复用（`Services/RecipeRunner.cs:353-398`）；修改 Recipe 后恢复可能复用旧配置的输出。需要 recipe/config 哈希或版本指纹。
 - [ ] **176 [P2] 本地化测试不扫描硬编码英文**：现有 `LocalizationTests` 只测服务、节点目录和预设，不检查 VM/代码后置里的用户可见英文字符串（见 197）。建议增加静态/反射扫描测试。
-- [ ] **177 [P2] 设置 UI 校验无测试**：只测 `SettingsStore.Load` 的非法值回退；TextBox 非法数值、不可写目录的即时提示没有测试。
-- [ ] **178 [P3] 示例文件漂移无检查**：`ExampleRecipeTests.WriteExamples` 为 `[Explicit]`（`Tests/ExampleRecipeTests.cs:36`）；CI 不验证 `examples/` 与 `RecipePresetCatalog`/默认配置一致。
+- [x] **177 [P2] 设置 UI 校验无测试**：只测 `SettingsStore.Load` 的非法值回退；TextBox 非法数值、不可写目录的即时提示没有测试。
+- [x] **178 [P3] 示例文件漂移无检查**：`ExampleRecipeTests.WriteExamples` 为 `[Explicit]`（`Tests/ExampleRecipeTests.cs:36`）；CI 不验证 `examples/` 与 `RecipePresetCatalog`/默认配置一致。
 - [ ] **179 [P3] 无跨平台构建冒烟**：CI 只有 Windows；Avalonia/net9.0 核心逻辑没有 Linux/macOS 构建验证。
 
 #### 8.3.3 CI 与工程化（180–182）
 
 - [ ] **180 [P3] 无跨平台 CI job**：与 179 配套；沙箱/Job Object 测试可条件跳过，构建与纯逻辑测试可跨平台跑。
-- [ ] **181 [P3] 无 Debug/Release 双配置构建**：CI 只构建 Release（`.github/workflows/ci.yml`）；Debug 下的条件编译/诊断引用没有持续验证。
-- [ ] **182 [P3] CI 不校验示例与显式测试**：`ExampleRecipeTests.WriteExamples` 不会在 PR 中运行，示例 Recipe 可能与代码/预设漂移。
+- [x] **181 [P3] 无 Debug/Release 双配置构建**：CI 只构建 Release（`.github/workflows/ci.yml`）；Debug 下的条件编译/诊断引用没有持续验证。
+- [x] **182 [P3] CI 不校验示例与显式测试**：`ExampleRecipeTests.WriteExamples` 不会在 PR 中运行，示例 Recipe 可能与代码/预设漂移。
 
 #### 8.3.4 配置与设置（183–186）
 
@@ -862,3 +864,46 @@
 - 数据工作台消息级表单编辑、匹配导航、预览分页、列排序/筛选。
 - API Key 加密、web_fetch 加固、诊断日志脱敏、安装包签名与干净机器验证。
 - 硬编码英文静态文案、架构/安装文档、健康检查与保留策略。
+
+---
+
+## 10. Round 18 执行记录（2026-11-18）
+
+### 10.1 已完成批次
+
+| 批次 | 范围 | 提交 |
+| --- | --- | --- |
+| Batch 7 | 单实例/命令行启动测试、打包清单与本地化一致性测试、设置面板校验 | 本次提交 |
+| Batch 8 | CI 门禁：格式、Debug/Release、覆盖率、示例漂移、发布冒烟 | 本次提交 |
+
+### 10.2 具体改动
+
+- 新增 `StartupLaunchTests`：命令行 Recipe 参数过滤、启动 Recipe 只消费一次、第二实例线程检测、命名管道转发/缺失回退。
+- `SingleInstanceService` 支持可注入实例名与管道名，便于测试；默认行为不变。
+- 新增 `PackagingConsistencyTests`：版本单一来源（`Directory.Build.props` → MSIX/Inno/version.ps1）、MSIX 资产、`.recipe` 关联、Inno 关联与 `%1` 转发、脚本 `-Version` 贯通、Release 不含 `Avalonia.Diagnostics`。
+- 移除 `Directory.Build.props` 中硬编码的 `AssemblyVersion`/`FileVersion`/`InformationalVersion`，让 `-p:Version` 真正传递到发布产物（发布冒烟验证 FileVersion=0.0.0.0）。
+- 新增 `LocalizationConsistencyTests`：zh-CN/en-US key 集合、占位符、重复 key、静态引用的 `{loc:Loc}` / `LocalizationService.L("...")` key 存在性。
+- 设置面板：数值项改为有界 `NumericUpDown`；缓存/运行/临时目录增加 Browse 按钮；Apply 前校验数值范围与目录可写性，失败时面板保持打开并在面板内显示错误。
+- 新增 `SettingsPanelTests`（VM 校验、读写持久化）与 Headless 输入边界/按钮检查。
+- CI 重写：格式门禁、Debug/Release 矩阵、Coverlet 覆盖率门禁（总行 ≥60%，Services/Commands ≥70%）、打包元数据测试、示例再生成 + `git diff` 漂移检查、PowerShell 脚本解析、`publish-win-x64.ps1` 版本冒烟；新增 concurrency/timeout/NuGet 缓存。
+- 新增 `scripts/check-coverage.ps1`；测试项目加入 `coverlet.msbuild`。
+- `DatasetIOTests` 的 CSV 多行 fixture 使用 `ReplaceLineEndings("\n")`，避免 CRLF 检出导致跨平台测试漂移。
+- 全仓执行 `dotnet format`，统一导入顺序、缩进与行尾。
+
+### 10.3 当前验证
+
+- `dotnet build -c Release`：0 警告，0 错误。
+- `dotnet test -c Release`：550 通过，0 失败，7 跳过（5 性能 gated + 2 provider gated）；`--list-tests` 557 个用例（含 1 个 `[Explicit]`）。
+- `dotnet format --verify-no-changes`：通过。
+- 覆盖率（本地）：总行 74.64%，Services/Commands 行 84.32%。
+- `scripts/publish-win-x64.ps1 -Version 0.0.0`：产物与 zip 生成，EXE FileVersion=0.0.0.0。
+- 示例再生成后 `git diff -- examples/`：无漂移。
+- 未在本机执行：GitHub Actions 实际运行、MSIX/Inno 编译、干净机器安装。
+
+### 10.4 本轮未做（保留在 7.x / 8.3）
+
+- 176 硬编码英文静态扫描（与 197 一起处理，需要可维护的允许清单）。
+- 179/180 跨平台 CI 构建（Linux/macOS）。
+- 7.2 自动崩溃入口、格式转换边界、索引缓存边界、节点面板逐项人工验收。
+- 7.1 Recipe 校验错误码、7.7 执行清理/配额、7.10 安全加固。
+- 7.3 nightly/gated job、依赖安全扫描、`Directory.Packages.props`/锁定依赖。

@@ -2,6 +2,28 @@
 
 本文件记录用户可见变更与工程化修复。完整未完成清单见 [PLAN/TODO/01-Bugfix1/HANDOFF.md](PLAN/TODO/01-Bugfix1/HANDOFF.md)。
 
+## [Unreleased] — 2026-11-18（Round 18 / 测试与 CI 门禁）
+
+### Added
+
+- 单实例与启动链路测试：命令行 Recipe 参数过滤、启动 Recipe 单次消费、第二实例检测、命名管道转发与主实例缺失回退。
+- 打包一致性测试：版本单一来源、MSIX 资产与 `.recipe` 关联、Inno 关联/`%1` 转发、脚本 `-Version` 贯通、Release 不含 `Avalonia.Diagnostics`。
+- 本地化一致性测试：zh-CN/en-US key 集合、占位符、重复 key 与静态引用 key 存在性。
+- 设置面板：缓存/运行/临时目录 Browse 按钮；数值项改为有界 `NumericUpDown`；Apply 前校验范围与目录可写性，错误显示在面板内。
+- `scripts/check-coverage.ps1` 与 `coverlet.msbuild`，CI 覆盖率门禁为总行 ≥60%、Services/Commands ≥70%。
+- CI 新增格式门禁、Debug/Release 矩阵、示例再生成漂移检查、PowerShell 脚本解析与 `publish-win-x64.ps1` 版本冒烟，并加入 concurrency/timeout/NuGet 缓存。
+
+### Changed
+
+- `Directory.Build.props` 移除硬编码 `AssemblyVersion`/`FileVersion`/`InformationalVersion`，由 `Version` 统一派生；发布脚本 `-Version` 现在会写入 EXE 文件版本。
+- 全仓执行 `dotnet format`，统一导入顺序、缩进与行尾；CSV 多行测试 fixture 显式使用 LF，避免跨平台行尾漂移。
+
+### Tests
+
+- `--list-tests`：557 个用例；`dotnet test`：550 通过 / 0 失败 / 7 跳过。
+- 覆盖率（本地）：总行 74.64%，Services/Commands 行 84.32%。
+- `dotnet format --verify-no-changes` 通过；发布冒烟产物 FileVersion=0.0.0.0；示例无漂移。
+
 ## [Unreleased] — 2026-11-17（Round 17 / Bugfix1）
 
 ### Added
@@ -43,4 +65,4 @@
 - Tool Profile MCP、容器级沙箱、Sampler count 模式分层仍未实现。
 - API Key 仍以明文保存在本机 `settings.json`；诊断包会脱敏，但磁盘文件未加密。
 - MSIX/Inno 安装包尚未在干净机器完成安装验证与签名。
-- CI 仍未包含格式、覆盖率、打包冒烟与 nightly gated job。
+- CI 尚未包含 nightly gated job、依赖安全扫描与跨平台（Linux/macOS）构建。
