@@ -1,6 +1,8 @@
 using Avalonia.Controls;
+using Avalonia.Controls.Documents;
 using Avalonia.Headless.NUnit;
 using Avalonia.Threading;
+using LMTrainingDataStudio2.Controls;
 using LMTrainingDataStudio2.Localization;
 using LMTrainingDataStudio2.Models;
 using LMTrainingDataStudio2.Services;
@@ -145,6 +147,25 @@ public sealed class HeadlessUiTests
         {
             window.Close();
         }
+    }
+
+    [AvaloniaTest]
+    public void HighlightBehavior_RendersMatchedRuns()
+    {
+        var block = new TextBlock();
+        TextHighlightBehavior.SetHighlightText(block, "row-1 and row-2");
+        TextHighlightBehavior.SetHighlightQuery(block, "row");
+
+        var window = new Window { Content = block };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var runs = block.Inlines!.OfType<Run>().ToArray();
+        Assert.That(runs, Has.Length.EqualTo(4));
+        Assert.That(runs.Count(run => run.Background is not null), Is.EqualTo(2));
+        Assert.That(string.Concat(runs.Select(run => run.Text)), Is.EqualTo("row-1 and row-2"));
+
+        window.Close();
     }
 
     [AvaloniaTest]

@@ -5,6 +5,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:LMTrainingDataStudio2.ViewModels"
              xmlns:services="using:LMTrainingDataStudio2.Services"
+             xmlns:controls="using:LMTrainingDataStudio2.Controls"
              mc:Ignorable="d" d:DesignWidth="1400" d:DesignHeight="760"
              x:Class="LMTrainingDataStudio2.Views.DataWorkbenchView"
              x:DataType="vm:DataWorkbenchViewModel">
@@ -19,6 +20,39 @@
         <Style Selector="TextBlock.sectionTitle">
             <Setter Property="FontSize" Value="10" />
             <Setter Property="Foreground" Value="#888888" />
+        </Style>
+        <Style Selector="Border.rowCard">
+            <Setter Property="Background" Value="#1E1E2E" />
+            <Setter Property="BorderBrush" Value="#2E2E42" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="0" />
+        </Style>
+        <Style Selector="Border.rowCard.inserted">
+            <Setter Property="Background" Value="#1B2A20" />
+            <Setter Property="BorderBrush" Value="#4E7A5A" />
+        </Style>
+        <Style Selector="Border.rowCard.match">
+            <Setter Property="BorderBrush" Value="#B08A2A" />
+        </Style>
+        <Style Selector="Border.rowCard.deleted">
+            <Setter Property="Opacity" Value="0.55" />
+        </Style>
+        <Style Selector="TextBlock.rowJson">
+            <Setter Property="FontFamily" Value="Consolas, Menlo, monospace" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Padding" Value="8,5" />
+            <Setter Property="Foreground" Value="#D6D6E0" />
+            <Setter Property="TextWrapping" Value="NoWrap" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+        <Style Selector="TextBlock.rowJson.deleted">
+            <Setter Property="TextDecorations" Value="Strikethrough" />
+        </Style>
+        <Style Selector="TextBlock.tag">
+            <Setter Property="FontSize" Value="9" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
+            <Setter Property="Margin" Value="0,0,4,0" />
         </Style>
     </UserControl.Styles>
 
@@ -96,9 +130,117 @@
                 </StackPanel>
             </Border>
 
+            <!-- Edit toolbar -->
+            <Border DockPanel.Dock="Top" Height="38"
+                    Background="#1F1F30"
+                    BorderBrush="{StaticResource PanelBorderBrush}"
+                    BorderThickness="0,0,0,1">
+                <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                              VerticalScrollBarVisibility="Disabled">
+                    <StackPanel Orientation="Horizontal" Spacing="6" Margin="10,0"
+                                VerticalAlignment="Center">
+                        <Button Content="{loc:Loc data.insert_above}"
+                                Command="{Binding InsertRowAboveCommand}"
+                                Background="Transparent" Foreground="#CCCCCC"
+                                FontSize="11" Padding="8,4" />
+                        <Button Content="{loc:Loc data.insert_below}"
+                                Command="{Binding InsertRowBelowCommand}"
+                                Background="Transparent" Foreground="#CCCCCC"
+                                FontSize="11" Padding="8,4" />
+                        <Button Content="{loc:Loc data.duplicate_row}"
+                                Command="{Binding DuplicateRowCommand}"
+                                Background="Transparent" Foreground="#CCCCCC"
+                                FontSize="11" Padding="8,4" />
+                        <Button Content="{loc:Loc data.delete_row}"
+                                Command="{Binding DeleteRowCommand}"
+                                Background="Transparent" Foreground="#FF9090"
+                                FontSize="11" Padding="8,4" />
+                        <Button Content="{loc:Loc data.restore_row}"
+                                Command="{Binding RestoreRowCommand}"
+                                Background="Transparent" Foreground="#7FD08A"
+                                FontSize="11" Padding="8,4" />
+                        <Border Width="1" Height="18" Background="#3A3A4E" Margin="4,0" />
+                        <Button Content="↶" Command="{Binding UndoEditCommand}"
+                                ToolTip.Tip="{loc:Loc data.undo_edit}"
+                                Background="Transparent" Foreground="#CCCCCC"
+                                FontSize="13" Padding="8,2" />
+                        <Button Content="↷" Command="{Binding RedoEditCommand}"
+                                ToolTip.Tip="{loc:Loc data.redo_edit}"
+                                Background="Transparent" Foreground="#CCCCCC"
+                                FontSize="13" Padding="8,2" />
+                        <Border Width="1" Height="18" Background="#3A3A4E" Margin="4,0" />
+                        <Button Content="{loc:Loc data.save_edits_as}"
+                                Click="OnSaveEditsClick"
+                                IsEnabled="{Binding HasPendingEdits}"
+                                Background="#4A90D9" Foreground="#FFFFFF"
+                                FontSize="11" Padding="10,4" />
+                        <Button Content="{loc:Loc data.overwrite_source}"
+                                Click="OnOverwriteSourceClick"
+                                IsEnabled="{Binding HasPendingEdits}"
+                                Background="#3A2020" Foreground="#FFB0B0"
+                                FontSize="11" Padding="10,4" />
+                        <Button Content="{loc:Loc data.discard_edits}"
+                                Command="{Binding DiscardEditsCommand}"
+                                Background="Transparent" Foreground="#AAAAAA"
+                                FontSize="11" Padding="8,4" />
+                        <TextBlock Text="{Binding PendingEditText}"
+                                   FontSize="10" Foreground="#E0C060"
+                                   VerticalAlignment="Center" Margin="6,0" />
+                        <ProgressBar Value="{Binding EditProgress}" Minimum="0" Maximum="1"
+                                     Width="80" Height="3" VerticalAlignment="Center"
+                                     IsVisible="{Binding IsSavingEdits}" />
+                        <TextBlock Text="{Binding EditStatusText}"
+                                   FontSize="10" Foreground="#888888"
+                                   VerticalAlignment="Center" Margin="4,0"
+                                   MaxWidth="360" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+
             <TextBlock DockPanel.Dock="Bottom" Text="{Binding StatusText}"
                        FontSize="10" Foreground="#777777" Margin="12,6"
                        TextWrapping="Wrap" />
+
+            <!-- Row JSON editor -->
+            <Border DockPanel.Dock="Bottom" Height="228"
+                    IsVisible="{Binding IsDatasetOpen}"
+                    Background="{StaticResource PanelBackgroundBrush}"
+                    BorderBrush="{StaticResource PanelBorderBrush}"
+                    BorderThickness="0,1,0,0">
+                <Grid RowDefinitions="Auto,*,Auto" Margin="10,8">
+                    <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
+                        <TextBlock Text="{loc:Loc data.row_json_editor}" FontSize="10"
+                                   Foreground="#888888" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1" Text="{Binding SelectedRow.NumberText}"
+                                   FontSize="10" Foreground="#4A90D9"
+                                   VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="2" Text="{loc:Loc data.edit_row_hint}"
+                                   FontSize="9" Foreground="#666666"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" />
+                    </Grid>
+
+                    <TextBox x:Name="RowJsonEditor" Grid.Row="1"
+                             Text="{Binding SelectedJsonText, Mode=TwoWay}"
+                             IsEnabled="{Binding SelectedRow.IsEditable}"
+                             AcceptsReturn="True" TextWrapping="NoWrap"
+                             FontFamily="Consolas, Menlo, monospace" FontSize="11"
+                             Background="#1E1E2E" BorderBrush="#2E2E42"
+                             BorderThickness="1" Padding="8,5"
+                             VerticalAlignment="Stretch" Margin="0,4"
+                             Watermark="{loc:Loc data.select_a_row_to_edit}" />
+
+                    <Grid Grid.Row="2" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <TextBlock Text="{Binding RowEditError}" FontSize="10"
+                                   Foreground="#FF8080" TextWrapping="Wrap"
+                                   VerticalAlignment="Center" />
+                        <Button Grid.Column="1" Content="{loc:Loc data.apply_row_edit}"
+                                Command="{Binding ApplyRowEditCommand}"
+                                Background="#3A3A4E" Foreground="#FFFFFF"
+                                FontSize="11" Padding="12,4" />
+                    </Grid>
+                </Grid>
+            </Border>
 
             <!-- Empty state -->
             <StackPanel IsVisible="{Binding !IsDatasetOpen}"
@@ -111,28 +253,44 @@
 
             <!-- Virtualized rows -->
             <ListBox ItemsSource="{Binding Rows}"
+                     SelectedItem="{Binding SelectedRow, Mode=TwoWay}"
+                     SelectionMode="Single"
                      IsVisible="{Binding IsDatasetOpen}"
                      Background="Transparent" BorderThickness="0"
-                     Margin="0,4">
+                     Margin="0,4"
+                     DoubleTapped="OnRowDoubleTapped">
                 <ListBox.ItemTemplate>
                     <DataTemplate x:DataType="vm:DatasetRowViewModel">
-                        <Grid ColumnDefinitions="52,*" Margin="6,3">
-                            <TextBlock Text="{Binding Number}" FontSize="10"
-                                       Foreground="#6A7A8A" VerticalAlignment="Top"
-                                       Margin="0,3,0,0" HorizontalAlignment="Right" />
-                            <TextBox Grid.Column="1"
-                                     Text="{Binding Preview}"
-                                     IsReadOnly="True"
-                                     AcceptsReturn="True"
-                                     TextWrapping="NoWrap"
-                                     FontFamily="Consolas, Menlo, monospace"
-                                     FontSize="11"
-                                     Background="#1E1E2E"
-                                     BorderBrush="#2E2E42"
-                                     BorderThickness="1"
-                                     Padding="8,5"
-                                     VerticalAlignment="Top" />
-                        </Grid>
+                        <Border Classes="rowCard"
+                                Classes.inserted="{Binding IsInserted}"
+                                Classes.deleted="{Binding IsDeleted}"
+                                Classes.match="{Binding IsSearchMatch}"
+                                Margin="6,3">
+                            <Grid ColumnDefinitions="48,*">
+                                <StackPanel Grid.Column="0" Margin="0,3,0,0">
+                                    <TextBlock Text="{Binding NumberText}" FontSize="10"
+                                               Foreground="#6A7A8A"
+                                               HorizontalAlignment="Right"
+                                               Margin="0,0,4,0" />
+                                    <TextBlock Classes="tag" Text="{loc:Loc data.row_tag_new}"
+                                               Foreground="#7FD08A"
+                                               IsVisible="{Binding IsInserted}" />
+                                    <TextBlock Classes="tag" Text="{loc:Loc data.row_tag_edited}"
+                                               Foreground="#E0C060"
+                                               IsVisible="{Binding IsModified}" />
+                                    <TextBlock Classes="tag" Text="{loc:Loc data.row_tag_deleted}"
+                                               Foreground="#FF8080"
+                                               IsVisible="{Binding IsDeleted}" />
+                                </StackPanel>
+                                <TextBlock Grid.Column="1"
+                                           Classes="rowJson"
+                                           Classes.deleted="{Binding IsDeleted}"
+                                           controls:TextHighlightBehavior.HighlightText="{Binding Preview}"
+                                           controls:TextHighlightBehavior.HighlightQuery="{Binding HighlightQuery}"
+                                           controls:TextHighlightBehavior.HighlightUseRegex="{Binding HighlightUseRegex}"
+                                           controls:TextHighlightBehavior.HighlightCaseSensitive="{Binding HighlightCaseSensitive}" />
+                            </Grid>
+                        </Border>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
@@ -512,9 +670,37 @@
                             <TextBlock Text="{Binding Validation.Summary}" FontSize="10"
                                        Foreground="#AAAAAA" TextWrapping="Wrap" />
 
+                            <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="6">
+                                <TextBlock Text="{loc:Loc data.severity_filter}" FontSize="10"
+                                           Foreground="#888888" VerticalAlignment="Center" />
+                                <ComboBox Grid.Column="1" FontSize="11" HorizontalAlignment="Stretch"
+                                          ItemsSource="{Binding Validation.SeverityOptions}"
+                                          SelectedItem="{Binding Validation.SelectedSeverityOption, Mode=TwoWay}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:ValidationSeverityOption">
+                                            <TextBlock Text="{Binding DisplayName}" FontSize="11" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                                <TextBlock Grid.Column="2" Text="{loc:Loc data.code_filter}" FontSize="10"
+                                           Foreground="#888888" VerticalAlignment="Center" />
+                                <ComboBox Grid.Column="3" FontSize="11" HorizontalAlignment="Stretch"
+                                          ItemsSource="{Binding Validation.CodeOptions}"
+                                          SelectedItem="{Binding Validation.SelectedCodeOption, Mode=TwoWay}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:ValidationCodeOption">
+                                            <TextBlock Text="{Binding DisplayName}" FontSize="11" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </Grid>
+
+                            <TextBlock Text="{Binding Validation.FilterSummary}" FontSize="9"
+                                       Foreground="#777777" />
+
                             <TextBlock Classes="sectionTitle"
                                        Text="{loc:Loc data.issues_double_click_to_jump}" />
-                            <ListBox ItemsSource="{Binding Validation.Issues}"
+                            <ListBox ItemsSource="{Binding Validation.FilteredIssues}"
                                      SelectedItem="{Binding Validation.SelectedIssue, Mode=TwoWay}"
                                      DoubleTapped="OnIssueDoubleTapped"
                                      Background="#1E1E2E" BorderBrush="#2E2E42"

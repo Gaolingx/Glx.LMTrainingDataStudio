@@ -1,6 +1,8 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using LMTrainingDataStudio2.Localization;
+using LMTrainingDataStudio2.Models;
 using LMTrainingDataStudio2.ViewModels;
 
 namespace LMTrainingDataStudio2.Views;
@@ -77,5 +79,103 @@ public partial class PropertyPanelView : UserControl
 
         editor.OutputPath = path;
         vm.StatusText = $"SFT export target selected: {path}";
+    }
+
+    private async void OnPreviewSftOutputClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm ||
+            vm.SelectedBlock is not { } block ||
+            block.SftExportEditor is not { } editor)
+        {
+            return;
+        }
+
+        await PreviewFileAsync(vm, block.Name, editor.OutputPath);
+    }
+
+    private async void OnPreviewRejectClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm ||
+            vm.SelectedBlock is not { } block ||
+            block.ValidatorEditor is not { } editor)
+        {
+            return;
+        }
+
+        await PreviewFileAsync(vm, block.Name, editor.RejectOutputPath);
+    }
+
+    private async void OnPreviewFailuresClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm ||
+            vm.SelectedBlock is not { } block ||
+            block.SimulationEditor is not { } editor)
+        {
+            return;
+        }
+
+        await PreviewFileAsync(vm, block.Name, editor.FailureOutputPath);
+    }
+
+    private async void OnPreviewCleanerDiffClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm ||
+            vm.SelectedBlock is not { } block ||
+            block.Config is not CleanerBlockConfig cleaner)
+        {
+            return;
+        }
+
+        if (TopLevel.GetTopLevel(this) is not Window owner)
+        {
+            return;
+        }
+
+        var files = await owner.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = LocalizationService.L("preview.cleaner_pick_sample"),
+            AllowMultiple = false,
+            FileTypeFilter = new[]
+            {
+                new FilePickerFileType("JSONL") { Patterns = new[] { "*.jsonl", "*.json" } },
+                FilePickerFileTypes.All
+            }
+        });
+
+        var path = files.Count > 0 ? files[0].TryGetLocalPath() : null;
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        var preview = vm.CreateSamplePreview();
+        await preview.LoadCleanerDiffAsync(path, cleaner.Rules, block.Name);
+        await SamplePreviewWindow.ShowAsync(owner, preview);
+    }
+
+    private async Task PreviewFileAsync(MainWindowViewModel vm, string nodeName, string? path)
+    {
+        if (TopLevel.GetTopLevel(this) is not Window owner)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        {
+            await MessageDialog.ShowAsync(
+                owner,
+                LocalizationService.L("preview.title"),
+                string.Format(
+                    LocalizationService.L("property.preview_file_missing"),
+                    string.IsNullOrWhiteSpace(path) ? "(empty)" : path),
+                MessageDialogButtons.Ok);
+            return;
+        }
+
+        var preview = vm.CreateSamplePreview();
+        await preview.LoadFileAsync(
+            path,
+            string.Format(LocalizationService.L("preview.node_format"), nodeName));
+        await SamplePreviewWindow.ShowAsync(owner, preview);
     }
 }

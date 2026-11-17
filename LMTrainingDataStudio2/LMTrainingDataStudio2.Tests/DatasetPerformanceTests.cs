@@ -105,6 +105,92 @@ public sealed class DatasetPerformanceTests
     }
 
     [Test]
+    public async Task EditSave_LargeInput_StaysBoundedAndConservesRows()
+    {
+        if (Environment.GetEnvironmentVariable("LMTDS_PERF_TESTS") != "1")
+        {
+            Assert.Ignore("Set LMTDS_PERF_TESTS=1 to run the large edit/save baseline.");
+            return;
+        }
+
+        var rows = int.TryParse(Environment.GetEnvironmentVariable("LMTDS_PERF_ROWS"), out var configured)
+            ? Math.Clamp(configured, 100_000, 20_000_000)
+            : 1_000_000;
+        const int rowBytes = 256;
+
+        var directory = Path.Combine(Path.GetTempPath(), "lmtds-perf-edit", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            var sourcePath = Path.Combine(directory, "edit.jsonl");
+            var targetPath = Path.Combine(directory, "edit.out.jsonl");
+
+            var generate = Stopwatch.StartNew();
+            GenerateDuplicates(sourcePath, rows, rowBytes);
+            generate.Stop();
+
+            var settings = new AppSettings
+            {
+                CacheDirectory = Path.Combine(directory, "cache"),
+                MaxCacheSizeMb = 512
+            };
+
+            const int replacements = 1000;
+            const int deletions = 100;
+            const int insertions = 100;
+            var step = Math.Max(1, rows / replacements);
+            var replacedRows = new Dictionary<long, string>();
+            var deletedRows = new HashSet<long>();
+            var insertedRows = new Dictionary<long, IReadOnlyList<DatasetInsertedRow>>();
+            for (var i = 0; i < replacements; i++)
+            {
+                replacedRows[(long)i * step] = $$"""{"messages":[{"role":"user","content":"edited {{i}}"}],"id":{{i}}}""";
+            }
+
+            for (var i = 0; i < deletions; i++)
+            {
+                deletedRows.Add((long)i * step + 1);
+            }
+
+            for (var i = 0; i < insertions; i++)
+            {
+                var anchor = (long)i * step + 2;
+                insertedRows[anchor] = new[]
+                {
+                    new DatasetInsertedRow(i + 1, anchor, $$"""{"messages":[{"role":"user","content":"inserted {{i}}"}],"id":-{{i + 1}}}""")
+                };
+            }
+
+            var snapshot = new DatasetEditSnapshot(replacedRows, deletedRows, insertedRows, insertions + 1);
+            var memoryBefore = GC.GetTotalMemory(forceFullCollection: true);
+
+            var save = Stopwatch.StartNew();
+            var service = new DatasetEditService(settings);
+            var result = await service.SaveAsync(snapshot, sourcePath, DataFileType.Jsonl, targetPath, chunkRows: 4096);
+            save.Stop();
+
+            var memoryAfter = GC.GetTotalMemory(forceFullCollection: false);
+            var expectedRows = rows - deletions + insertions;
+
+            Assert.That(result.WrittenRows, Is.EqualTo(expectedRows));
+            Assert.That(File.ReadLines(targetPath).Count(), Is.EqualTo(expectedRows));
+            Assert.That(memoryAfter - memoryBefore, Is.LessThan(MemoryLimitBytes),
+                $"Managed memory delta after edit+save: {(memoryAfter - memoryBefore) / 1024.0 / 1024.0:F0} MB.");
+
+            TestContext.Progress.WriteLine(
+                $"{rows:N0} rows @ {rowBytes}B: generate {generate.Elapsed.TotalSeconds:F1}s, " +
+                $"edit+save {save.Elapsed.TotalSeconds:F1}s ({replacements} replaced, {deletions} deleted, " +
+                $"{insertions} inserted, {expectedRows:N0} written), " +
+                $"managed memory delta {(memoryAfter - memoryBefore) / 1024.0 / 1024.0:F0} MB.");
+        }
+        finally
+        {
+            try { Directory.Delete(directory, true); } catch { /* best effort */ }
+        }
+    }
+
+    [Test]
 public async Task QualityOperations_LargeInput_StayBoundedAndConserveRows()
 {
     if (Environment.GetEnvironmentVariable("LMTDS_PERF_TESTS") != "1")

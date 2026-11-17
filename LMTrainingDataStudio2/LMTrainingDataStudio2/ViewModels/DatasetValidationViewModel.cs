@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using LMTrainingDataStudio2.Localization;
 using LMTrainingDataStudio2.Models;
 using LMTrainingDataStudio2.Services;
 using LMTrainingDataStudio2.Services.Datasets;
@@ -61,19 +62,53 @@ public partial class DatasetValidationViewModel : ObservableObject
     [ObservableProperty]
     private bool _hasFixPreview;
 
+    [ObservableProperty]
+    private ValidationSeverityOption? _selectedSeverityOption;
+
+    [ObservableProperty]
+    private ValidationCodeOption? _selectedCodeOption;
+
+    [ObservableProperty]
+    private string _filterSummary = string.Empty;
+
     public ObservableCollection<DatasetIssueViewModel> Issues { get; } = new();
+    public ObservableCollection<DatasetIssueViewModel> FilteredIssues { get; } = new();
     public ObservableCollection<DatasetFixSample> FixSamples { get; } = new();
+    public ObservableCollection<ValidationSeverityOption> SeverityOptions { get; } = new();
+    public ObservableCollection<ValidationCodeOption> CodeOptions { get; } = new();
 
     public event Action<long>? JumpRequested;
 
     public DatasetValidationViewModel(AppSettings settings)
     {
         _service = new DatasetValidationService(settings);
+        RefreshLocalization();
     }
 
     public void ApplySettings(AppSettings settings)
     {
         _service = new DatasetValidationService(settings);
+    }
+
+    public void RefreshLocalization()
+    {
+        var severityKey = SelectedSeverityOption?.Key ?? ValidationSeverityOption.AllKey;
+        var codeKey = SelectedCodeOption?.Key ?? ValidationCodeOption.AllKey;
+
+        SeverityOptions.Clear();
+        SeverityOptions.Add(new ValidationSeverityOption(
+            ValidationSeverityOption.AllKey, LocalizationService.L("data.all_values")));
+        SeverityOptions.Add(new ValidationSeverityOption(
+            "error", LocalizationService.L("data.severity_errors")));
+        SeverityOptions.Add(new ValidationSeverityOption(
+            "warning", LocalizationService.L("data.severity_warnings")));
+        SelectedSeverityOption = SeverityOptions.FirstOrDefault(option => option.Key == severityKey)
+                                 ?? SeverityOptions[0];
+
+        RebuildCodeOptions(codeKey);
+        ApplyFilter();
+        OnPropertyChanged(nameof(SeverityOptions));
+        OnPropertyChanged(nameof(CodeOptions));
     }
 
     public void SetSource(string path, DataFileType fileType)
@@ -82,6 +117,7 @@ public partial class DatasetValidationViewModel : ObservableObject
         _fileType = fileType;
         _hasSource = true;
         Issues.Clear();
+        FilteredIssues.Clear();
         FixSamples.Clear();
         HasIssues = false;
         HasFixPreview = false;
@@ -90,8 +126,10 @@ public partial class DatasetValidationViewModel : ObservableObject
         WarningCount = 0;
         Summary = string.Empty;
         FixSummary = string.Empty;
+        FilterSummary = string.Empty;
         StatusText = $"Ready to validate '{Path.GetFileName(path)}'.";
         FixTargetPath = SuggestFixPath(path);
+        RebuildCodeOptions(ValidationCodeOption.AllKey);
     }
 
     public void RequestJump(long lineNumber) => JumpRequested?.Invoke(lineNumber);
@@ -134,6 +172,9 @@ public partial class DatasetValidationViewModel : ObservableObject
             WarningCount = (int)Math.Min(report.WarningCount, int.MaxValue);
             HasIssues = report.TotalIssueCount > 0;
             IssuesTruncated = report.IssuesTruncated;
+
+            RebuildCodeOptions(SelectedCodeOption?.Key ?? ValidationCodeOption.AllKey);
+            ApplyFilter();
 
             var truncated = report.IssuesTruncated
                 ? $" Showing the first {report.Issues.Count:N0}."
@@ -268,6 +309,62 @@ public partial class DatasetValidationViewModel : ObservableObject
 
     private bool CanCancel() => IsCancellable;
 
+    partial void OnSelectedSeverityOptionChanged(ValidationSeverityOption? value) => ApplyFilter();
+
+    partial void OnSelectedCodeOptionChanged(ValidationCodeOption? value) => ApplyFilter();
+
+    private void RebuildCodeOptions(string selectedKey)
+    {
+        CodeOptions.Clear();
+        CodeOptions.Add(new ValidationCodeOption(
+            ValidationCodeOption.AllKey, LocalizationService.L("data.all_values")));
+
+        foreach (var code in Issues
+                     .Select(issue => issue.CodeText)
+                     .Distinct(StringComparer.OrdinalIgnoreCase)
+                     .OrderBy(code => code, StringComparer.OrdinalIgnoreCase))
+        {
+            CodeOptions.Add(new ValidationCodeOption(code, code));
+        }
+
+        SelectedCodeOption = CodeOptions.FirstOrDefault(option =>
+                                 string.Equals(option.Key, selectedKey, StringComparison.OrdinalIgnoreCase))
+                             ?? CodeOptions[0];
+    }
+
+    private void ApplyFilter()
+    {
+        var severityKey = SelectedSeverityOption?.Key ?? ValidationSeverityOption.AllKey;
+        var codeKey = SelectedCodeOption?.Key ?? ValidationCodeOption.AllKey;
+
+        FilteredIssues.Clear();
+        foreach (var issue in Issues)
+        {
+            if (severityKey == ValidationSeverityOption.ErrorKey && !issue.IsError)
+            {
+                continue;
+            }
+
+            if (severityKey == ValidationSeverityOption.WarningKey && !issue.IsWarning)
+            {
+                continue;
+            }
+
+            if (codeKey != ValidationCodeOption.AllKey &&
+                !string.Equals(issue.CodeText, codeKey, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            FilteredIssues.Add(issue);
+        }
+
+        FilterSummary = Issues.Count == 0
+            ? string.Empty
+            : string.Format(LocalizationService.L("data.filtered_issues_format"),
+                FilteredIssues.Count, Issues.Count);
+    }
+
     private bool EnsureJsonl(string operation)
     {
         if (!_hasSource)
@@ -310,6 +407,22 @@ public partial class DatasetValidationViewModel : ObservableObject
         var fileName = $"{name}.fixed{extension}";
         return string.IsNullOrEmpty(directory) ? fileName : Path.Combine(directory, fileName);
     }
+}
+
+public sealed record ValidationSeverityOption(string Key, string DisplayName)
+{
+    public const string AllKey = "all";
+    public const string ErrorKey = "error";
+    public const string WarningKey = "warning";
+
+    public override string ToString() => DisplayName;
+}
+
+public sealed record ValidationCodeOption(string Key, string DisplayName)
+{
+    public const string AllKey = "all";
+
+    public override string ToString() => DisplayName;
 }
 
 public sealed class DatasetIssueViewModel

@@ -16,7 +16,9 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - Validator：表达式 / JSON Schema 规则、reject JSONL、失败率日志；Sampler：确定性多文件切分
 - Tool Profile：参数树编辑、JSON 导入导出，并被 Simulation/LLM 引用复用
 - 统一数据集 IO：JSONL / CSV / Parquet 分页读取与原子写出；Seed 支持三种格式
-- 数据工作台（Data 视图）：分页预览、行号跳转、页面大小切换
+- 数据工作台（Data 视图）：分页预览、行号跳转、页面大小切换、逐行 CRUD（插入/复制/删除/恢复）、行 JSON 单元格编辑、撤销/重做、编辑另存或覆盖源文件
+- 搜索命中行内高亮；校验问题按级别/错误码筛选与计数
+- 统一样本预览弹窗：SFT Export 输出、Validator 拒绝行、Simulation 失败样本、Cleaner 前后 diff，可一键在数据工作台打开
 - 数据质量与治理：校验问题列表（级别/行号/JSON 路径/错误码）与跳行、JSONL 自动修复预览与写副本、搜索/正则替换、去重、固定 seed 混洗、比例/份数切分、数据集统计
 - 画布：网格/吸附（Alt 关闭）、鼠标中心缩放、Fit、拓扑自动布局、Mini-map 视口与点击导航、双击添加、复制携带连线、内联重命名、真实端口坐标、边 hover
 - 执行：层内受控并行、暂停/恢复、节点重试、运行输出目录与 `run-summary.json`
@@ -39,7 +41,7 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - 中英文界面本地化（zh-CN / en-US，可在设置中切换），节点库、属性面板与画布悬停提示包含完整节点说明
 - 通用 Block Config JSON 编辑器，可直接配置所有节点类型
 
-> 注意：当前仍是开发版。**数据逐行编辑 CRUD、搜索命中高亮、10M 实测、节点尺寸手柄/边过渡动画、MSIX 安装包、README 截图、完整浅色主题、LLM 请求侧 tools/结构化输出、Validator 代码规则/超时、Sampler 多输出端口、MCP 适配尚未实现**；应用默认启动空白 Recipe，可通过 File → New from Sample 加载 4 节点示例，或恢复上次打开的文件。
+> 注意：当前仍是开发版。**10M 实测、节点尺寸手柄/边过渡动画、MSIX 安装包、README 截图、完整浅色主题、LLM 请求侧 tools/结构化输出、Validator 代码规则/超时、Sampler 多输出端口、MCP 适配尚未实现**；应用默认启动空白 Recipe，可通过 File → New from Sample 加载 4 节点示例，或恢复上次打开的文件。
 >
 > - 完整功能清单与节点能力矩阵：[PLAN/STATUS.md](PLAN/STATUS.md)
 > - 分阶段实施计划、阶段目标与验收标准：[PLAN/TODO.md](PLAN/TODO.md)
@@ -226,6 +228,8 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - CSV 使用 RFC 4180 记录边界索引，Parquet 按 row group 随机读取；两者都只加载当前页。
 - 1M 行、平均 1KB/行实测：索引 8.8s，任意 100 行分页 ≤10.9ms，转换 66.9s，内存增量 14MB。
 - 1M 行、256B/行质量操作实测：去重+混洗+切分 124.2s（50 万保留/50 万重复），统计 63.6s，托管内存增量 2MB；10M 可通过 `LMTDS_PERF_ROWS=10000000` 运行。
+- 1M 行编辑+保存实测：1000 替换 / 100 删除 / 100 插入，流式重写 55.6s，托管内存增量 11MB；未修改 JSONL 行文本原样保留。
+- 逐行编辑按页进行，编辑计划跨页保留；保存时按块读取源文件并流式写入临时文件，最后原子替换目标，取消/失败不破坏原文件。
 
 相关实现：
 
@@ -258,7 +262,10 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - 问题列表包含级别、行号、JSON 路径与错误码；支持双击跳转到对应行。
 - 覆盖语法、非对象、空行、聊天消息结构、未知格式；CSV/Parquet 复用统一读取器做行级 JSON/结构校验。
 - 自动修复：预览可修复/需人工行，写入独立修复副本；原文件字节不变，非法 UTF-8 与超长行原样保留。
-- 搜索 / 正则替换：当前页或全文件、大小写、分组替换、匹配预览、取消与原子写目标文件。
+- 搜索 / 正则替换：当前页或全文件、大小写、分组替换、匹配预览、取消与原子写目标文件；表格中命中文本行内高亮。
+- 逐行编辑：插入（上方/下方）、复制、删除/恢复、行 JSON 编辑；待保存编辑跨页保留，支持撤销/重做与保存前差异摘要；可另存或确认后覆盖源文件。
+- 校验问题可按级别（错误/警告）与错误码筛选，并显示筛选计数。
+- 统一样本预览：任意 JSONL/CSV/Parquet 文件前 N 行，以及 Cleaner 规则的清洗前后 diff；预览窗口可跳转到数据工作台。
 - 去重（SHA256 + 临时 SQLite）、固定 seed 混洗（SQLite 外排）、`name:ratio` / `name:count` 多文件切分；行数守恒、同 seed 可复现。
 - 数据集统计：角色分布、长度分桶、空样本、空内容消息、重复率、工具调用/工具消息、格式分布、坏行数。
 - 批量转换按行隔离错误，坏行带行号/原因/原始数据落盘，不中断整批。
@@ -302,6 +309,8 @@ UI 采用 Recipe Graph / DAG 的设计：
 - 底部 Status Bar（文件路径、脏标记、进度、内存与缩放）
 - Data 视图：数据集分页预览、首/上/下/末页、按行号跳转、页面大小切换；右侧 Convert / Search / Transform / Stats / Validate 五个工具页签
 - Data 视图：格式转换与失败行列表；搜索/正则替换预览与写目标文件；去重/混洗/切分；角色/长度/重复率/工具调用统计；校验问题列表与自动修复
+- Data 视图：逐行编辑（插入/复制/删除/恢复、行 JSON 编辑、撤销/重做、另存/覆盖确认）、搜索命中高亮、校验问题级别/错误码筛选
+- 样本预览弹窗：SFT Export、Validator reject、Simulation 失败样本与 Cleaner diff 共用同一窗口
 
 相关实现：
 
@@ -419,6 +428,13 @@ dotnet build .\LMTrainingDataStudio2.slnx
 ```powershell
 dotnet test .\LMTrainingDataStudio2.slnx
 dotnet test .\LMTrainingDataStudio2.slnx --filter HeadlessUiTests
+```
+
+### 1M 行编辑保存基线（gated）
+
+```powershell
+$env:LMTDS_PERF_TESTS = "1"
+dotnet test .\LMTrainingDataStudio2.slnx --filter EditSave_LargeInput
 ```
 
 ### 发布（win-x64 单文件）
@@ -544,7 +560,10 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 - [x] Recipe 新建 / 打开 / 保存 / 另存为、最近文件与脏标记
 - [x] JSONL / CSV / Parquet 流式读取与分页预览
 - [x] 大文件随机行跳转
-- [ ] 数据增删查改
+- [x] 数据增删查改（逐行插入/复制/删除/恢复、行 JSON 编辑、撤销/重做、另存/覆盖）
+- [ ] 10M 行与 CSV/Parquet 大规模基线
+- [x] 搜索命中高亮、校验问题级别/错误码筛选
+- [x] 统一样本/输出预览弹窗（SFT / Validator reject / Simulation 失败样本 / Cleaner diff）
 - [x] 去重、混洗、切分文件
 - [x] 正则搜索与替换
 - [x] OpenAI / ShareGPT / Alpaca 完整批量互转
@@ -555,7 +574,7 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 - [x] 网格背景/吸附、鼠标中心缩放、Fit、自动布局
 - [x] Mini-map 视口矩形与点击导航
 - [x] 双击添加、复制携带内部连线、内联重命名、真实端口坐标、边 hover
-- [ ] Node 尺寸手柄、Edge 过渡动画与样本预览弹窗
+- [ ] Node 尺寸手柄、Edge 过渡动画与标签避让
 - [x] Command Pattern 撤销 / 重做
 - [部分] 亮色 / 暗色主题切换（主面板/画布已主题化，部分视图仍硬编码深色）
 - [ ] LiveCharts2 或 OxyPlot 进度图表
@@ -564,14 +583,14 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 - [x] SFT Export 文件选择器、覆盖确认、字段白名单、行数与预览日志
 - [x] 1M 行 Seed → Expression → SFT Export 基线（17.2s，托管内存增量 1MB）
 - [x] 滚动日志、全局异常、CI、win-x64 单文件发布、Headless UI 测试、MIT LICENSE、应用图标
-- [x] 单元测试与集成测试（442 个：437 自动化通过 + 5 个 gated：2 个真实 provider 冒烟 + 3 个性能）
+- [x] 单元测试与集成测试（473 个：467 自动化通过 + 6 个 gated：2 个真实 provider 冒烟 + 4 个性能）
 - [x] Round 8：Recipe 新建/打开/保存、脏标记、最近文件、按类型端口契约
 - [x] Round 9：Expression/Validator/Sampler/Tool Profile 节点能力补齐
 - [x] Round 10：数据预览、CSV/Parquet、格式转换、DPO/Pretrain
 - [x] Round 11：校验修复、去重/混洗/切分、搜索替换、统计
 - [x] Round 12：画布体验、并行/暂停/重试、CI/打包/主题/日志
 - [x] Round 13：执行与 IO 韧性（节点间溢写/流式、中断恢复、取消/清理硬化、SFT Export 收尾）
-- [ ] Round 14：数据工作台编辑与预览（逐行 CRUD、搜索高亮、样本预览）
+- [x] Round 14：数据工作台逐行编辑（CRUD/撤销/另存/覆盖确认）、搜索高亮、校验筛选、统一样本预览
 - [ ] Round 15：节点能力收紧（LLM tools/结构化输出、Validator 代码规则、Sampler 多端口、Simulation 可视化配置）
 - [ ] Round 16：发布与体验（画布 polish、完整浅色主题、MSIX/文件关联、10M 基线、README 截图）
 

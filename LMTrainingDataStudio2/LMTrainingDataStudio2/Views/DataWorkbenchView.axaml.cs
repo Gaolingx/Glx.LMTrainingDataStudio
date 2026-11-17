@@ -2,7 +2,9 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using LMTrainingDataStudio2.Localization;
 using LMTrainingDataStudio2.Models;
+using LMTrainingDataStudio2.Services.Datasets;
 using LMTrainingDataStudio2.ViewModels;
 
 namespace LMTrainingDataStudio2.Views;
@@ -185,6 +187,127 @@ public partial class DataWorkbenchView : UserControl
             vm.Search.RequestJump(match.LineNumber);
         }
     }
+
+    private void OnRowDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (RowJsonEditor.IsEnabled)
+        {
+            RowJsonEditor.Focus();
+            RowJsonEditor.SelectAll();
+        }
+    }
+
+    private async void OnSaveEditsClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not DataWorkbenchViewModel vm) return;
+        if (TopLevel.GetTopLevel(this) is not Window owner) return;
+
+        var summary = await vm.BuildEditSummaryAsync();
+        if (summary is null)
+        {
+            await MessageDialog.ShowAsync(
+                owner,
+                LocalizationService.L("data.edit_summary_title"),
+                vm.EditStatusText,
+                MessageDialogButtons.Ok);
+            return;
+        }
+
+        var confirmed = await MessageDialog.ShowAsync(
+            owner,
+            LocalizationService.L("data.edit_summary_title"),
+            BuildSummaryText(summary),
+            MessageDialogButtons.OkCancel);
+        if (confirmed != MessageDialogResult.Ok)
+        {
+            return;
+        }
+
+        var extension = Path.GetExtension(vm.SourcePath).TrimStart('.');
+        var file = await owner.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = LocalizationService.L("data.save_edits_as"),
+            SuggestedFileName = $"{Path.GetFileNameWithoutExtension(vm.SourcePath)}.edited.{extension}",
+            DefaultExtension = string.IsNullOrEmpty(extension) ? "jsonl" : extension,
+            ShowOverwritePrompt = true,
+            FileTypeChoices = DatasetFileTypes()
+        });
+
+        var path = file?.TryGetLocalPath();
+        if (!string.IsNullOrWhiteSpace(path))
+        {
+            await vm.SaveEditsAsync(path);
+        }
+    }
+
+    private async void OnOverwriteSourceClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not DataWorkbenchViewModel vm) return;
+        if (TopLevel.GetTopLevel(this) is not Window owner) return;
+
+        var summary = await vm.BuildEditSummaryAsync();
+        if (summary is null)
+        {
+            await MessageDialog.ShowAsync(
+                owner,
+                LocalizationService.L("data.overwrite_source_title"),
+                vm.EditStatusText,
+                MessageDialogButtons.Ok);
+            return;
+        }
+
+        var confirmed = await MessageDialog.ShowAsync(
+            owner,
+            LocalizationService.L("data.overwrite_source_title"),
+            string.Format(LocalizationService.L("data.overwrite_source_message"), vm.SourcePath) +
+            "\n\n" + BuildSummaryText(summary),
+            MessageDialogButtons.OkCancel);
+        if (confirmed != MessageDialogResult.Ok)
+        {
+            return;
+        }
+
+        await vm.SaveEditsAsync(vm.SourcePath);
+    }
+
+    private static string BuildSummaryText(DatasetEditSummary summary)
+    {
+        var text =
+            string.Format(
+                LocalizationService.L("data.edit_summary_counts"),
+                summary.ReplacedRows, summary.DeletedRows, summary.InsertedRows, summary.EffectiveRows);
+
+        if (summary.Samples.Count == 0)
+        {
+            return text;
+        }
+
+        var builder = new System.Text.StringBuilder(text);
+        builder.AppendLine().AppendLine();
+        builder.AppendLine(LocalizationService.L("data.edit_summary_samples"));
+
+        foreach (var sample in summary.Samples)
+        {
+            builder.Append('[').Append(sample.Kind).Append("] ");
+            builder.AppendLine(sample.SourceLine is { } line
+                ? string.Format(LocalizationService.L("data.edit_summary_line"), line)
+                : string.Empty);
+            if (!string.IsNullOrEmpty(sample.Before))
+            {
+                builder.Append("- ").AppendLine(Truncate(sample.Before));
+            }
+
+            if (!string.IsNullOrEmpty(sample.After))
+            {
+                builder.Append("+ ").AppendLine(Truncate(sample.After));
+            }
+        }
+
+        return builder.ToString();
+    }
+
+    private static string Truncate(string text) =>
+        text.Length <= 240 ? text : text[..240] + "…";
 
     private static FilePickerFileType[] DatasetFileTypes() => new[]
     {

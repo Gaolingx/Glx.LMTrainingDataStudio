@@ -294,6 +294,10 @@
                              FontSize="11" Padding="8,6" Watermark="out/rejected.jsonl" />
                     <TextBlock Text="{loc:Loc property.rejected_rows_are_written_as_linenumber_reason_d}"
                                FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
+                    <Button Content="{loc:Loc property.preview_reject}"
+                            Click="OnPreviewRejectClick"
+                            HorizontalAlignment="Left" Padding="10,5" FontSize="10"
+                            Background="#3A3A4E" Foreground="#FFFFFF" />
                 </StackPanel>
 
                 <TextBlock Text="{loc:Loc property.cleanup_rules_remain_in_config_json_below}"
@@ -511,6 +515,10 @@
                     <TextBlock Text="{loc:Loc property.failure_jsonl_path_optional}" FontSize="11" Foreground="#AAAAAA" />
                     <TextBox Text="{Binding SelectedBlock.SimulationEditor.FailureOutputPath, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Watermark="out/failed.jsonl" />
+                    <Button Content="{loc:Loc property.preview_failures}"
+                            Click="OnPreviewFailuresClick"
+                            HorizontalAlignment="Left" Padding="10,5" FontSize="10"
+                            Background="#3A3A4E" Foreground="#FFFFFF" />
                 </StackPanel>
 
                 <StackPanel Spacing="4">
@@ -616,6 +624,10 @@
 
                 <TextBlock Text="{loc:Loc property.regex_replacements_remain_in_config_json_below}"
                            FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
+                <Button Content="{loc:Loc property.preview_cleaner_diff}"
+                        Click="OnPreviewCleanerDiffClick"
+                        HorizontalAlignment="Left" Padding="10,5" FontSize="10"
+                        Background="#3A3A4E" Foreground="#FFFFFF" />
             </StackPanel>
 
             <!-- SFT export configuration -->
@@ -640,6 +652,10 @@
                              FontSize="11" Padding="8,6" Watermark="messages, tools" />
                     <TextBlock Text="{loc:Loc property.sft_export_fields_hint}"
                                FontSize="10" Foreground="#777777" TextWrapping="Wrap" />
+                    <Button Content="{loc:Loc property.preview_output}"
+                            Click="OnPreviewSftOutputClick"
+                            HorizontalAlignment="Left" Padding="10,5" FontSize="10"
+                            Background="#3A3A4E" Foreground="#FFFFFF" />
                 </StackPanel>
             </StackPanel>
 

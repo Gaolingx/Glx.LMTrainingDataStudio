@@ -1249,6 +1249,22 @@ public partial class MainWindowViewModel : ObservableObject
         IsDataView = true;
     }
 
+    /// <summary>Creates a sample preview whose "open in Data" action switches views and opens the file.</summary>
+    public SamplePreviewViewModel CreateSamplePreview()
+    {
+        var preview = new SamplePreviewViewModel(_settings);
+        preview.OpenInDataRequested = OpenDatasetInDataViewAsync;
+        return preview;
+    }
+
+    public async Task OpenDatasetInDataViewAsync(string path)
+    {
+        IsEditorView = false;
+        IsExecutionsView = false;
+        IsDataView = true;
+        await DataWorkbench.OpenDatasetAsync(path);
+    }
+
     #endregion
 
     #region Settings

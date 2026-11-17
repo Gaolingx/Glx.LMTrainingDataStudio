@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LMTrainingDataStudio2.Localization;
 using LMTrainingDataStudio2.Models;
+using LMTrainingDataStudio2.Services;
 using LMTrainingDataStudio2.Services.Datasets;
 using System.Collections.ObjectModel;
 using System.Text.Json;
@@ -25,6 +26,7 @@ public partial class DataWorkbenchViewModel : ObservableObject
     };
 
     private readonly DatasetBatchConverter _converter;
+    private DatasetEditService _editService;
     private AppSettings _settings;
     private IDatasetReader? _reader;
     private DataFileType _sourceFileType;
@@ -32,6 +34,9 @@ public partial class DataWorkbenchViewModel : ObservableObject
     private int _pageLoadVersion;
     private bool _targetPathIsSuggested = true;
     private bool _updatingTargetPath;
+    private DatasetEditSession? _editSession;
+
+    private const string NewRowTemplate = """{"text":""}""";
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SourcePathText))]
@@ -84,6 +89,40 @@ public partial class DataWorkbenchViewModel : ObservableObject
     [ObservableProperty]
     private bool _hasConversionErrors;
 
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ApplyRowEditCommand))]
+    private DatasetRowViewModel? _selectedRow;
+
+    [ObservableProperty]
+    private string _selectedJsonText = string.Empty;
+
+    [ObservableProperty]
+    private string? _rowEditError;
+
+    [ObservableProperty]
+    private bool _hasPendingEdits;
+
+    [ObservableProperty]
+    private string _pendingEditText = string.Empty;
+
+    [ObservableProperty]
+    private bool _isSavingEdits;
+
+    [ObservableProperty]
+    private double _editProgress;
+
+    [ObservableProperty]
+    private string _editStatusText = string.Empty;
+
+    [ObservableProperty]
+    private string _highlightQuery = string.Empty;
+
+    [ObservableProperty]
+    private bool _highlightUseRegex;
+
+    [ObservableProperty]
+    private bool _highlightCaseSensitive;
+
     public ObservableCollection<DatasetRowViewModel> Rows { get; } = new();
     public ObservableCollection<string> ConversionErrors { get; } = new();
     public IReadOnlyList<int> AvailablePageSizes => PageSizes;
@@ -111,12 +150,15 @@ public partial class DataWorkbenchViewModel : ObservableObject
         OnPropertyChanged(nameof(PositionText));
         OnPropertyChanged(nameof(TotalRowsText));
         OnPropertyChanged(nameof(SourcePathText));
+        Validation.RefreshLocalization();
+        OnEditSessionChanged();
     }
 
     public DataWorkbenchViewModel(AppSettings settings)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _converter = new DatasetBatchConverter(settings);
+        _editService = new DatasetEditService(settings);
 
         Validation = new DatasetValidationViewModel(settings);
         Search = new DatasetSearchReplaceViewModel(settings);
@@ -125,11 +167,22 @@ public partial class DataWorkbenchViewModel : ObservableObject
 
         Validation.JumpRequested += line => _ = JumpToLineAsync(line);
         Search.JumpRequested += line => _ = JumpToLineAsync(line);
+        Search.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName is nameof(Search.Query) or nameof(Search.UseRegex)
+                or nameof(Search.CaseSensitive))
+            {
+                HighlightQuery = Search.Query;
+                HighlightUseRegex = Search.UseRegex;
+                HighlightCaseSensitive = Search.CaseSensitive;
+            }
+        };
     }
 
     public void ApplySettings(AppSettings settings)
     {
         _settings = settings;
+        _editService = new DatasetEditService(settings);
         Validation.ApplySettings(settings);
         Search.ApplySettings(settings);
         Transform.ApplySettings(settings);
@@ -178,6 +231,10 @@ public partial class DataWorkbenchViewModel : ObservableObject
             TotalRows = openedRows;
             IsDatasetOpen = true;
             GoToRowText = TotalRows == 0 ? "0" : "1";
+            ResetEditSession(openedRows);
+            SelectedRow = null;
+            EditStatusText = string.Empty;
+            RowEditError = null;
             if (string.IsNullOrWhiteSpace(TargetPath) || _targetPathIsSuggested)
             {
                 SetSuggestedTargetPath(openedPath, SelectedTargetFormat.Format);
@@ -244,6 +301,8 @@ public partial class DataWorkbenchViewModel : ObservableObject
         if (_reader is null) return;
 
         var version = ++_pageLoadVersion;
+        var previousAnchor = SelectedRow?.OriginalIndex;
+        var previousInsertId = SelectedRow?.InsertId;
         try
         {
             var totalPages = TotalPages;
@@ -259,7 +318,22 @@ public partial class DataWorkbenchViewModel : ObservableObject
             Rows.Clear();
             foreach (var row in pageRows)
             {
-                Rows.Add(new DatasetRowViewModel(row.LineNumber + 1, row.Json));
+                AddInsertedRows(row.LineNumber);
+                Rows.Add(CreateRowViewModel(row));
+            }
+
+            if (startRow + pageRows.Count >= TotalRows)
+            {
+                AddInsertedRows(TotalRows);
+            }
+
+            if (previousInsertId is { } insertId)
+            {
+                SelectedRow = Rows.FirstOrDefault(row => row.InsertId == insertId);
+            }
+            else if (previousAnchor is { } anchor)
+            {
+                SelectedRow = Rows.FirstOrDefault(row => row.OriginalIndex == anchor);
             }
 
             CurrentPage = page;
@@ -298,6 +372,399 @@ public partial class DataWorkbenchViewModel : ObservableObject
         GoToRowText = target.ToString();
         return LoadPageAsync((target - 1) / PageSize + 1);
     }
+
+    #region Row editing
+
+    [RelayCommand(CanExecute = nameof(CanInsertRow))]
+    private Task InsertRowAboveAsync() => InsertRowAsync(above: true);
+
+    [RelayCommand(CanExecute = nameof(CanInsertRow))]
+    private Task InsertRowBelowAsync() => InsertRowAsync(above: false);
+
+    [RelayCommand(CanExecute = nameof(CanEditSelectedRow))]
+    private Task DuplicateRowAsync() => InsertJsonAsync(SelectedRow!.Json, above: false);
+
+    [RelayCommand(CanExecute = nameof(CanDeleteSelectedRow))]
+    private async Task DeleteRowAsync()
+    {
+        if (_editSession is null || SelectedRow is null) return;
+
+        if (SelectedRow.InsertId is { } insertId)
+        {
+            _editSession.DeleteInsertedRow(insertId);
+        }
+        else if (SelectedRow.OriginalIndex is { } originalIndex)
+        {
+            _editSession.DeleteSourceRow(originalIndex);
+        }
+
+        EditStatusText = "Row marked for deletion; save to apply.";
+        await ReloadPageAsync();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRestoreSelectedRow))]
+    private async Task RestoreRowAsync()
+    {
+        if (_editSession is null || SelectedRow?.OriginalIndex is not { } originalIndex) return;
+
+        _editSession.RestoreSourceRow(originalIndex);
+        EditStatusText = "Row restored.";
+        await ReloadPageAsync();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanApplyRowEdit))]
+    private async Task ApplyRowEditAsync()
+    {
+        if (_editSession is null || SelectedRow is null) return;
+
+        var json = SelectedJsonText?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            RowEditError = "Row JSON is empty.";
+            return;
+        }
+
+        try
+        {
+            using var _ = JsonDocument.Parse(json);
+        }
+        catch (JsonException ex)
+        {
+            RowEditError = $"Invalid JSON: {ex.Message}";
+            return;
+        }
+
+        RowEditError = null;
+        try
+        {
+            if (SelectedRow.InsertId is { } insertId)
+            {
+                _editSession.UpdateInsertedRow(insertId, json);
+            }
+            else if (SelectedRow.OriginalIndex is { } originalIndex)
+            {
+                _editSession.SetRowJson(originalIndex, json);
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            RowEditError = ex.Message;
+            return;
+        }
+
+        EditStatusText = "Row edit applied; save to write it.";
+        await ReloadPageAsync();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanUndoEdit))]
+    private async Task UndoEditAsync()
+    {
+        if (_editSession?.Undo() == true)
+        {
+            EditStatusText = "Undo applied.";
+            await ReloadPageAsync();
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRedoEdit))]
+    private async Task RedoEditAsync()
+    {
+        if (_editSession?.Redo() == true)
+        {
+            EditStatusText = "Redo applied.";
+            await ReloadPageAsync();
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanDiscardEdits))]
+    private async Task DiscardEditsAsync()
+    {
+        _editSession?.Clear();
+        EditStatusText = "Pending edits discarded.";
+        await ReloadPageAsync();
+    }
+
+    /// <summary>Counts and before/after samples shown before saving edits.</summary>
+    public async Task<DatasetEditSummary?> BuildEditSummaryAsync()
+    {
+        if (_reader is null || _editSession is null || !_editSession.HasChanges)
+        {
+            return null;
+        }
+
+        try
+        {
+            return await _editService.BuildSummaryAsync(_editSession.Snapshot(), _reader);
+        }
+        catch (Exception ex) when (ex is DatasetFormatException or ArgumentException or IOException)
+        {
+            EditStatusText = $"Cannot summarize edits: {ex.Message}";
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Streams the source and writes pending edits to <paramref name="targetPath"/>.
+    /// Overwriting the open source closes and reopens the reader around the atomic replace.
+    /// </summary>
+    public async Task<bool> SaveEditsAsync(string targetPath, CancellationToken cancellationToken = default)
+    {
+        if (_reader is null || _editSession is null)
+        {
+            StatusText = "Open a dataset first.";
+            return false;
+        }
+
+        if (!_editSession.HasChanges)
+        {
+            EditStatusText = "There are no pending edits.";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(targetPath))
+        {
+            EditStatusText = "Choose a target file.";
+            return false;
+        }
+
+        if (IsSavingEdits)
+        {
+            return false;
+        }
+
+        var overwriteSource = SamePath(targetPath, SourcePath);
+        var snapshot = _editSession.Snapshot();
+        IsSavingEdits = true;
+        EditProgress = 0;
+        EditStatusText = "Saving edits...";
+
+        try
+        {
+            if (overwriteSource)
+            {
+                await CloseReaderAsync();
+            }
+
+            var progress = new Progress<double>(value => EditProgress = value);
+            var result = await _editService.SaveAsync(
+                snapshot, SourcePath, _sourceFileType, targetPath,
+                progress: progress, cancellationToken: cancellationToken);
+
+            if (overwriteSource)
+            {
+                await ReopenAfterOverwriteAsync();
+            }
+            else
+            {
+                _editSession.Clear();
+                await ReloadPageAsync();
+            }
+
+            EditStatusText =
+                $"Saved {result.WrittenRows:N0} row(s) " +
+                $"({result.ReplacedRows:N0} replaced, {result.DeletedRows:N0} deleted, " +
+                $"{result.InsertedRows:N0} inserted) to '{result.TargetPath}' " +
+                $"in {result.Elapsed.TotalSeconds:F1}s.";
+            StatusText = overwriteSource
+                ? "Edits saved over the source file."
+                : $"Edited copy written to '{result.TargetPath}'.";
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            EditStatusText = "Save cancelled; the target was not replaced.";
+            return false;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                                       or DatasetFormatException or ArgumentException)
+        {
+            EditStatusText = $"Save failed: {ex.Message}";
+            return false;
+        }
+        finally
+        {
+            IsSavingEdits = false;
+            EditProgress = 0;
+            if (overwriteSource && _reader is null)
+            {
+                await TryReopenSourceAsync();
+            }
+        }
+    }
+
+    private async Task InsertRowAsync(bool above)
+    {
+        if (_editSession is null) return;
+        await InsertJsonAsync(NewRowTemplate, above);
+    }
+
+    private async Task InsertJsonAsync(string json, bool above)
+    {
+        if (_editSession is null) return;
+
+        var anchor = ResolveInsertAnchor(above);
+        var insertId = _editSession.InsertBefore(anchor, json);
+        EditStatusText = "Row inserted; edit the JSON then save.";
+        await ReloadPageAsync();
+        SelectedRow = Rows.FirstOrDefault(row => row.InsertId == insertId);
+    }
+
+    private long ResolveInsertAnchor(bool above)
+    {
+        if (SelectedRow?.OriginalIndex is { } originalIndex)
+        {
+            return above ? originalIndex : originalIndex + 1;
+        }
+
+        if (SelectedRow?.InsertId is { } insertId && _editSession is not null)
+        {
+            return _editSession.FindInsertedRowAnchor(insertId) ?? 0;
+        }
+
+        var pageStart = (CurrentPage - 1) * PageSize;
+        return above
+            ? Math.Clamp(pageStart, 0, TotalRows)
+            : Math.Clamp(pageStart + PageSize, 0, TotalRows);
+    }
+
+    private DatasetRowViewModel CreateRowViewModel(DatasetRow row)
+    {
+        var replacement = _editSession?.GetReplacement(row.LineNumber);
+        var model = new DatasetRowViewModel(
+            row.LineNumber + 1,
+            replacement ?? row.Json,
+            originalIndex: row.LineNumber,
+            isDeleted: _editSession?.IsDeleted(row.LineNumber) == true,
+            isModified: replacement is not null);
+        ApplyHighlight(model);
+        return model;
+    }
+
+    private void AddInsertedRows(long anchorRow)
+    {
+        if (_editSession is null) return;
+
+        foreach (var inserted in _editSession.GetInsertions(anchorRow))
+        {
+            var model = new DatasetRowViewModel(
+                anchorRow + 1,
+                inserted.Json,
+                insertId: inserted.Id,
+                isInserted: true);
+            ApplyHighlight(model);
+            Rows.Add(model);
+        }
+    }
+
+    private Task ReloadPageAsync() => LoadPageAsync(CurrentPage);
+
+    private void ResetEditSession(long totalRows)
+    {
+        if (_editSession is not null)
+        {
+            _editSession.Changed -= OnEditSessionChanged;
+        }
+
+        _editSession = new DatasetEditSession(totalRows);
+        _editSession.Changed += OnEditSessionChanged;
+        HasPendingEdits = false;
+        PendingEditText = string.Empty;
+        NotifyEditCommands();
+    }
+
+    private void OnEditSessionChanged()
+    {
+        HasPendingEdits = _editSession?.HasChanges ?? false;
+        PendingEditText = _editSession is { HasChanges: true }
+            ? string.Format(
+                LocalizationService.L("data.pending_edits_format"),
+                _editSession.InsertedRows,
+                _editSession.DeletedRows,
+                _editSession.EffectiveRows)
+            : string.Empty;
+        NotifyEditCommands();
+    }
+
+    private async Task ReopenAfterOverwriteAsync()
+    {
+        var reader = DatasetIO.CreateReader(_sourceFileType, _settings);
+        await reader.OpenAsync(SourcePath);
+        _reader = reader;
+        TotalRows = reader.TotalRows;
+        ResetEditSession(TotalRows);
+        SelectedRow = null;
+        GoToRowText = TotalRows == 0 ? "0" : "1";
+        await LoadPageAsync(1);
+    }
+
+    private async Task TryReopenSourceAsync()
+    {
+        try
+        {
+            await ReopenAfterOverwriteAsync();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                                       or DatasetFormatException or InvalidOperationException)
+        {
+            IsDatasetOpen = false;
+            EditStatusText = $"The source could not be reopened: {ex.Message}";
+        }
+    }
+
+    private bool CanInsertRow() => _editSession is not null && !IsBusy && !IsConverting && !IsSavingEdits;
+
+    private bool CanEditSelectedRow() => CanInsertRow() && SelectedRow is { IsDeleted: false };
+
+    private bool CanDeleteSelectedRow() => CanEditSelectedRow();
+
+    private bool CanRestoreSelectedRow() =>
+        CanInsertRow() && SelectedRow is { IsDeleted: true, OriginalIndex: not null };
+
+    private bool CanApplyRowEdit() =>
+        CanEditSelectedRow() &&
+        SelectedRow is not null &&
+        !string.Equals(SelectedJsonText, SelectedRow.Json, StringComparison.Ordinal);
+
+    private bool CanUndoEdit() =>
+        _editSession?.CanUndo == true && !IsBusy && !IsConverting && !IsSavingEdits;
+
+    private bool CanRedoEdit() =>
+        _editSession?.CanRedo == true && !IsBusy && !IsConverting && !IsSavingEdits;
+
+    private bool CanDiscardEdits() => HasPendingEdits && !IsBusy && !IsConverting && !IsSavingEdits;
+
+    private void NotifyEditCommands()
+    {
+        InsertRowAboveCommand.NotifyCanExecuteChanged();
+        InsertRowBelowCommand.NotifyCanExecuteChanged();
+        DuplicateRowCommand.NotifyCanExecuteChanged();
+        DeleteRowCommand.NotifyCanExecuteChanged();
+        RestoreRowCommand.NotifyCanExecuteChanged();
+        ApplyRowEditCommand.NotifyCanExecuteChanged();
+        UndoEditCommand.NotifyCanExecuteChanged();
+        RedoEditCommand.NotifyCanExecuteChanged();
+        DiscardEditsCommand.NotifyCanExecuteChanged();
+    }
+
+    private void ApplyHighlight(DatasetRowViewModel row)
+    {
+        row.HighlightQuery = HighlightQuery;
+        row.HighlightUseRegex = HighlightUseRegex;
+        row.HighlightCaseSensitive = HighlightCaseSensitive;
+    }
+
+    private void UpdateRowHighlight()
+    {
+        foreach (var row in Rows)
+        {
+            ApplyHighlight(row);
+        }
+    }
+
+    private static bool SamePath(string left, string right) =>
+        string.Equals(Path.GetFullPath(left), Path.GetFullPath(right), StringComparison.OrdinalIgnoreCase);
+
+    #endregion
 
     [RelayCommand(CanExecute = nameof(CanCancelConversion))]
     private void CancelConversion() => _conversionCancellation?.Cancel();
@@ -407,6 +874,29 @@ public partial class DataWorkbenchViewModel : ObservableObject
         }
     }
 
+    partial void OnSelectedRowChanged(DatasetRowViewModel? value)
+    {
+        RowEditError = null;
+        SelectedJsonText = value?.Json ?? string.Empty;
+        NotifyEditCommands();
+    }
+
+    partial void OnSelectedJsonTextChanged(string value) => ApplyRowEditCommand.NotifyCanExecuteChanged();
+
+    partial void OnIsBusyChanged(bool value) => NotifyEditCommands();
+
+    partial void OnIsConvertingChanged(bool value) => NotifyEditCommands();
+
+    partial void OnIsSavingEditsChanged(bool value) => NotifyEditCommands();
+
+    partial void OnHasPendingEditsChanged(bool value) => NotifyEditCommands();
+
+    partial void OnHighlightQueryChanged(string value) => UpdateRowHighlight();
+
+    partial void OnHighlightUseRegexChanged(bool value) => UpdateRowHighlight();
+
+    partial void OnHighlightCaseSensitiveChanged(bool value) => UpdateRowHighlight();
+
     partial void OnSelectedTargetFormatChanged(DatasetFormatOption value)
     {
         if (_targetPathIsSuggested && IsDatasetOpen)
@@ -439,23 +929,68 @@ public sealed record DatasetFormatOption(DatasetFormat Format, string Name)
 
 /// <summary>
 /// One preview row. Large rows are pretty-printed and truncated for display only.
+/// Inserted rows carry an <see cref="InsertId"/>; source rows carry an <see cref="OriginalIndex"/>.
 /// </summary>
-public sealed class DatasetRowViewModel
+public sealed partial class DatasetRowViewModel : ObservableObject
 {
     private const int MaxPreviewLength = 4000;
 
-    public DatasetRowViewModel(long number, string json)
+    [ObservableProperty]
+    private string _highlightQuery = string.Empty;
+
+    [ObservableProperty]
+    private bool _highlightUseRegex;
+
+    [ObservableProperty]
+    private bool _highlightCaseSensitive;
+
+    public DatasetRowViewModel(
+        long number,
+        string json,
+        long? originalIndex = null,
+        long? insertId = null,
+        bool isDeleted = false,
+        bool isInserted = false,
+        bool isModified = false)
     {
         Number = number;
         Json = json;
+        OriginalIndex = originalIndex;
+        InsertId = insertId;
+        IsDeleted = isDeleted;
+        IsInserted = isInserted;
+        IsModified = isModified;
         Preview = BuildPreview(json);
     }
 
     public long Number { get; }
 
+    public long? OriginalIndex { get; }
+
+    public long? InsertId { get; }
+
+    public bool IsDeleted { get; }
+
+    public bool IsInserted { get; }
+
+    public bool IsModified { get; }
+
+    public string NumberText => IsInserted ? "＋" : Number.ToString("N0");
+
     public string Json { get; }
 
     public string Preview { get; }
+
+    public bool IsEditable => !IsDeleted;
+
+    public bool IsSearchMatch => HighlightMatcher.HasMatch(
+        Preview, HighlightQuery, HighlightUseRegex, HighlightCaseSensitive);
+
+    partial void OnHighlightQueryChanged(string value) => OnPropertyChanged(nameof(IsSearchMatch));
+
+    partial void OnHighlightUseRegexChanged(bool value) => OnPropertyChanged(nameof(IsSearchMatch));
+
+    partial void OnHighlightCaseSensitiveChanged(bool value) => OnPropertyChanged(nameof(IsSearchMatch));
 
     private static string BuildPreview(string json)
     {

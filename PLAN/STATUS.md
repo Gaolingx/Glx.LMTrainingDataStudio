@@ -1,7 +1,7 @@
 # STATUS — 功能清单、节点能力矩阵与下一阶段规划
 
-> 最后核对：2026-11-17（已逐项与源码、测试复核）
-> 验证基线：`dotnet build` 0 警告 0 错误；`dotnet test` 420 通过 + 4 个 gated 测试（2 个真实 provider 冒烟 + 2 个性能，默认跳过）；Headless UI 5 个测试通过；1M 行 JSONL 与 1M 行质量操作基线通过；win-x64 单文件发布启动通过。
+> 最后核对：2026-11-17（Round 14 完成）
+> 验证基线：`dotnet build` 0 警告 0 错误；`dotnet test` 467 通过 + 6 个 gated 测试（2 个真实 provider 冒烟 + 4 个性能，默认跳过）；Headless UI 7 个测试通过；1M 行 JSONL、1M 行质量操作与 1M 行编辑保存基线通过；win-x64 单文件发布启动通过。
 >
 > 图例：`[x]` 已完成并有测试/验证；`[部分]` 可用但有明确缺口；`[ ]` 未实现。
 >
@@ -21,6 +21,9 @@
 - Tool Profile 支持参数树编辑与 JSON 导入导出，并被 Simulation/LLM 复用。
 - 统一数据集 IO：JSONL / CSV / Parquet 随机分页读取与原子写出；Seed 节点支持三种格式。
 - 数据工作台（Data 视图）：分页预览、行号跳转、页面大小切换，JSONL 走 SQLite 索引，CSV 走记录边界索引，Parquet 按 row group 读取。
+- 数据逐行编辑：插入/复制/删除/恢复、行 JSON 编辑、跨页待保存编辑、撤销/重做、保存前差异摘要、另存或确认后覆盖源文件；流式重写与原子替换。
+- 搜索命中行内高亮（字面量/正则）；校验问题按级别与错误码筛选。
+- 统一样本预览弹窗：SFT Export 输出、Validator 拒绝行、Simulation 失败样本、Cleaner 前后 diff；可跳转数据工作台。
 - 批量格式转换：OpenAI / ShareGPT / Alpaca / DPO / Pretrain，支持进度、取消、失败行 `.errors.jsonl` 与原子目标写入。
 - 数据治理：校验问题列表（级别/行号/JSON 路径/错误码）与跳行；JSONL 自动修复预览与“写修复副本”；搜索/正则替换（当前页/全文件/预览/取消）；去重、固定 seed 混洗、比例/份数切分；角色/长度/空样本/重复率/工具调用统计。
 - 1M 行 JSONL 验收通过：索引 8.8s（≤10s）、100 行分页 10.9ms（≤100ms）、转换 66.9s、内存增量 14MB（≤300MB）。
@@ -41,14 +44,14 @@
 - 节点说明：10 类节点具备本地化名称、简介、详细说明与端口摘要；属性面板 Node Guide 与画布悬停提示复用同一份目录。
 - 界面本地化：zh-CN / en-US 资源化静态 UI（约 230 个键），设置面板切换语言后即时刷新；运行日志/执行状态仍为英文技术文本。
 - 工程化：滚动日志与全局异常、Dark/Light 主题资源、GitHub Actions CI、win-x64 单文件发布脚本、Headless UI 测试、MIT LICENSE、应用图标。
-- 442 个自动化测试：437 个常规通过 + 5 个 gated（2 个真实 provider 冒烟 + 3 个性能）。
+- 473 个自动化测试：467 个常规通过 + 6 个 gated（2 个真实 provider 冒烟 + 4 个性能）。
 
 ### 1.2 当前最大缺口（按优先级）
 
-1. **数据工作台编辑**：分页表格只读；无逐行 CRUD/单元格编辑/写回；搜索无命中高亮；校验问题无分组；无统一样本/输出预览弹窗。
-2. **节点能力**：LLM 不向 provider 发送 tool definitions，无结构化输出/多轮/并发/成本统计；Validator 无代码规则与超时；Sampler 无多输出端口与分层采样；Simulation 的 Tools/Rules/Script 仍依赖 Config JSON；Tool Profile 无 MCP。
-3. **发布与体验**：10M 行实测、MSIX/安装包、文件关联/单实例、README 截图、完整浅色主题、节点尺寸手柄/边过渡动画、Undo/Redo 菜单尚未完成。
-4. **执行韧性残余**：恢复仅验证行数与内容，未做逐字节/哈希比对；溢写阈值按行数计；检查点无磁盘配额。
+1. **节点能力**：LLM 不向 provider 发送 tool definitions，无结构化输出/多轮/并发/成本统计；Validator 无代码规则与超时；Sampler 无多输出端口与分层采样；Simulation 的 Tools/Rules/Script 仍依赖 Config JSON；Tool Profile 无 MCP。
+2. **发布与体验**：10M 行实测、MSIX/安装包、文件关联/单实例、README 截图、完整浅色主题、节点尺寸手柄/边过渡动画、Undo/Redo 菜单尚未完成。
+3. **执行韧性残余**：恢复仅验证行数与内容，未做逐字节/哈希比对；溢写阈值按行数计；检查点无磁盘配额。
+4. **数据编辑残余**：编辑只保存为源格式；按字段/消息的表单编辑、表格内上一处/下一处导航、预览窗口分页未做。
 
 ### 1.3 一页总览
 
@@ -66,18 +69,17 @@
 
 - Seed：三种格式可读；Streaming 只在 JSONL + 关闭索引缓存时生效，UI 未暴露；无节点内过滤/列映射。
 - LLM：三种 provider、超时/重试、Fluid Prompt 可用；tools 只写入输出、不发给 provider；无结构化输出/多轮/并发/成本。
-- Validator：表达式 + JSON Schema + reject 文件可用；失败样本无 UI 预览；无代码规则/超时/多规则组合。
+- Validator：表达式 + JSON Schema + reject 文件可用；拒绝行可在统一预览窗口查看；无代码规则/超时/多规则组合。
 - Sampler：count/ratio/splits 可用；切分写文件但不产生独立输出端口；无分层采样/统计预览。
-- Cleaner：5 个布尔规则 + 正则规则可用；正则规则仍走 Config JSON；无预览/diff/坏行报告。
-- SFT Export：流式 + 原子替换 + 行透传 + 文件选择器 + 覆盖确认 + 字段白名单可用；无独立预览弹窗/拆分/DPO-Pretrain 直出。
+- Cleaner：5 个布尔规则 + 正则规则可用；正则规则仍走 Config JSON；已有清洗前后 diff 预览，无坏行报告。
+- SFT Export：流式 + 原子替换 + 行透传 + 文件选择器 + 覆盖确认 + 字段白名单可用；已有输出预览弹窗；无拆分/DPO-Pretrain 直出。
 - 执行：层内并行/暂停/重试、输出摘要、溢写/流式、检查点恢复可用；检查点无配额，恢复未做哈希比对。
 - 画布：核心交互可用；无节点尺寸手柄/边动画/Undo-Redo 菜单；配置修改未进撤销历史。
 - 设置：主题变体与网格吸附生效；部分视图仍硬编码深色；内存占用只在启动时采样一次。
 
 **未实现（下一阶段工作池）**
 
-- 数据逐行 CRUD、单元格编辑、写回原文件、编辑撤销/重做。
-- 搜索命中高亮、校验问题分组、样本/输出预览弹窗。
+- 数据编辑残余：跨格式保存、按字段/消息表单编辑、匹配项导航、预览分页。
 - LLM 请求侧 tools、结构化输出、多轮上下文、并发、token/成本统计、失败样本。
 - Validator 代码规则/超时/失败样本 UI/独立通过-拒绝端口。
 - Sampler 多输出端口、分层/分组采样、统计预览。
@@ -313,6 +315,9 @@
 - [x] Tool Profile：参数树编辑、JSON 导入导出、配置型执行器、Simulation/LLM 引用复用。
 - [x] 统一数据集读写（JSONL / CSV / Parquet）与临时文件 + 原子替换写出。
 - [x] 数据工作台：分页预览、行号跳转、页面大小切换、批量格式转换与失败行报告。
+- [x] 数据工作台编辑：插入/复制/删除/恢复、行 JSON 编辑、跨页待保存编辑、撤销/重做、保存前摘要、另存/覆盖确认、流式原子重写。
+- [x] 搜索命中行内高亮与校验问题级别/错误码筛选。
+- [x] 统一样本预览窗口：任意数据集文件与 Cleaner 前后 diff，可跳转数据工作台。
 - [x] 数据质量与治理：校验问题列表（级别/行号/路径/错误码）与跳行、JSONL 自动修复预览与写副本、搜索/正则替换、去重、确定性混洗、比例/份数切分、数据集统计。
 - [x] DPO / Pretrain 格式检测、规范化与转换矩阵；不支持组合显式失败。
 - [x] 1M 行 JSONL 性能与内存基线；1M 行质量操作基线（去重+混洗+切分 124.2s、统计 63.6s、托管内存增量 2MB）。
@@ -344,10 +349,11 @@
 
 **数据与数据工作台**
 
-- [ ] 数据逐行 CRUD：插入、删除、单元格/JSON 编辑、写回原文件或另存。
-- [ ] 数据编辑撤销/重做与保存前差异预览。
-- [ ] 搜索命中高亮；校验问题按级别/错误码分组与筛选。
-- [ ] 统一样本/输出预览弹窗（SFT Export、Validator reject、Simulation 失败样本、Cleaner 前后 diff）。
+- [x] 数据逐行 CRUD：插入、删除、复制、行 JSON 编辑、另存或确认覆盖源文件。
+- [x] 数据编辑撤销/重做与保存前差异摘要。
+- [x] 搜索命中行内高亮；校验问题按级别/错误码筛选与计数。
+- [x] 统一样本/输出预览弹窗（SFT Export、Validator reject、Simulation 失败样本、Cleaner 前后 diff）。
+- [ ] 跨格式保存、按字段/消息的表单编辑、匹配项导航、预览窗口分页。
 - [ ] CSV 类型推断与列类型展示；CSV/Parquet 1M 行质量基线；10M 行实测。
 - [ ] Seed 节点内过滤/列映射/多文件/目录/HuggingFace/HTTP 源。
 - [ ] 输出文件追加模式、字段白名单与目标格式选择。
@@ -408,7 +414,7 @@
 
 ---
 
-## 五、已完成轮次（Round 8–12）
+## 五、已完成轮次（Round 8–14）
 
 | Round | 主题 | 关键交付 | 结果 |
 | --- | --- | --- | --- |
@@ -417,6 +423,8 @@
 | 10 | 数据工作台 A | JSONL 分页/跳转、CSV/Parquet、批量转换、DPO/Pretrain、1M 基线 | 331 测试 |
 | 11 | 数据工作台 B | 校验/修复、搜索替换、去重/混洗/切分、统计 | 368 测试 |
 | 12 | 画布、执行与发布 | 网格/吸附/锚点缩放/Fit/自动布局/Mini-map、并行/暂停/重试/输出摘要、CI/打包/主题/日志 | 386 测试 + 4 gated |
+| 13 | 执行与 IO 韧性 | 溢写缓冲、检查点/恢复、取消清理硬化、SFT 收尾 | 437 测试 + 5 gated |
+| 14 | 数据工作台编辑与预览 | 逐行 CRUD/撤销重做/另存与覆盖、搜索高亮、校验筛选、统一样本预览 | 467 测试 + 6 gated |
 
 ---
 
@@ -446,6 +454,8 @@
 - `dotnet build` 0 警告，测试全绿。
 
 ### Round 14 — 数据工作台编辑与预览（P1）
+
+> 状态：已完成（2026-11-17）。新增 `DatasetEditSession`/`DatasetEditService`、工作台编辑工具栏与行编辑器、`HighlightMatcher`、校验问题筛选、`SamplePreviewService` 与统一预览窗口；新增 30 个测试与 1 个 gated 1M 行编辑保存基线（55.6s，托管内存增量 11MB）。
 
 **目标**：把 Data 视图从“只读预览 + 批处理”升级为可编辑的数据工作台。
 
@@ -534,6 +544,13 @@ powershell -ExecutionPolicy Bypass -File scripts/publish-win-x64.ps1
 $env:LMTDS_PERF_TESTS = "1"
 $env:LMTDS_PERF_ROWS = "1000000"
 dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx --filter QualityOperations_LargeInput
+```
+
+1M 行编辑保存基线：
+
+```powershell
+$env:LMTDS_PERF_TESTS = "1"
+dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx --filter EditSave_LargeInput
 ```
 
 真实 provider 冒烟（可选，Key 只放环境变量）：

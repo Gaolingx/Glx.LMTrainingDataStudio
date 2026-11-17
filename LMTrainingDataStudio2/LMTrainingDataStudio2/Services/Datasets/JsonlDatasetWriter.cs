@@ -27,7 +27,10 @@ public sealed class JsonlDatasetWriter : IDatasetWriter
         _tempPath = _targetPath + ".tmp-" + Guid.NewGuid().ToString("N");
         _writer = new StreamWriter(
             new FileStream(_tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 65536, FileOptions.Asynchronous),
-            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false))
+        {
+            NewLine = "\n"
+        };
     }
 
     public async Task WriteRowAsync(DatasetRow row, CancellationToken cancellationToken = default)

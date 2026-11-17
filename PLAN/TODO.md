@@ -1,6 +1,6 @@
 # PLAN / TODO — 实施计划与验收标准
 
-> 最后更新：2026-11-17（文档同步：已按源码复核第四节目录与阶段计划）
+> 最后更新：2026-11-17（Round 14 数据工作台编辑与预览完成）
 > 当前基线：.NET 9 / Avalonia 11.3 / NUnit 4
 > 工作方式：小步提交，每个 Phase 独立验收；开发期允许 break change，不保留兼容层。
 >
@@ -13,7 +13,7 @@
 - 逐项核对 `Services/`、`ViewModels/`、`Views/` 与测试，修正第四节目录中已完成的条目（画布、数据治理、执行控制、UI 面板等）。
 - 修正与代码不一致的描述：LLM Prompt 使用 Fluid 模板（不再写“仅 field.path”）；SFT Export 按行透传、不主动裁剪字段；CurrentFilePath 已接线；内存占用仍只采样一次。
 - 新增 Round 13–16 规划：执行与 IO 韧性、数据工作台编辑与预览、节点能力收紧、发布与体验。
-- 当前验证：`dotnet build` 0 警告；`dotnet test` 420 通过 + 4 个 gated 跳过。
+- 当前验证：`dotnet build` 0 警告；`dotnet test` 467 通过 + 6 个 gated 跳过。
 
 ---
 
@@ -76,6 +76,43 @@
 - 恢复结果与不中断运行的逐字节/哈希比对（当前验证行数、内容与节点复用次数）。
 - 溢写阈值按行数计，未提供按字节阈值；检查点磁盘占用无自动配额。
 - 取消 1s 断言依赖本机调度，CI 上未单独设置性能门禁。
+
+---
+
+## 附八：Round 14 数据工作台编辑与预览（2026-11-17）
+
+### 8.1 本轮做了什么
+
+- [x] 编辑会话：新增 `DatasetEditSession`，按源行号记录替换/删除/插入（插入行有稳定 ID），支持跨页保留、撤销/重做（快照栈，最多 200 步）与整体放弃。
+- [x] 流式保存：新增 `DatasetEditService`，先校验所有编辑行 JSON，再按块读取源文件、应用编辑并写临时文件，最后原子替换；取消/失败不产生半成品，未修改 JSONL 行文本原样复制。
+- [x] 保存摘要：保存前生成替换/删除/插入计数与最多 5 条 before/after 示例；覆盖源文件与另存为均先确认。
+- [x] Data 工作台编辑 UI：插入上方/下方、复制行、删除/恢复、行 JSON 编辑器、撤销/重做、丢弃、编辑另存为、覆盖源文件；行显示 NEW/EDIT/DEL 标记，删除行删除线显示。
+- [x] 搜索高亮：`HighlightMatcher` 支持字面量与正则（100ms 超时、非法模式降级），`TextHighlightBehavior` 用 Inlines 渲染行内高亮；搜索框查询即时映射到表格行。
+- [x] 校验问题筛选：新增级别（全部/错误/警告）与错误码下拉筛选、筛选计数；列表绑定筛选结果。
+- [x] 统一样本预览：`SamplePreviewService` 读取 JSONL/CSV/Parquet 前 N 行，或对 JSONL 应用 Cleaner 规则生成前后 diff；`SamplePreviewWindow` 支持文件/双栏 diff 两种模式。
+- [x] 预览入口：SFT Export 输出、Validator 拒绝行、Simulation 失败样本接入文件预览；Cleaner 面板选择样本文件后查看清洗 diff；预览窗口可跳转数据工作台打开该文件。
+- [x] JSONL 写出统一使用 LF 换行，保证未修改行在 LF 源上逐字节一致。
+- [x] 新增 30 个测试：编辑服务 9、工作台编辑/撤销/覆盖/筛选 7、高亮匹配 8、样本预览 5、Headless 高亮渲染 1；另新增 1 个 gated 1M 行编辑保存基线。
+
+### 8.2 验证结果
+
+| 项目 | 命令 | 结果 |
+| --- | --- | --- |
+| 构建 | `dotnet build LMTrainingDataStudio2/LMTrainingDataStudio2.slnx` | 成功，0 警告，0 错误 |
+| 测试 | `dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx` | 467 通过，0 失败，6 跳过（2 provider + 4 性能 gated） |
+| Headless UI | `dotnet test --filter HeadlessUiTests` | 7 通过，含行内高亮 Inlines 渲染断言 |
+| 编辑保存 | `DatasetEditServiceTests` | 行数守恒、未修改行保持、无效 JSON 先失败、取消不落盘、覆盖源文件、撤销重做还原 |
+| 1M 行编辑保存 | `LMTDS_PERF_TESTS=1 dotnet test --filter EditSave_LargeInput` | 1000 替换/100 删除/100 插入，55.6s，托管内存增量 11MB，写出 1,000,000 行 |
+| 启动冒烟 | `LMTrainingDataStudio2.exe`（Debug，8s） | 进程持续运行，无异常输出 |
+
+### 8.3 本轮未做
+
+- 编辑只支持保存为源格式；跨格式保存需先走批量转换。
+- 单元格式编辑是整行 JSON 编辑器，未做按字段/消息级别的结构化表单。
+- CSV/Parquet 保存会重写整表（内容等价但字节不保证一致）；逐字节一致仅对 LF JSONL 保证。
+- 搜索高亮不区分“当前匹配项”，也未实现表格内上一处/下一处导航。
+- 预览窗口固定加载前 50 行，未提供分页或全文搜索。
+- 数据工作台编辑 UI 未做逐项人工点击验收（Headless 加载、ViewModel 单测与启动冒烟通过）。
 
 ---
 
@@ -1177,8 +1214,9 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 - [x] 去重、混洗、切分（Round 11，数据工作台 Transform）。
 - [x] 正则搜索与替换（Round 11，当前页/全文件/预览/取消）。
 - [x] 数据集统计（角色、长度、空样本、重复率、工具调用，Round 11）。
-- [ ] 数据增删查改、单元格编辑、保存回原文件与编辑撤销/重做。
-- [ ] 输出预览弹窗 / 样本查看器（SFT Export、Validator、Simulation）。
+- [x] 数据增删查改、行 JSON 单元格编辑、保存到新文件或覆盖源文件、编辑撤销/重做（Round 14）。
+- [x] 输出预览弹窗 / 样本查看器（SFT Export、Validator reject、Simulation 失败样本、Cleaner 前后 diff，Round 14）。
+- [x] 搜索命中行内高亮（Round 14）。
 - [x] 最近文件、脏标记、关闭确认（Round 8）。
 - [部分] 文件编码、CRLF、超长行、无结尾换行：JSONL 读取/校验已覆盖（Round 11）；CSV/Parquet 编码选项未暴露。
 - [ ] CSV 类型推断与列类型展示（当前全部按字符串）。
@@ -1195,7 +1233,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 - [x] 自动修复入口、预览、写修复副本（Round 11）。
 - [x] 校验问题列表、行号跳转（Round 11）；级别/错误码筛选未做。
 - [x] 校验错误上限/采样，避免超大坏文件吃满内存（Round 11）。
-- [ ] 校验问题分组与级别筛选 UI。
+- [x] 校验问题分组与级别/错误码筛选 UI（Round 14）。
 - [ ] Alpaca 多轮转换不丢轮次、不丢 tools。
 - [ ] 转换保留额外字段 / 元数据，或明确声明丢弃策略。
 - [ ] ShareGPT tool_call 解析失败上报，不静默吞异常。
@@ -1256,7 +1294,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 - [ ] 系统剪贴板 / 跨实例粘贴。
 - [ ] 快捷键全局化，避免焦点冲突。
 - [ ] 节点尺寸调整手柄、边过渡动画、标签避让、自动布局间距/分组选项。
-- [ ] 样本/输出预览弹窗；Cleaner 前后 diff；Validator 失败样本 UI。
+- [x] 样本/输出预览弹窗；Cleaner 前后 diff；Validator 失败样本预览（Round 14）。
 - [ ] Simulation Tools / Rules / Script 可视化编辑器。
 - [ ] Cleaner 正则规则列表 UI；Validator Cleanup 规则 UI。
 - [ ] 状态栏内存占用定时刷新（当前只在构造时采样一次）。
@@ -1344,13 +1382,18 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 - [x] Avalonia Headless UI 测试（Round 12：主窗口、画布、主题）。
 - [x] 视口/布局/日志/并行执行/暂停/重试测试（Round 12，18 个）。
 - [x] ViewModel 单测：文档生命周期、数据工作台、Executions、各节点配置编辑器（Round 5–12）。
-- [部分] 集成测试：分模块 1M 行与四节点流水线已覆盖；完整 1M 行多节点链路待 Round 13。
-- [部分] 性能基准：NUnit gated 1M 行测试已有；BenchmarkDotNet 专项基准未做。
+- [部分] 集成测试：分模块 1M 行、四节点流水线与 1M 行执行链路已覆盖；完整 10M 行多节点链路待 Round 16。
+- [部分] 性能基准：NUnit gated 1M 行测试已有（含编辑保存基线）；BenchmarkDotNet 专项基准未做。
 - [x] 本地化/节点目录/预设：语言切换、10 类节点文案与端口摘要、6 个预设合法性与加载（16 个，Round 附六）。
 - [x] 自定义预设：单文件存储、保存/导入/删除、原子写入、坏文件告警、快照隔离与 VM 加载（18 个）。
 - [x] 溢写缓冲/节点检查点/恢复/重试清理/取消清理（Round 13，10 个）。
 - [x] SFT 字段白名单/预览、运行溢写设置往返与回退（Round 13，7 个）。
-- [x] 当前测试总数：437 通过 + 5 gated（2026-11-17 复核）。
+- [x] 数据编辑：会话/保存/摘要/覆盖/取消/撤销重做（Round 14，9 个）。
+- [x] 工作台编辑/高亮传播/删除插入/校验筛选/覆盖重开（Round 14，7 个）。
+- [x] 行内高亮匹配器（字面量/正则/大小写/超时/上限，Round 14，8 个）。
+- [x] 样本预览：文件读取、Cleaner diff、格式限制与缺失文件（Round 14，5 个）。
+- [x] Headless 行内高亮 Inlines 渲染（Round 14，1 个）。
+- [x] 当前测试总数：467 通过 + 6 gated（2026-11-17 复核）。
 
 ### 4.9 工程化与发布
 
@@ -1379,13 +1422,13 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 4. [x] SFT Export：文件选择器、覆盖确认、可选字段白名单、写出行数/预览摘要。
 5. [x] 1M 行 Seed → Expression → SFT Export 链路内存 ≤ 300MB 验收。
 
-### P1 — Round 14：数据工作台编辑与预览
+### P1 — Round 14：数据工作台编辑与预览（已完成，见附八）
 
-1. [ ] 逐行 CRUD（插入/删除/复制/单元格编辑）与写回/另存。
-2. [ ] 编辑撤销/重做与保存前差异摘要。
-3. [ ] 搜索命中高亮、校验问题分组/筛选。
-4. [ ] 统一样本/输出预览弹窗（SFT/Validator/Simulation/Cleaner）。
-5. [ ] 1M 行编辑/保存内存上限测试。
+1. [x] 逐行 CRUD（插入/删除/复制/单元格 JSON 编辑）与另存/覆盖（覆盖需确认）。
+2. [x] 编辑撤销/重做与保存前差异摘要。
+3. [x] 搜索命中高亮、校验问题按级别/错误码筛选。
+4. [x] 统一样本/输出预览弹窗（SFT / Validator reject / Simulation 失败样本 / Cleaner diff）。
+5. [x] 1M 行编辑/保存内存上限验收（55.6s，托管内存增量 11MB）。
 
 ### P1 — Round 15：节点能力收紧
 
@@ -1436,7 +1479,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 | 15 | 节点能力收紧 | P1 | LLM tools/结构化输出/多轮/并发/成本；Validator 代码规则/超时/双端口；Sampler 多端口/分层；Simulation 可视化配置 | 请求体与结构化输出可验证；端口行数守恒；分层比例在容差内 |
 | 16 | 发布与体验 | P2 | 画布 polish、完整浅色主题、MSIX/文件关联/单实例、10M 基线、README 截图、分析器 | 500 节点逐帧 <100ms；浅色无残留；安装/双击打开可用；10M 基线记录 |
 
-**执行顺序**：Round 13 → 14 → 15 → 16；Round 13 已完成（见附七），下一轮为 Round 14；每轮结束按第七节收尾模板更新勾选状态、README 与提交记录。
+**执行顺序**：Round 13 → 14 → 15 → 16；Round 13、14 已完成（见附七、附八），下一轮为 Round 15；每轮结束按第七节收尾模板更新勾选状态、README 与提交记录。
 
 ---
 
