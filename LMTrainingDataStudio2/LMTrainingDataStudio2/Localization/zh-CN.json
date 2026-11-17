@@ -430,5 +430,14 @@
   "property.simulated_tools": "模拟工具",
   "property.script_turns": "脚本回合",
   "property.add_turn": "添加回合",
-  "property.rule_negate": "取反"
+  "property.rule_negate": "取反",
+  "property.seed_streaming": "流式读取",
+  "property.seed_streaming_hint": "仅在 JSONL 且关闭索引缓存时生效。",
+  "property.cleanup_rules": "清洗规则",
+  "property.regex_replacements": "正则替换",
+  "property.regex_ignore_case": "忽略大小写",
+  "property.add_regex_rule": "添加正则规则",
+  "property.validate_schema": "校验 Schema",
+  "property.invalid_json_schema_format": "JSON Schema 无效：{0}",
+  "property.sft_fields_invalid": "字段名必须唯一且不能包含空白字符。"
 }

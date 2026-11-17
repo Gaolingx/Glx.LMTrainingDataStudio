@@ -9,6 +9,76 @@
              x:Class="LMTrainingDataStudio2.Views.PropertyPanelView"
              x:DataType="vm:MainWindowViewModel">
 
+    <UserControl.Resources>
+        <DataTemplate x:Key="CleanupRulesTemplate" x:DataType="vm:CleanupRulesEditorViewModel">
+            <StackPanel Spacing="6">
+                <TextBlock Text="{loc:Loc property.cleanup_rules}" FontSize="11"
+                           FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+
+                <CheckBox Content="{loc:Loc property.normalize_whitespace}" FontSize="11"
+                          Foreground="{DynamicResource TextPrimaryBrush}"
+                          IsChecked="{Binding NormalizeWhitespace, Mode=TwoWay}" />
+                <CheckBox Content="{loc:Loc property.normalize_newlines}" FontSize="11"
+                          Foreground="{DynamicResource TextPrimaryBrush}"
+                          IsChecked="{Binding NormalizeNewlines, Mode=TwoWay}" />
+                <CheckBox Content="{loc:Loc property.strip_ansi_escapes}" FontSize="11"
+                          Foreground="{DynamicResource TextPrimaryBrush}"
+                          IsChecked="{Binding StripAnsi, Mode=TwoWay}" />
+                <CheckBox Content="{loc:Loc property.remove_reasoning_content}" FontSize="11"
+                          Foreground="{DynamicResource TextPrimaryBrush}"
+                          IsChecked="{Binding RemoveReasoningContent, Mode=TwoWay}" />
+                <CheckBox Content="{loc:Loc property.drop_empty_messages}" FontSize="11"
+                          Foreground="{DynamicResource TextPrimaryBrush}"
+                          IsChecked="{Binding DropEmptyMessages, Mode=TwoWay}" />
+
+                <TextBlock Text="{loc:Loc property.regex_replacements}" FontSize="11"
+                           Foreground="{DynamicResource TextMutedBrush}" Margin="0,4,0,0" />
+                <ItemsControl ItemsSource="{Binding RegexReplacements}" x:CompileBindings="False">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:RegexReplacementEditorViewModel">
+                            <Border Background="{DynamicResource InputBackgroundBrush}" CornerRadius="4"
+                                    Padding="6" Margin="0,2">
+                                <StackPanel Spacing="4">
+                                    <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="4">
+                                        <TextBox Grid.Column="0" Text="{Binding Pattern, Mode=TwoWay}"
+                                                 FontSize="10" Padding="6,4" Watermark="pattern" />
+                                        <Button Grid.Column="1" Content="↑"
+                                                Command="{Binding $parent[ItemsControl].DataContext.MoveRegexUpCommand}"
+                                                CommandParameter="{Binding}"
+                                                Padding="6,2" Background="{DynamicResource ButtonSurfaceBrush}"
+                                                Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
+                                        <Button Grid.Column="2" Content="↓"
+                                                Command="{Binding $parent[ItemsControl].DataContext.MoveRegexDownCommand}"
+                                                CommandParameter="{Binding}"
+                                                Padding="6,2" Background="{DynamicResource ButtonSurfaceBrush}"
+                                                Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
+                                        <Button Grid.Column="3" Content="×"
+                                                Command="{Binding $parent[ItemsControl].DataContext.RemoveRegexCommand}"
+                                                CommandParameter="{Binding}"
+                                                Padding="6,2" Background="{DynamicResource ButtonSurfaceBrush}"
+                                                Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
+                                    </Grid>
+                                    <TextBox Text="{Binding Replacement, Mode=TwoWay}"
+                                             FontSize="10" Padding="6,4" Watermark="replacement" />
+                                    <CheckBox Content="{loc:Loc property.regex_ignore_case}"
+                                              FontSize="10" Foreground="{DynamicResource TextMutedBrush}"
+                                              IsChecked="{Binding IgnoreCase, Mode=TwoWay}" />
+                                    <TextBlock Text="{Binding PatternError}" FontSize="10"
+                                               Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap"
+                                               IsVisible="{Binding PatternError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Button Content="{loc:Loc property.add_regex_rule}" Command="{Binding AddRegexCommand}"
+                        HorizontalAlignment="Left" Padding="10,5"
+                        Background="{DynamicResource ButtonSurfaceBrush}"
+                        Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
+            </StackPanel>
+        </DataTemplate>
+    </UserControl.Resources>
+
     <StackPanel Margin="12" Spacing="12">
 
         <!-- No Selection State -->
@@ -116,6 +186,12 @@
                 <CheckBox Content="{loc:Loc property.use_index_cache}"
                           FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}"
                           IsChecked="{Binding SelectedBlock.SeedEditor.UseIndexCache, Mode=TwoWay}" />
+
+                <CheckBox Content="{loc:Loc property.seed_streaming}"
+                          FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}"
+                          IsChecked="{Binding SelectedBlock.SeedEditor.Streaming, Mode=TwoWay}" />
+                <TextBlock Text="{loc:Loc property.seed_streaming_hint}"
+                           FontSize="10" Foreground="{DynamicResource TextFaintBrush}" TextWrapping="Wrap" />
             </StackPanel>
 
             <!-- LLM configuration -->
@@ -222,6 +298,13 @@
                              FontSize="11" Padding="8,6" Height="80"
                              AcceptsReturn="True" TextWrapping="NoWrap"
                              FontFamily="Consolas" />
+                    <TextBlock Text="{Binding SelectedBlock.LlmEditor.SchemaError}"
+                               FontSize="10" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap"
+                               IsVisible="{Binding SelectedBlock.LlmEditor.SchemaError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <Button Content="{loc:Loc property.validate_schema}"
+                            Command="{Binding SelectedBlock.LlmEditor.ValidateSchemaCommand}"
+                            HorizontalAlignment="Left" Padding="10,5"
+                            Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
                 </StackPanel>
 
                 <StackPanel Spacing="4">
@@ -408,8 +491,8 @@
                             Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
                 </StackPanel>
 
-                <TextBlock Text="{loc:Loc property.cleanup_rules_remain_in_config_json_below}"
-                           FontSize="10" Foreground="{DynamicResource TextFaintBrush}" TextWrapping="Wrap" />
+                <ContentControl Content="{Binding SelectedBlock.ValidatorEditor.Cleanup}"
+                                ContentTemplate="{StaticResource CleanupRulesTemplate}" />
             </StackPanel>
 
             <!-- Sampler configuration -->
@@ -904,19 +987,9 @@
                 <Border Height="1" Background="{DynamicResource ButtonSurfaceBrush}" />
                 <TextBlock Text="{loc:Loc property.cleaner_configuration}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
 
-                <CheckBox Content="{loc:Loc property.normalize_whitespace}" FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}"
-                          IsChecked="{Binding SelectedBlock.CleanerEditor.NormalizeWhitespace, Mode=TwoWay}" />
-                <CheckBox Content="{loc:Loc property.normalize_newlines}" FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}"
-                          IsChecked="{Binding SelectedBlock.CleanerEditor.NormalizeNewlines, Mode=TwoWay}" />
-                <CheckBox Content="{loc:Loc property.strip_ansi_escapes}" FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}"
-                          IsChecked="{Binding SelectedBlock.CleanerEditor.StripAnsi, Mode=TwoWay}" />
-                <CheckBox Content="{loc:Loc property.remove_reasoning_content}" FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}"
-                          IsChecked="{Binding SelectedBlock.CleanerEditor.RemoveReasoningContent, Mode=TwoWay}" />
-                <CheckBox Content="{loc:Loc property.drop_empty_messages}" FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}"
-                          IsChecked="{Binding SelectedBlock.CleanerEditor.DropEmptyMessages, Mode=TwoWay}" />
+                <ContentControl Content="{Binding SelectedBlock.CleanerEditor.Cleanup}"
+                                ContentTemplate="{StaticResource CleanupRulesTemplate}" />
 
-                <TextBlock Text="{loc:Loc property.regex_replacements_remain_in_config_json_below}"
-                           FontSize="10" Foreground="{DynamicResource TextFaintBrush}" TextWrapping="Wrap" />
                 <Button Content="{loc:Loc property.preview_cleaner_diff}"
                         Click="OnPreviewCleanerDiffClick"
                         HorizontalAlignment="Left" Padding="10,5" FontSize="10"
@@ -945,6 +1018,9 @@
                              FontSize="11" Padding="8,6" Watermark="messages, tools" />
                     <TextBlock Text="{loc:Loc property.sft_export_fields_hint}"
                                FontSize="10" Foreground="{DynamicResource TextFaintBrush}" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding SelectedBlock.SftExportEditor.FieldsError}"
+                               FontSize="10" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap"
+                               IsVisible="{Binding SelectedBlock.SftExportEditor.FieldsError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                     <Button Content="{loc:Loc property.preview_output}"
                             Click="OnPreviewSftOutputClick"
                             HorizontalAlignment="Left" Padding="10,5" FontSize="10"

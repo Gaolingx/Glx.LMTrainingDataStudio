@@ -430,5 +430,14 @@
   "property.simulated_tools": "Simulated tools",
   "property.script_turns": "Scripted turns",
   "property.add_turn": "Add turn",
-  "property.rule_negate": "Negate"
+  "property.rule_negate": "Negate",
+  "property.seed_streaming": "Streaming read",
+  "property.seed_streaming_hint": "Only applies to JSONL when index cache is disabled.",
+  "property.cleanup_rules": "Cleanup rules",
+  "property.regex_replacements": "Regex replacements",
+  "property.regex_ignore_case": "Ignore case",
+  "property.add_regex_rule": "Add regex rule",
+  "property.validate_schema": "Validate schema",
+  "property.invalid_json_schema_format": "Invalid JSON Schema: {0}",
+  "property.sft_fields_invalid": "Field names must be unique and contain no whitespace."
 }

@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using LMTrainingDataStudio2.Localization;
 using LMTrainingDataStudio2.Models;
 using LMTrainingDataStudio2.Services.Executors;
 
@@ -51,7 +52,6 @@ public partial class ValidatorRuleEditorViewModel : ObservableObject
 public partial class ValidatorConfigEditorViewModel : ObservableObject
 {
     private readonly Action<ValidatorBlockConfig> _apply;
-    private readonly DatasetCleanupRules? _cleanup;
 
     [ObservableProperty]
     private ValidatorRuleKindOption _selectedRuleKind;
@@ -77,7 +77,7 @@ public partial class ValidatorConfigEditorViewModel : ObservableObject
     public ValidatorConfigEditorViewModel(ValidatorBlockConfig config, Action<ValidatorBlockConfig> apply)
     {
         _apply = apply;
-        _cleanup = config.Cleanup;
+        Cleanup = new CleanupRulesEditorViewModel(config.Cleanup, Push);
         _rejectOnFailure = config.RejectOnFailure;
         _rejectOutputPath = config.RejectOutputPath ?? string.Empty;
         _matchAllRules = config.MatchAllRules;
@@ -106,6 +106,8 @@ public partial class ValidatorConfigEditorViewModel : ObservableObject
     };
 
     public ObservableCollection<ValidatorRuleEditorViewModel> AdditionalRules { get; } = new();
+
+    public CleanupRulesEditorViewModel Cleanup { get; }
 
     partial void OnSelectedRuleKindChanged(ValidatorRuleKindOption value)
     {
@@ -158,7 +160,7 @@ public partial class ValidatorConfigEditorViewModel : ObservableObject
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
-            RuleError = $"Invalid JSON Schema: {ex.Message}";
+            RuleError = string.Format(LocalizationService.L("property.invalid_json_schema_format"), ex.Message);
         }
     }
 
@@ -174,7 +176,7 @@ public partial class ValidatorConfigEditorViewModel : ObservableObject
             SelectedRuleKind.Id,
             Rule ?? string.Empty,
             RejectOnFailure,
-            _cleanup,
+            Cleanup.HasAnyRule ? Cleanup.Build() : null,
             string.IsNullOrWhiteSpace(RejectOutputPath) ? null : RejectOutputPath.Trim(),
             rules.ToArray(),
             MatchAllRules,

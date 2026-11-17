@@ -437,6 +437,7 @@
 | 2026-11-17 | 二次扫描复核 | `dotnet test --list-tests`；`dotnet test --no-build`；全仓 grep 遗留标记 | 513 用例；505 通过 / 0 失败 / 7 跳过；生产代码 0 遗留标记 | 第 8 节 |
 | 2026-11-17 | Batch 1：`.recipe` 一致性 | `dotnet build -c Release`；`dotnet test -c Release --no-build` | 0 警告；522 通过 / 0 失败 / 7 跳过 | `RecipeFileExtensionsTests` |
 | 2026-11-17 | Batch 2：版本、图标、打包 | `dotnet build -c Release`；检查 Release deps.json 与 exe VersionInfo；PowerShell Parser 校验脚本 | 0 警告；FileVersion 1.0.0.0；Release 不含 Avalonia.Diagnostics；脚本语法通过 | 本文件 7.1/8.3.1 勾选 |
+| 2026-11-17 | Batch 4：节点编辑器 | `dotnet build -c Release`；`dotnet test -c Release --no-build` | 0 警告；528 通过 / 0 失败 / 7 跳过 | `NodeEditorTests`、Cleanup 共享模板 Headless 测试 |
 
 ---
 
@@ -509,7 +510,7 @@
 
 #### Seed
 
-- [ ] **[节点/P1] Streaming 开关 UI 未暴露**：`SeedConfigEditorViewModel` 只保留 `_streaming` 原值（`ViewModels/SeedConfigEditorViewModel.cs:18,43`），且仅 JSONL + `UseIndexCache=false` 生效。
+- [x] **[节点/P1] Streaming 开关 UI 未暴露**：`SeedConfigEditorViewModel` 只保留 `_streaming` 原值（`ViewModels/SeedConfigEditorViewModel.cs:18,43`），且仅 JSONL + `UseIndexCache=false` 生效。
 - [ ] **[节点/P2] 节点内过滤/列映射/Limit/Offset 未做**。
 - [ ] **[节点/P2] 多文件/目录数据源、HuggingFace/HTTP 源未做**。
 - [ ] **[节点/P2] CSV 编码/分隔符/类型推断选项未暴露**：CSV 值当前全部按字符串读取。
@@ -531,7 +532,7 @@
 
 #### Validator
 
-- [ ] **[节点/P1] Cleanup 规则 UI 缺失**：`ValidatorConfigEditorViewModel` 只保留 `_cleanup` 不提供编辑（`ViewModels/ValidatorConfigEditorViewModel.cs:54,80`），仍走 Config JSON。
+- [x] **[节点/P1] Cleanup 规则 UI 缺失**：`ValidatorConfigEditorViewModel` 只保留 `_cleanup` 不提供编辑（`ViewModels/ValidatorConfigEditorViewModel.cs:54,80`），仍走 Config JSON。
 - [ ] **[节点/P2] 无失败率/规则结果摘要面板**：只有日志与 reject 文件。
 - [ ] **[节点/P2] `script` 为 Fluid 布尔表达式**，不是任意脚本；超时只停止等待，不强制终止底层 CPU 渲染。
 
@@ -563,7 +564,7 @@
 
 #### Cleaner
 
-- [ ] **[节点/P1] 正则规则列表 UI 缺失**：仍走 Config JSON（`ViewModels/CleanerConfigEditorViewModel.cs` 只有 5 个布尔开关）。
+- [x] **[节点/P1] 正则规则列表 UI 缺失**：仍走 Config JSON（`ViewModels/CleanerConfigEditorViewModel.cs` 只有 5 个布尔开关）。
 - [ ] **[节点/P2] 坏 JSON 直接失败**：无坏行跳过与坏行报告。
 - [ ] **[节点/P3] 无自定义字段/JSONPath 清洗**。
 
@@ -747,8 +748,8 @@
 
 #### 8.3.5 节点模块（187–190）
 
-- [ ] **187 [P2] SFT 字段白名单是逗号文本框**：`SftExportConfigEditorViewModel.FieldsText` 直接按逗号拆分（`ViewModels/SftExportConfigEditorViewModel.cs:39-44`），面板只有 TextBox（`Views/PropertyPanelView.axaml:943-947`）；无字段选择器、无样本字段提示、拼写错误会静默输出缺字段。建议从输入样本读取顶层字段做多选。
-- [ ] **188 [P3] LLM `response_schema` 无编辑期校验/格式化**：面板是纯 TextBox（`Views/PropertyPanelView.axaml:221`），没有 JSON 语法校验、格式化或从 Schema 生成示例；错误只在运行时暴露。
+- [ ] **187 [P2] SFT 字段白名单是逗号文本框（校验已补，字段选择器未做）**：`SftExportConfigEditorViewModel.FieldsText` 直接按逗号拆分（`ViewModels/SftExportConfigEditorViewModel.cs:39-44`），面板只有 TextBox（`Views/PropertyPanelView.axaml:943-947`）；无字段选择器、无样本字段提示、拼写错误会静默输出缺字段。建议从输入样本读取顶层字段做多选。
+- [x] **188 [P3] LLM `response_schema` 无编辑期校验/格式化**：面板是纯 TextBox（`Views/PropertyPanelView.axaml:221`），没有 JSON 语法校验、格式化或从 Schema 生成示例；错误只在运行时暴露。
 - [ ] **189 [P3] Sampler splits 是纯多行文本**：`SplitsText` 只有整体解析/错误提示（`ViewModels/SamplerConfigEditorViewModel.cs:110-130`），没有逐行增删、排序、重命名和单行预览。
 - [ ] **190 [P3] 路径输入体验不统一**：Seed 与 SFT 有 Browse/可写性检查；Validator reject 路径（`Views/PropertyPanelView.axaml:401`）、LLM failure 路径（`:229`）、Simulation failure 路径（`:671`）、Sampler 输出目录（`:451`）仍是纯文本，且没有目录/文件存在性提示。
 

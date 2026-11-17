@@ -3,6 +3,7 @@ using Avalonia.Controls.Documents;
 using Avalonia.Headless.NUnit;
 using Avalonia.Media;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using LMTrainingDataStudio2.Controls;
 using LMTrainingDataStudio2.Localization;
 using LMTrainingDataStudio2.Models;
@@ -206,6 +207,35 @@ public sealed class HeadlessUiTests
         finally
         {
             ThemeManager.Apply(dark: true);
+            window.Close();
+        }
+    }
+
+    [AvaloniaTest]
+    public void CleanerAndValidatorPanels_RenderSharedCleanupEditor()
+    {
+        var vm = new MainWindowViewModel(new SettingsStore(Path.Combine(_directory, "settings.json")));
+        var window = new MainWindow { DataContext = vm };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        try
+        {
+            vm.AddBlockCommand.Execute(BlockType.Cleaner);
+            Dispatcher.UIThread.RunJobs();
+            Assert.That(vm.SelectedBlock?.CleanerEditor?.Cleanup, Is.Not.Null);
+
+            vm.AddBlockCommand.Execute(BlockType.Validator);
+            Dispatcher.UIThread.RunJobs();
+            Assert.That(vm.SelectedBlock?.ValidatorEditor?.Cleanup, Is.Not.Null);
+
+            var cleanupEditors = window.GetVisualDescendants()
+                .OfType<ContentControl>()
+                .Count(control => control.Content is CleanupRulesEditorViewModel);
+            Assert.That(cleanupEditors, Is.GreaterThan(0));
+        }
+        finally
+        {
             window.Close();
         }
     }

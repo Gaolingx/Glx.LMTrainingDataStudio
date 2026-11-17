@@ -1,5 +1,8 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using LMTrainingDataStudio2.Localization;
 using LMTrainingDataStudio2.Models;
+using LMTrainingDataStudio2.Services.Executors;
 
 namespace LMTrainingDataStudio2.ViewModels;
 
@@ -50,6 +53,9 @@ public partial class LlmConfigEditorViewModel : ObservableObject
 
     [ObservableProperty]
     private string _responseSchema;
+
+    [ObservableProperty]
+    private string? _schemaError;
 
     [ObservableProperty]
     private string _failureOutputPath;
@@ -121,7 +127,11 @@ public partial class LlmConfigEditorViewModel : ObservableObject
 
     partial void OnMaxConcurrencyChanged(int value) => Push();
 
-    partial void OnResponseSchemaChanged(string value) => Push();
+    partial void OnResponseSchemaChanged(string value)
+    {
+        SchemaError = null;
+        Push();
+    }
 
     partial void OnFailureOutputPathChanged(string value) => Push();
 
@@ -132,6 +142,25 @@ public partial class LlmConfigEditorViewModel : ObservableObject
     partial void OnOutputCostPerMillionTokensChanged(double value) => Push();
 
     partial void OnContinueOnErrorChanged(bool value) => Push();
+
+    [RelayCommand]
+    private void ValidateSchema()
+    {
+        SchemaError = null;
+        if (string.IsNullOrWhiteSpace(ResponseSchema))
+        {
+            return;
+        }
+
+        try
+        {
+            JsonSchemaRuleEvaluator.Parse(ResponseSchema);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            SchemaError = string.Format(LocalizationService.L("property.invalid_json_schema_format"), ex.Message);
+        }
+    }
 
     private void Push() => _apply(new LlmBlockConfig(
         SelectedProvider.Id,

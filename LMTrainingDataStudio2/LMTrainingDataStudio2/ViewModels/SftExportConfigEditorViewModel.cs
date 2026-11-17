@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using LMTrainingDataStudio2.Localization;
 using LMTrainingDataStudio2.Models;
 
 namespace LMTrainingDataStudio2.ViewModels;
@@ -16,6 +17,9 @@ public partial class SftExportConfigEditorViewModel : ObservableObject
     [ObservableProperty]
     private string _fieldsText;
 
+    [ObservableProperty]
+    private string? _fieldsError;
+
     public SftExportConfigEditorViewModel(
         SftExportBlockConfig config,
         Action<SftExportBlockConfig> apply)
@@ -29,14 +33,34 @@ public partial class SftExportConfigEditorViewModel : ObservableObject
 
     partial void OnOutputPathChanged(string value) => Push();
 
-    partial void OnFieldsTextChanged(string value) => Push();
+    partial void OnFieldsTextChanged(string value)
+    {
+        ValidateFields(value);
+        Push();
+    }
+
+    private void ValidateFields(string? text)
+    {
+        var fields = ParseFields(text);
+        var hasInvalidName = fields.Any(field => field.Any(char.IsWhiteSpace));
+        var hasDuplicate = fields
+            .GroupBy(field => field, StringComparer.Ordinal)
+            .Any(group => group.Count() > 1);
+
+        FieldsError = hasInvalidName || hasDuplicate
+            ? LocalizationService.L("property.sft_fields_invalid")
+            : null;
+    }
 
     private void Push()
     {
-        var fields = FieldsText?
-            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        var fields = ParseFields(FieldsText);
         _apply(new SftExportBlockConfig(
             OutputPath ?? string.Empty,
-            fields is { Length: > 0 } ? fields : null));
+            fields.Length > 0 ? fields : null));
     }
+
+    private static string[] ParseFields(string? text) =>
+        (text ?? string.Empty).Split(
+            ',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
 }

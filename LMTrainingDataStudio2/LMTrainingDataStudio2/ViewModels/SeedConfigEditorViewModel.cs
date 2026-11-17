@@ -9,7 +9,6 @@ namespace LMTrainingDataStudio2.ViewModels;
 public partial class SeedConfigEditorViewModel : ObservableObject
 {
     private readonly Action<SeedBlockConfig> _apply;
-    private readonly bool _streaming;
 
     [ObservableProperty]
     private string _sourcePath;
@@ -20,13 +19,16 @@ public partial class SeedConfigEditorViewModel : ObservableObject
     [ObservableProperty]
     private bool _useIndexCache;
 
+    [ObservableProperty]
+    private bool _streaming;
+
     public SeedConfigEditorViewModel(SeedBlockConfig config, Action<SeedBlockConfig> apply)
     {
         _apply = apply;
-        _streaming = config.Streaming;
         _sourcePath = config.SourcePath;
         _fileType = config.FileType;
         _useIndexCache = config.UseIndexCache;
+        _streaming = config.Streaming;
     }
 
     public IReadOnlyList<DataFileType> FileTypes { get; } = Enum.GetValues<DataFileType>();
@@ -37,6 +39,8 @@ public partial class SeedConfigEditorViewModel : ObservableObject
 
     partial void OnUseIndexCacheChanged(bool value) => Push();
 
+    partial void OnStreamingChanged(bool value) => Push();
+
     private void Push() =>
-        _apply(new SeedBlockConfig(SourcePath ?? string.Empty, FileType, _streaming, UseIndexCache));
+        _apply(new SeedBlockConfig(SourcePath ?? string.Empty, FileType, Streaming, UseIndexCache));
 }
