@@ -35,6 +35,7 @@ public partial class DataWorkbenchViewModel : ObservableObject
     private bool _targetPathIsSuggested = true;
     private bool _updatingTargetPath;
     private DatasetEditSession? _editSession;
+    private bool _fieldsStructureDirty;
 
     private const string NewRowTemplate = """{"text":""}""";
 
@@ -123,6 +124,19 @@ public partial class DataWorkbenchViewModel : ObservableObject
     [ObservableProperty]
     private bool _highlightCaseSensitive;
 
+    [ObservableProperty]
+    private bool _fieldsAvailable;
+
+    [ObservableProperty]
+    private DatasetFieldViewModel? _selectedField;
+
+    [ObservableProperty]
+    private string _newFieldName = string.Empty;
+
+    [ObservableProperty]
+    private int _selectedEditorTabIndex = 1;
+
+    public ObservableCollection<DatasetFieldViewModel> SelectedRowFields { get; } = new();
     public ObservableCollection<DatasetRowViewModel> Rows { get; } = new();
     public ObservableCollection<string> ConversionErrors { get; } = new();
     public IReadOnlyList<int> AvailablePageSizes => PageSizes;
@@ -413,11 +427,77 @@ public partial class DataWorkbenchViewModel : ObservableObject
     }
 
     [RelayCommand(CanExecute = nameof(CanApplyRowEdit))]
-    private async Task ApplyRowEditAsync()
+    private Task ApplyRowEditAsync()
+    {
+        var json = SelectedJsonText?.Trim() ?? string.Empty;
+        return ApplySelectedRowJsonAsync(json, "Row edit applied; save to write it.");
+    }
+
+    [RelayCommand(CanExecute = nameof(CanApplyFields))]
+    private async Task ApplyFieldsAsync()
+    {
+        if (SelectedRow is null || !FieldsAvailable) return;
+
+        var fields = SelectedRowFields
+            .Select(field => new DatasetFieldValue(field.Name, field.ValueText, field.Kind))
+            .ToArray();
+        if (!DatasetFieldEditor.TryBuild(fields, out var json, out var error))
+        {
+            RowEditError = error;
+            return;
+        }
+
+        await ApplySelectedRowJsonAsync(json, "Fields applied; save to write them.");
+    }
+
+    [RelayCommand(CanExecute = nameof(CanEditFields))]
+    private void AddField()
+    {
+        var name = NewFieldName?.Trim() ?? string.Empty;
+        if (name.Length == 0)
+        {
+            RowEditError = "Enter a field name.";
+            return;
+        }
+
+        if (SelectedRowFields.Any(field =>
+                string.Equals(field.Name, name, StringComparison.Ordinal)))
+        {
+            RowEditError = $"Field '{name}' already exists.";
+            return;
+        }
+
+        var field = new DatasetFieldViewModel(
+            new DatasetFieldValue(name, "\"\"", "string"));
+        SelectedRowFields.Add(field);
+        SelectedField = field;
+        NewFieldName = string.Empty;
+        RowEditError = null;
+        _fieldsStructureDirty = true;
+        ApplyFieldsCommand.NotifyCanExecuteChanged();
+        RemoveFieldCommand.NotifyCanExecuteChanged();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRemoveField))]
+    private void RemoveField()
+    {
+        if (SelectedField is null) return;
+
+        var index = SelectedRowFields.IndexOf(SelectedField);
+        SelectedRowFields.Remove(SelectedField);
+        SelectedField = SelectedRowFields.Count == 0
+            ? null
+            : SelectedRowFields[Math.Min(index, SelectedRowFields.Count - 1)];
+        RowEditError = null;
+        _fieldsStructureDirty = true;
+        ApplyFieldsCommand.NotifyCanExecuteChanged();
+        RemoveFieldCommand.NotifyCanExecuteChanged();
+    }
+
+    private async Task ApplySelectedRowJsonAsync(string json, string status)
     {
         if (_editSession is null || SelectedRow is null) return;
 
-        var json = SelectedJsonText?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(json))
         {
             RowEditError = "Row JSON is empty.";
@@ -452,7 +532,7 @@ public partial class DataWorkbenchViewModel : ObservableObject
             return;
         }
 
-        EditStatusText = "Row edit applied; save to write it.";
+        EditStatusText = status;
         await ReloadPageAsync();
     }
 
@@ -725,6 +805,14 @@ public partial class DataWorkbenchViewModel : ObservableObject
         SelectedRow is not null &&
         !string.Equals(SelectedJsonText, SelectedRow.Json, StringComparison.Ordinal);
 
+    private bool CanEditFields() => CanEditSelectedRow() && FieldsAvailable;
+
+    private bool CanApplyFields() =>
+        CanEditFields() &&
+        (_fieldsStructureDirty || SelectedRowFields.Any(field => field.IsDirty));
+
+    private bool CanRemoveField() => CanEditFields() && SelectedField is not null;
+
     private bool CanUndoEdit() =>
         _editSession?.CanUndo == true && !IsBusy && !IsConverting && !IsSavingEdits;
 
@@ -741,6 +829,9 @@ public partial class DataWorkbenchViewModel : ObservableObject
         DeleteRowCommand.NotifyCanExecuteChanged();
         RestoreRowCommand.NotifyCanExecuteChanged();
         ApplyRowEditCommand.NotifyCanExecuteChanged();
+        ApplyFieldsCommand.NotifyCanExecuteChanged();
+        AddFieldCommand.NotifyCanExecuteChanged();
+        RemoveFieldCommand.NotifyCanExecuteChanged();
         UndoEditCommand.NotifyCanExecuteChanged();
         RedoEditCommand.NotifyCanExecuteChanged();
         DiscardEditsCommand.NotifyCanExecuteChanged();
@@ -751,6 +842,50 @@ public partial class DataWorkbenchViewModel : ObservableObject
         row.HighlightQuery = HighlightQuery;
         row.HighlightUseRegex = HighlightUseRegex;
         row.HighlightCaseSensitive = HighlightCaseSensitive;
+    }
+
+    private void LoadFieldsFromRow()
+    {
+        foreach (var field in SelectedRowFields)
+        {
+            field.PropertyChanged -= OnFieldPropertyChanged;
+        }
+
+        SelectedRowFields.Clear();
+        SelectedField = null;
+        _fieldsStructureDirty = false;
+
+        if (SelectedRow is not null &&
+            DatasetFieldEditor.TryReadObject(SelectedRow.Json, out var fields, out _))
+        {
+            FieldsAvailable = true;
+            foreach (var field in fields)
+            {
+                var model = new DatasetFieldViewModel(field);
+                model.PropertyChanged += OnFieldPropertyChanged;
+                SelectedRowFields.Add(model);
+            }
+
+            SelectedField = SelectedRowFields.FirstOrDefault();
+            SelectedEditorTabIndex = 0;
+        }
+        else
+        {
+            FieldsAvailable = false;
+            SelectedEditorTabIndex = 1;
+        }
+
+        ApplyFieldsCommand.NotifyCanExecuteChanged();
+        AddFieldCommand.NotifyCanExecuteChanged();
+        RemoveFieldCommand.NotifyCanExecuteChanged();
+    }
+
+    private void OnFieldPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(DatasetFieldViewModel.ValueText))
+        {
+            ApplyFieldsCommand.NotifyCanExecuteChanged();
+        }
     }
 
     private void UpdateRowHighlight()
@@ -878,10 +1013,14 @@ public partial class DataWorkbenchViewModel : ObservableObject
     {
         RowEditError = null;
         SelectedJsonText = value?.Json ?? string.Empty;
+        LoadFieldsFromRow();
         NotifyEditCommands();
     }
 
     partial void OnSelectedJsonTextChanged(string value) => ApplyRowEditCommand.NotifyCanExecuteChanged();
+
+    partial void OnSelectedFieldChanged(DatasetFieldViewModel? value) =>
+        RemoveFieldCommand.NotifyCanExecuteChanged();
 
     partial void OnIsBusyChanged(bool value) => NotifyEditCommands();
 
@@ -925,6 +1064,34 @@ public partial class DataWorkbenchViewModel : ObservableObject
 public sealed record DatasetFormatOption(DatasetFormat Format, string Name)
 {
     public override string ToString() => Name;
+}
+
+/// <summary>
+/// One editable top-level field of the selected row. Values are edited as JSON text,
+/// so nested objects and arrays keep their structure.
+/// </summary>
+public sealed partial class DatasetFieldViewModel : ObservableObject
+{
+    public DatasetFieldViewModel(DatasetFieldValue field)
+    {
+        Name = field.Name;
+        Kind = field.Kind;
+        OriginalValueText = field.ValueText;
+        _valueText = field.ValueText;
+    }
+
+    public string Name { get; }
+
+    public string Kind { get; }
+
+    public string OriginalValueText { get; }
+
+    [ObservableProperty]
+    private string _valueText;
+
+    public bool IsDirty => !string.Equals(ValueText, OriginalValueText, StringComparison.Ordinal);
+
+    partial void OnValueTextChanged(string value) => OnPropertyChanged(nameof(IsDirty));
 }
 
 /// <summary>

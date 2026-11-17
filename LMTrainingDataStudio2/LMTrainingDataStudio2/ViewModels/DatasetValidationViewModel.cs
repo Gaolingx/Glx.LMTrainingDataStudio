@@ -71,11 +71,22 @@ public partial class DatasetValidationViewModel : ObservableObject
     [ObservableProperty]
     private string _filterSummary = string.Empty;
 
+    [ObservableProperty]
+    private ValidationGroupModeOption? _selectedGroupMode;
+
+    [ObservableProperty]
+    private bool _isGrouped;
+
+    [ObservableProperty]
+    private ValidationIssueNodeViewModel? _selectedTreeNode;
+
     public ObservableCollection<DatasetIssueViewModel> Issues { get; } = new();
     public ObservableCollection<DatasetIssueViewModel> FilteredIssues { get; } = new();
+    public ObservableCollection<ValidationIssueNodeViewModel> IssueTree { get; } = new();
     public ObservableCollection<DatasetFixSample> FixSamples { get; } = new();
     public ObservableCollection<ValidationSeverityOption> SeverityOptions { get; } = new();
     public ObservableCollection<ValidationCodeOption> CodeOptions { get; } = new();
+    public ObservableCollection<ValidationGroupModeOption> GroupModes { get; } = new();
 
     public event Action<long>? JumpRequested;
 
@@ -94,6 +105,7 @@ public partial class DatasetValidationViewModel : ObservableObject
     {
         var severityKey = SelectedSeverityOption?.Key ?? ValidationSeverityOption.AllKey;
         var codeKey = SelectedCodeOption?.Key ?? ValidationCodeOption.AllKey;
+        var groupKey = SelectedGroupMode?.Key ?? ValidationGroupModeOption.NoneKey;
 
         SeverityOptions.Clear();
         SeverityOptions.Add(new ValidationSeverityOption(
@@ -105,10 +117,21 @@ public partial class DatasetValidationViewModel : ObservableObject
         SelectedSeverityOption = SeverityOptions.FirstOrDefault(option => option.Key == severityKey)
                                  ?? SeverityOptions[0];
 
+        GroupModes.Clear();
+        GroupModes.Add(new ValidationGroupModeOption(
+            ValidationGroupModeOption.NoneKey, LocalizationService.L("data.group_none")));
+        GroupModes.Add(new ValidationGroupModeOption(
+            ValidationGroupModeOption.SeverityKey, LocalizationService.L("data.group_severity")));
+        GroupModes.Add(new ValidationGroupModeOption(
+            ValidationGroupModeOption.CodeKey, LocalizationService.L("data.group_code")));
+        SelectedGroupMode = GroupModes.FirstOrDefault(option => option.Key == groupKey)
+                            ?? GroupModes[0];
+
         RebuildCodeOptions(codeKey);
         ApplyFilter();
         OnPropertyChanged(nameof(SeverityOptions));
         OnPropertyChanged(nameof(CodeOptions));
+        OnPropertyChanged(nameof(GroupModes));
     }
 
     public void SetSource(string path, DataFileType fileType)
@@ -118,6 +141,8 @@ public partial class DatasetValidationViewModel : ObservableObject
         _hasSource = true;
         Issues.Clear();
         FilteredIssues.Clear();
+        IssueTree.Clear();
+        SelectedTreeNode = null;
         FixSamples.Clear();
         HasIssues = false;
         HasFixPreview = false;
@@ -313,6 +338,16 @@ public partial class DatasetValidationViewModel : ObservableObject
 
     partial void OnSelectedCodeOptionChanged(ValidationCodeOption? value) => ApplyFilter();
 
+    partial void OnSelectedGroupModeChanged(ValidationGroupModeOption? value) => ApplyFilter();
+
+    partial void OnSelectedTreeNodeChanged(ValidationIssueNodeViewModel? value)
+    {
+        if (value?.Issue is { } issue)
+        {
+            SelectedIssue = issue;
+        }
+    }
+
     private void RebuildCodeOptions(string selectedKey)
     {
         CodeOptions.Clear();
@@ -363,7 +398,60 @@ public partial class DatasetValidationViewModel : ObservableObject
             ? string.Empty
             : string.Format(LocalizationService.L("data.filtered_issues_format"),
                 FilteredIssues.Count, Issues.Count);
+
+        RebuildIssueTree();
     }
+
+    private void RebuildIssueTree()
+    {
+        IssueTree.Clear();
+        var mode = SelectedGroupMode?.Key ?? ValidationGroupModeOption.NoneKey;
+        IsGrouped = mode != ValidationGroupModeOption.NoneKey;
+
+        if (!IsGrouped)
+        {
+            SelectedTreeNode = null;
+            return;
+        }
+
+        var groups = mode == ValidationGroupModeOption.SeverityKey
+            ? FilteredIssues
+                .GroupBy(issue => issue.SeverityText)
+                .OrderBy(group => SeverityOrder(group.Key))
+            : FilteredIssues
+                .GroupBy(issue => issue.CodeText, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var group in groups)
+        {
+            var display = mode == ValidationGroupModeOption.SeverityKey
+                ? SeverityDisplay(group.Key)
+                : group.Key;
+            var node = ValidationIssueNodeViewModel.Group(string.Format(
+                LocalizationService.L("data.issue_group_format"), display, group.Count()));
+
+            foreach (var issue in group)
+            {
+                node.Children.Add(ValidationIssueNodeViewModel.Leaf(issue));
+            }
+
+            IssueTree.Add(node);
+        }
+    }
+
+    private static int SeverityOrder(string severity) => severity switch
+    {
+        "Error" => 0,
+        "Warning" => 1,
+        _ => 2
+    };
+
+    private static string SeverityDisplay(string severity) => severity switch
+    {
+        "Error" => LocalizationService.L("data.severity_errors"),
+        "Warning" => LocalizationService.L("data.severity_warnings"),
+        _ => LocalizationService.L("data.severity_info")
+    };
 
     private bool EnsureJsonl(string operation)
     {
@@ -423,6 +511,47 @@ public sealed record ValidationCodeOption(string Key, string DisplayName)
     public const string AllKey = "all";
 
     public override string ToString() => DisplayName;
+}
+
+public sealed record ValidationGroupModeOption(string Key, string DisplayName)
+{
+    public const string NoneKey = "none";
+    public const string SeverityKey = "severity";
+    public const string CodeKey = "code";
+
+    public override string ToString() => DisplayName;
+}
+
+/// <summary>One node of the grouped issue tree: a group header or a leaf issue.</summary>
+public sealed class ValidationIssueNodeViewModel
+{
+    private ValidationIssueNodeViewModel(string header, DatasetIssueViewModel? issue)
+    {
+        Header = header;
+        Issue = issue;
+    }
+
+    public string Header { get; }
+
+    public DatasetIssueViewModel? Issue { get; }
+
+    public bool IsGroup => Issue is null;
+
+    public bool IsLeaf => Issue is not null;
+
+    public ObservableCollection<ValidationIssueNodeViewModel> Children { get; } = new();
+
+    public string LineText => Issue?.LineText ?? string.Empty;
+
+    public string CodeText => Issue?.CodeText ?? string.Empty;
+
+    public string PathText => Issue?.PathText ?? string.Empty;
+
+    public string Message => Issue?.Message ?? string.Empty;
+
+    public static ValidationIssueNodeViewModel Group(string header) => new(header, null);
+
+    public static ValidationIssueNodeViewModel Leaf(DatasetIssueViewModel issue) => new(string.Empty, issue);
 }
 
 public sealed class DatasetIssueViewModel

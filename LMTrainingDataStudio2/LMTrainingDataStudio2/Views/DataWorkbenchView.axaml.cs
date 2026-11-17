@@ -179,6 +179,15 @@ public partial class DataWorkbenchView : UserControl
         }
     }
 
+    private void OnIssueTreeDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (DataContext is not DataWorkbenchViewModel vm) return;
+        if (vm.Validation.SelectedTreeNode?.Issue?.LineNumber is { } line)
+        {
+            vm.Validation.RequestJump(line);
+        }
+    }
+
     private void OnSearchMatchDoubleTapped(object? sender, TappedEventArgs e)
     {
         if (DataContext is not DataWorkbenchViewModel vm) return;
@@ -190,11 +199,17 @@ public partial class DataWorkbenchView : UserControl
 
     private void OnRowDoubleTapped(object? sender, TappedEventArgs e)
     {
-        if (RowJsonEditor.IsEnabled)
+        if (DataContext is not DataWorkbenchViewModel vm || !RowJsonEditor.IsEnabled)
+        {
+            return;
+        }
+
+        vm.SelectedEditorTabIndex = 1;
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
             RowJsonEditor.Focus();
             RowJsonEditor.SelectAll();
-        }
+        });
     }
 
     private async void OnSaveEditsClick(object? sender, RoutedEventArgs e)

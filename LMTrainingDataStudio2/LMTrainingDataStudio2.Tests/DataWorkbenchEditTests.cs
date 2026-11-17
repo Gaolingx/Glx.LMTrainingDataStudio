@@ -191,6 +191,144 @@ public sealed class DataWorkbenchEditTests
         Assert.That(vm.Validation.FilterSummary, Does.Contain("1 /"));
     }
 
+    [Test]
+    public async Task Edit_FieldCells_UpdateOnlySelectedField()
+    {
+        var vm = new DataWorkbenchViewModel(_settings);
+        await vm.OpenDatasetAsync(CreateJsonl(2));
+
+        vm.SelectedRow = vm.Rows[0];
+
+        Assert.That(vm.FieldsAvailable, Is.True);
+        Assert.That(vm.SelectedEditorTabIndex, Is.Zero);
+        Assert.That(vm.SelectedRowFields.Select(field => field.Name),
+            Is.EqualTo(new[] { "id", "text" }));
+
+        var text = vm.SelectedRowFields.First(field => field.Name == "text");
+        Assert.That(vm.ApplyFieldsCommand.CanExecute(null), Is.False);
+        text.ValueText = "\"changed\"";
+        Assert.That(vm.ApplyFieldsCommand.CanExecute(null), Is.True);
+        await vm.ApplyFieldsCommand.ExecuteAsync(null);
+
+        Assert.That(vm.HasPendingEdits, Is.True);
+        Assert.That(vm.Rows[0].Preview, Does.Contain("changed"));
+        Assert.That(vm.Rows[0].Preview, Does.Contain("\"id\": 1"));
+
+        await vm.UndoEditCommand.ExecuteAsync(null);
+        Assert.That(vm.HasPendingEdits, Is.False);
+        Assert.That(vm.Rows[0].Preview, Does.Contain("row-1"));
+        Assert.That(vm.SelectedRowFields.First(field => field.Name == "text").ValueText,
+            Is.EqualTo("\"row-1\""));
+    }
+
+    [Test]
+    public async Task Edit_AddAndRemoveFields_ArePersisted()
+    {
+        var target = Path.Combine(_directory, "fields.jsonl");
+        var vm = new DataWorkbenchViewModel(_settings);
+        await vm.OpenDatasetAsync(CreateJsonl(1));
+
+        vm.SelectedRow = vm.Rows[0];
+        vm.NewFieldName = "tag";
+        vm.AddFieldCommand.Execute(null);
+        var tag = vm.SelectedRowFields.First(field => field.Name == "tag");
+        tag.ValueText = "\"x\"";
+        await vm.ApplyFieldsCommand.ExecuteAsync(null);
+
+        vm.SelectedRow = vm.Rows[0];
+        vm.SelectedField = vm.SelectedRowFields.First(field => field.Name == "id");
+        vm.RemoveFieldCommand.Execute(null);
+        await vm.ApplyFieldsCommand.ExecuteAsync(null);
+
+        Assert.That(vm.Rows[0].Preview, Does.Contain("\"tag\": \"x\""));
+        Assert.That(vm.Rows[0].Preview, Does.Not.Contain("\"id\""));
+
+        Assert.That(await vm.SaveEditsAsync(target), Is.True, vm.EditStatusText);
+        var line = (await File.ReadAllLinesAsync(target)).Single();
+        Assert.That(line, Does.Contain("\"tag\":\"x\""));
+        Assert.That(line, Does.Not.Contain("\"id\""));
+    }
+
+    [Test]
+    public async Task Edit_NonObjectRow_UsesRawEditor()
+    {
+        var path = Path.Combine(_directory, "array.jsonl");
+        await File.WriteAllLinesAsync(path, new[] { "[1,2]", """{"a":1}""" });
+        var vm = new DataWorkbenchViewModel(_settings);
+        await vm.OpenDatasetAsync(path);
+
+        vm.SelectedRow = vm.Rows[0];
+
+        Assert.That(vm.FieldsAvailable, Is.False);
+        Assert.That(vm.SelectedEditorTabIndex, Is.EqualTo(1));
+
+        vm.SelectedJsonText = """[3,4]""";
+        await vm.ApplyRowEditCommand.ExecuteAsync(null);
+
+        Assert.That(vm.HasPendingEdits, Is.True);
+        Assert.That(vm.Rows[0].Preview, Does.Contain("3"));
+    }
+
+    [Test]
+    public async Task Edit_InvalidFieldValue_ReportsFieldError()
+    {
+        var vm = new DataWorkbenchViewModel(_settings);
+        await vm.OpenDatasetAsync(CreateJsonl(1));
+        vm.SelectedRow = vm.Rows[0];
+
+        var id = vm.SelectedRowFields.First(field => field.Name == "id");
+        id.ValueText = "{broken";
+        await vm.ApplyFieldsCommand.ExecuteAsync(null);
+
+        Assert.That(vm.RowEditError, Does.Contain("Field 'id'"));
+        Assert.That(vm.HasPendingEdits, Is.False);
+    }
+
+    [Test]
+    public async Task Validation_GroupBySeverityAndCode_BuildsTree()
+    {
+        var path = Path.Combine(_directory, "group.jsonl");
+        await File.WriteAllLinesAsync(path, new[]
+        {
+            """{"messages":[{"role":"user","content":"ok"}]}""",
+            "{broken",
+            """{"foo":"bar"}"""
+        });
+
+        var vm = new DataWorkbenchViewModel(_settings);
+        await vm.OpenDatasetAsync(path);
+        await vm.Validation.ValidateCommand.ExecuteAsync(null);
+
+        vm.Validation.SelectedGroupMode = vm.Validation.GroupModes
+            .First(mode => mode.Key == ValidationGroupModeOption.SeverityKey);
+
+        Assert.That(vm.Validation.IsGrouped, Is.True);
+        Assert.That(vm.Validation.IssueTree, Has.Count.EqualTo(2));
+        Assert.That(vm.Validation.IssueTree[0].Header, Does.Contain("1"));
+        Assert.That(vm.Validation.IssueTree.Sum(group => group.Children.Count),
+            Is.EqualTo(vm.Validation.FilteredIssues.Count));
+
+        var leaf = vm.Validation.IssueTree[0].Children[0];
+        vm.Validation.SelectedTreeNode = leaf;
+        Assert.That(vm.Validation.SelectedIssue, Is.SameAs(leaf.Issue));
+        Assert.That(vm.Validation.SelectedIssue!.IsError, Is.True);
+
+        vm.Validation.SelectedCodeOption = vm.Validation.CodeOptions
+            .First(option => option.Key == "json-syntax");
+        Assert.That(vm.Validation.IssueTree, Has.Count.EqualTo(1));
+        Assert.That(vm.Validation.IssueTree[0].Children, Has.Count.EqualTo(1));
+
+        vm.Validation.SelectedGroupMode = vm.Validation.GroupModes
+            .First(mode => mode.Key == ValidationGroupModeOption.CodeKey);
+        Assert.That(vm.Validation.IssueTree, Has.Count.EqualTo(1));
+        Assert.That(vm.Validation.IssueTree[0].Header, Does.Contain("json-syntax"));
+
+        vm.Validation.SelectedGroupMode = vm.Validation.GroupModes
+            .First(mode => mode.Key == ValidationGroupModeOption.NoneKey);
+        Assert.That(vm.Validation.IsGrouped, Is.False);
+        Assert.That(vm.Validation.IssueTree, Is.Empty);
+    }
+
     private string CreateJsonl(int rows)
     {
         var path = Path.Combine(_directory, $"source-{Guid.NewGuid():N}.jsonl");

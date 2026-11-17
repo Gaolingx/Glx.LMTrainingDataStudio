@@ -13,7 +13,7 @@
 - 逐项核对 `Services/`、`ViewModels/`、`Views/` 与测试，修正第四节目录中已完成的条目（画布、数据治理、执行控制、UI 面板等）。
 - 修正与代码不一致的描述：LLM Prompt 使用 Fluid 模板（不再写“仅 field.path”）；SFT Export 按行透传、不主动裁剪字段；CurrentFilePath 已接线；内存占用仍只采样一次。
 - 新增 Round 13–16 规划：执行与 IO 韧性、数据工作台编辑与预览、节点能力收紧、发布与体验。
-- 当前验证：`dotnet build` 0 警告；`dotnet test` 467 通过 + 6 个 gated 跳过。
+- 当前验证：`dotnet build` 0 警告；`dotnet test` 480 通过 + 6 个 gated 跳过。
 
 ---
 
@@ -86,20 +86,21 @@
 - [x] 编辑会话：新增 `DatasetEditSession`，按源行号记录替换/删除/插入（插入行有稳定 ID），支持跨页保留、撤销/重做（快照栈，最多 200 步）与整体放弃。
 - [x] 流式保存：新增 `DatasetEditService`，先校验所有编辑行 JSON，再按块读取源文件、应用编辑并写临时文件，最后原子替换；取消/失败不产生半成品，未修改 JSONL 行文本原样复制。
 - [x] 保存摘要：保存前生成替换/删除/插入计数与最多 5 条 before/after 示例；覆盖源文件与另存为均先确认。
-- [x] Data 工作台编辑 UI：插入上方/下方、复制行、删除/恢复、行 JSON 编辑器、撤销/重做、丢弃、编辑另存为、覆盖源文件；行显示 NEW/EDIT/DEL 标记，删除行删除线显示。
+- [x] Data 工作台编辑 UI：插入上方/下方、复制行、删除/恢复、撤销/重做、丢弃、编辑另存为、覆盖源文件；行显示 NEW/EDIT/DEL 标记，删除行删除线显示。
+- [x] 字段级单元格编辑：选中行默认进入 Fields 模式，按顶层字段编辑 JSON 值，支持新增/删除字段；非对象行回退 Raw JSON 模式；嵌套对象/数组按 JSON 文本编辑。
 - [x] 搜索高亮：`HighlightMatcher` 支持字面量与正则（100ms 超时、非法模式降级），`TextHighlightBehavior` 用 Inlines 渲染行内高亮；搜索框查询即时映射到表格行。
-- [x] 校验问题筛选：新增级别（全部/错误/警告）与错误码下拉筛选、筛选计数；列表绑定筛选结果。
+- [x] 校验问题分组与筛选：级别/错误码筛选 + 按级别/按错误码分组树，组头显示计数，叶子双击跳行；筛选与分组可组合。
 - [x] 统一样本预览：`SamplePreviewService` 读取 JSONL/CSV/Parquet 前 N 行，或对 JSONL 应用 Cleaner 规则生成前后 diff；`SamplePreviewWindow` 支持文件/双栏 diff 两种模式。
 - [x] 预览入口：SFT Export 输出、Validator 拒绝行、Simulation 失败样本接入文件预览；Cleaner 面板选择样本文件后查看清洗 diff；预览窗口可跳转数据工作台打开该文件。
 - [x] JSONL 写出统一使用 LF 换行，保证未修改行在 LF 源上逐字节一致。
-- [x] 新增 30 个测试：编辑服务 9、工作台编辑/撤销/覆盖/筛选 7、高亮匹配 8、样本预览 5、Headless 高亮渲染 1；另新增 1 个 gated 1M 行编辑保存基线。
+- [x] 新增 43 个测试：编辑服务 9、工作台编辑/字段编辑/撤销/覆盖/筛选/分组 12、字段读写 8、高亮匹配 8、样本预览 5、Headless 高亮渲染 1；另新增 1 个 gated 1M 行编辑保存基线。
 
 ### 8.2 验证结果
 
 | 项目 | 命令 | 结果 |
 | --- | --- | --- |
 | 构建 | `dotnet build LMTrainingDataStudio2/LMTrainingDataStudio2.slnx` | 成功，0 警告，0 错误 |
-| 测试 | `dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx` | 467 通过，0 失败，6 跳过（2 provider + 4 性能 gated） |
+| 测试 | `dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx` | 480 通过，0 失败，6 跳过（2 provider + 4 性能 gated） |
 | Headless UI | `dotnet test --filter HeadlessUiTests` | 7 通过，含行内高亮 Inlines 渲染断言 |
 | 编辑保存 | `DatasetEditServiceTests` | 行数守恒、未修改行保持、无效 JSON 先失败、取消不落盘、覆盖源文件、撤销重做还原 |
 | 1M 行编辑保存 | `LMTDS_PERF_TESTS=1 dotnet test --filter EditSave_LargeInput` | 1000 替换/100 删除/100 插入，55.6s，托管内存增量 11MB，写出 1,000,000 行 |
@@ -108,7 +109,7 @@
 ### 8.3 本轮未做
 
 - 编辑只支持保存为源格式；跨格式保存需先走批量转换。
-- 单元格式编辑是整行 JSON 编辑器，未做按字段/消息级别的结构化表单。
+- 字段编辑覆盖顶层字段；`messages` 等嵌套结构仍以整段 JSON 文本编辑，未做消息/角色级表单。
 - CSV/Parquet 保存会重写整表（内容等价但字节不保证一致）；逐字节一致仅对 LF JSONL 保证。
 - 搜索高亮不区分“当前匹配项”，也未实现表格内上一处/下一处导航。
 - 预览窗口固定加载前 50 行，未提供分页或全文搜索。
@@ -278,10 +279,8 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/DatasetPerformanceTests.cs
 
 ### 1.5 本轮未做
 
-- 数据逐行编辑 CRUD/单元格编辑。
 - CSV / Parquet 的 1M 质量操作基线（本轮 1M 基线为 JSONL）。
 - 10M 实测（已提供 `LMTDS_PERF_ROWS=10000000` 入口，本轮未执行）。
-- 搜索命中行高亮、问题分组、数据编辑撤销/重做。
 - 数据工作台 UI 未逐项人工点击验证（XAML 编译、启动冒烟与 ViewModel 单测通过）。
 
 ---
@@ -1214,7 +1213,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 - [x] 去重、混洗、切分（Round 11，数据工作台 Transform）。
 - [x] 正则搜索与替换（Round 11，当前页/全文件/预览/取消）。
 - [x] 数据集统计（角色、长度、空样本、重复率、工具调用，Round 11）。
-- [x] 数据增删查改、行 JSON 单元格编辑、保存到新文件或覆盖源文件、编辑撤销/重做（Round 14）。
+- [x] 数据增删查改、字段级单元格编辑与整行 JSON 编辑、保存到新文件或覆盖源文件、编辑撤销/重做（Round 14）。
 - [x] 输出预览弹窗 / 样本查看器（SFT Export、Validator reject、Simulation 失败样本、Cleaner 前后 diff，Round 14）。
 - [x] 搜索命中行内高亮（Round 14）。
 - [x] 最近文件、脏标记、关闭确认（Round 8）。
@@ -1389,11 +1388,12 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 - [x] 溢写缓冲/节点检查点/恢复/重试清理/取消清理（Round 13，10 个）。
 - [x] SFT 字段白名单/预览、运行溢写设置往返与回退（Round 13，7 个）。
 - [x] 数据编辑：会话/保存/摘要/覆盖/取消/撤销重做（Round 14，9 个）。
-- [x] 工作台编辑/高亮传播/删除插入/校验筛选/覆盖重开（Round 14，7 个）。
+- [x] 工作台编辑/高亮传播/删除插入/校验筛选/覆盖重开/字段编辑/分组树（Round 14，12 个）。
+- [x] 字段读写：对象字段解析、嵌套 JSON、增删字段、非法值与重名（Round 14，8 个）。
 - [x] 行内高亮匹配器（字面量/正则/大小写/超时/上限，Round 14，8 个）。
 - [x] 样本预览：文件读取、Cleaner diff、格式限制与缺失文件（Round 14，5 个）。
 - [x] Headless 行内高亮 Inlines 渲染（Round 14，1 个）。
-- [x] 当前测试总数：467 通过 + 6 gated（2026-11-17 复核）。
+- [x] 当前测试总数：480 通过 + 6 gated（2026-11-17 复核）。
 
 ### 4.9 工程化与发布
 
@@ -1424,7 +1424,7 @@ LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/RecipeValidationServiceTests.c
 
 ### P1 — Round 14：数据工作台编辑与预览（已完成，见附八）
 
-1. [x] 逐行 CRUD（插入/删除/复制/单元格 JSON 编辑）与另存/覆盖（覆盖需确认）。
+1. [x] 逐行 CRUD（插入/删除/复制/字段级单元格编辑）与另存/覆盖（覆盖需确认）。
 2. [x] 编辑撤销/重做与保存前差异摘要。
 3. [x] 搜索命中高亮、校验问题按级别/错误码筛选。
 4. [x] 统一样本/输出预览弹窗（SFT / Validator reject / Simulation 失败样本 / Cleaner diff）。
