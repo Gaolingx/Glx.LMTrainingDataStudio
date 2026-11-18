@@ -2,6 +2,71 @@
 
 本文件记录用户可见变更与工程化修复。完整未完成清单见 [PLAN/TODO/01-Bugfix1/HANDOFF.md](PLAN/TODO/01-Bugfix1/HANDOFF.md)。
 
+## [Unreleased] — 2026-11-18（Round 30 / 数据工作台视图）
+
+### Added
+
+- 数据工作台新增字段表格视图：按顶层字段展示单元格，表头点击排序（升/降序切换），筛选工具栏支持包含、相等、数值比较、空值与正则。
+- 排序与筛选在完整数据集上流式构建视图索引；`IDatasetReader.ReadRowsAsync` 支持散列行读取，Parquet 按 row group 批量解码。
+- 列宽可拖拽调整，并按字段名保存到设置（加载时钳制 48–800px）。
+
+### Changed
+
+- 视图激活期间禁用行编辑；搜索/校验跳转自动清除视图；存在待保存编辑或转换时拒绝建立视图。
+- 视图内“跳转到行”仍按源行号定位，未命中时提示该行不在视图中。
+- 视图索引用 4,096 行分块扫描，匹配上限 100 万行；超限提示缩窄筛选。
+
+### Tests
+
+- `--list-tests`：709 个用例；`dotnet test`：701 通过 / 0 失败 / 7 跳过（另 1 个 `[Explicit]`）。
+- 新增 24 项测试：筛选/排序/正则/上限/散列读取、视图分页与编辑禁用、视图内跳行、列宽持久化、设置清洗与 Headless 字段视图绑定。
+
+### Known Issues
+
+- 视图索引常驻内存且上限 100 万行，10M 行未做磁盘索引与实测；CSV 类型推断未做。
+
+## [Unreleased] — 2026-11-18（Round 29 / LLM 流式与模型列表）
+
+### Added
+
+- LLM 节点新增 `Streaming` 开关：OpenAI Chat 走 SSE，累积 content、按 index 合并 tool_calls 并读取 usage；重试从空累积器重启。
+- 新增 `LlmModelCatalog` 与面板模型下拉/刷新（OpenAI `/models`、Anthropic `/v1/models`），复用 `ILlmCredentials`。
+
+### Changed
+
+- Responses/Anthropic 在开启流式时仍为一次性响应，面板已注明。
+- 模型目录失败在面板内提示；刷新期间切换 provider/endpoint 丢弃过期结果。
+
+### Tests
+
+- `--list-tests`：685 个用例；`dotnet test`：677 通过 / 0 失败 / 7 跳过（另 1 个 `[Explicit]`）。
+- 新增 16 项测试：SSE 内容/工具/usage 累积、瞬时错误重试、模型目录、编辑器写回与 Headless 面板绑定。
+
+### Known Issues
+
+- SSE 与模型接口仅用本地桩验证，真实 provider 冒烟仍为 gated；Responses/Anthropic 无流式。
+
+## [Unreleased] — 2026-11-18（Round 28 / 执行并发与溢写清理）
+
+### Added
+
+- 运行期输出写锁：每个目标文件同级 `.lmtds.lock` 以 `FileShare.None` 独占，运行前获取、结束/失败释放，冲突时拒绝启动并列出目标。
+- 启动时清理溢写根下的 run-scoped 残留目录；删除失败留待下次重试。
+
+### Changed
+
+- 输出目标定义抽到 `RecipeOutputTargets`，校验与运行期锁共用。
+- 取消性能测试改为读取 `LMTDS_CANCEL_BUDGET_MS`，CI 使用 3s 门禁，本机默认 1s。
+
+### Tests
+
+- `--list-tests`：669 个用例；`dotnet test`：661 通过 / 0 失败 / 7 跳过（另 1 个 `[Explicit]`）。
+- 新增 10 项测试：写锁冲突/释放、溢写目录启动清理、运行前置锁校验。
+
+### Known Issues
+
+- 锁的跨进程语义以同进程第二次独占打开模拟，未做真实双进程端到端验证。
+
 ## [Unreleased] — 2026-11-18（Round 27 / 执行韧性收尾）
 
 ### Added

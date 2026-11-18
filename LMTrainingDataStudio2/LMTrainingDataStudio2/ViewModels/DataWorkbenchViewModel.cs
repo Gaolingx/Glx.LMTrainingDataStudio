@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Text.Json;
+using System.Windows.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LMTrainingDataStudio2.Localization;
@@ -33,8 +34,12 @@ public partial class DataWorkbenchViewModel : ObservableObject
     private DataFileType _sourceFileType;
     private CancellationTokenSource? _conversionCancellation;
     private CancellationTokenSource? _loadCancellation;
+    private CancellationTokenSource? _viewCancellation;
+    private DatasetViewIndex? _viewIndex;
+    private DatasetViewSpec _viewSpec = new();
     private int _pageLoadVersion;
     private int _openVersion;
+    private int _viewVersion;
     private bool _targetPathIsSuggested = true;
     private bool _updatingTargetPath;
     private DatasetEditSession? _editSession;
@@ -150,10 +155,48 @@ public partial class DataWorkbenchViewModel : ObservableObject
     [ObservableProperty]
     private string? _messageEditError;
 
+    [ObservableProperty]
+    private long _sourceTotalRows;
+
+    [ObservableProperty]
+    private bool _showFields;
+
+    [ObservableProperty]
+    private bool _isBuildingView;
+
+    [ObservableProperty]
+    private double _viewProgress;
+
+    [ObservableProperty]
+    private string _viewStatusText = string.Empty;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TotalRowsText))]
+    private bool _hasActiveView;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ApplyFilterCommand))]
+    private DatasetColumnViewModel? _selectedFilterColumn;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ApplyFilterCommand))]
+    private DatasetFilterOperatorOption? _selectedFilterOperator;
+
+    [ObservableProperty]
+    private string _filterValue = string.Empty;
+
+    [ObservableProperty]
+    private bool _filterCaseSensitive;
+
     public ObservableCollection<DatasetFieldViewModel> SelectedRowFields { get; } = new();
     public ObservableCollection<DatasetMessageViewModel> Messages { get; } = new();
     public ObservableCollection<DatasetRowViewModel> Rows { get; } = new();
+    public ObservableCollection<DatasetColumnViewModel> Columns { get; } = new();
+    public ObservableCollection<DatasetFilterOperatorOption> FilterOperators { get; } = new();
     public ObservableCollection<string> ConversionErrors { get; } = new();
+
+    /// <summary>Raised after column widths change so the shell can persist settings.</summary>
+    public event EventHandler? SettingsPersistenceRequested;
     public IReadOnlyList<int> AvailablePageSizes => PageSizes;
     public IReadOnlyList<DatasetFormatOption> TargetFormats => Formats;
 
@@ -166,7 +209,10 @@ public partial class DataWorkbenchViewModel : ObservableObject
         ? string.Format(LocalizationService.L("data.position_format"), CurrentPage, TotalPages)
         : LocalizationService.L("data.no_dataset");
 
-    public string TotalRowsText => string.Format(LocalizationService.L("data.total_rows_format"), TotalRows);
+    public string TotalRowsText => HasActiveView
+        ? string.Format(
+            LocalizationService.L("data.filtered_rows_format"), TotalRows, SourceTotalRows)
+        : string.Format(LocalizationService.L("data.total_rows_format"), TotalRows);
 
     public string SourcePathText => string.IsNullOrWhiteSpace(SourcePath)
         ? LocalizationService.L("data.no_dataset_opened")
@@ -183,8 +229,39 @@ public partial class DataWorkbenchViewModel : ObservableObject
         OnPropertyChanged(nameof(PositionText));
         OnPropertyChanged(nameof(TotalRowsText));
         OnPropertyChanged(nameof(SourcePathText));
+        RefreshFilterOperators();
         Validation.RefreshLocalization();
         OnEditSessionChanged();
+    }
+
+    private void RefreshFilterOperators()
+    {
+        var selected = SelectedFilterOperator?.Operator ?? DatasetFilterOperator.Contains;
+        FilterOperators.Clear();
+        FilterOperators.Add(new DatasetFilterOperatorOption(
+            DatasetFilterOperator.Contains, LocalizationService.L("data.filter_contains")));
+        FilterOperators.Add(new DatasetFilterOperatorOption(
+            DatasetFilterOperator.NotContains, LocalizationService.L("data.filter_not_contains")));
+        FilterOperators.Add(new DatasetFilterOperatorOption(
+            DatasetFilterOperator.Equals, LocalizationService.L("data.filter_equals")));
+        FilterOperators.Add(new DatasetFilterOperatorOption(
+            DatasetFilterOperator.NotEquals, LocalizationService.L("data.filter_not_equals")));
+        FilterOperators.Add(new DatasetFilterOperatorOption(
+            DatasetFilterOperator.GreaterThan, LocalizationService.L("data.filter_greater")));
+        FilterOperators.Add(new DatasetFilterOperatorOption(
+            DatasetFilterOperator.GreaterOrEqual, LocalizationService.L("data.filter_greater_equal")));
+        FilterOperators.Add(new DatasetFilterOperatorOption(
+            DatasetFilterOperator.LessThan, LocalizationService.L("data.filter_less")));
+        FilterOperators.Add(new DatasetFilterOperatorOption(
+            DatasetFilterOperator.LessOrEqual, LocalizationService.L("data.filter_less_equal")));
+        FilterOperators.Add(new DatasetFilterOperatorOption(
+            DatasetFilterOperator.IsEmpty, LocalizationService.L("data.filter_is_empty")));
+        FilterOperators.Add(new DatasetFilterOperatorOption(
+            DatasetFilterOperator.IsNotEmpty, LocalizationService.L("data.filter_is_not_empty")));
+        FilterOperators.Add(new DatasetFilterOperatorOption(
+            DatasetFilterOperator.MatchesRegex, LocalizationService.L("data.filter_matches_regex")));
+        SelectedFilterOperator =
+            FilterOperators.FirstOrDefault(option => option.Operator == selected) ?? FilterOperators[0];
     }
 
     public DataWorkbenchViewModel(AppSettings settings)
@@ -212,6 +289,7 @@ public partial class DataWorkbenchViewModel : ObservableObject
         Search = new DatasetSearchReplaceViewModel(settingsService.Current);
         Transform = new DatasetTransformViewModel(settingsService.Current);
         Statistics = new DatasetStatisticsViewModel(settingsService.Current);
+        RefreshFilterOperators();
 
         Validation.JumpRequested += line => _ = JumpToLineAsync(line);
         Search.JumpRequested += line => _ = JumpToLineAsync(line);
@@ -261,6 +339,7 @@ public partial class DataWorkbenchViewModel : ObservableObject
             return;
         }
 
+        CancelViewBuild();
         var openVersion = ++_openVersion;
         var cancellation = BeginLoad();
         IsBusy = true;
@@ -294,8 +373,16 @@ public partial class DataWorkbenchViewModel : ObservableObject
             _sourceFileType = fileType;
             SourcePath = openedPath;
             SourceFileTypeText = fileType.ToString().ToUpperInvariant();
+            ResetViewState();
+            SourceTotalRows = openedRows;
             TotalRows = openedRows;
+            Columns.Clear();
+            SelectedFilterColumn = null;
+            FilterValue = string.Empty;
+            FilterCaseSensitive = false;
+            ViewStatusText = string.Empty;
             IsDatasetOpen = true;
+            ApplyFilterCommand.NotifyCanExecuteChanged();
             GoToRowText = TotalRows == 0 ? "0" : "1";
             ResetEditSession(openedRows);
             SelectedRow = null;
@@ -367,6 +454,26 @@ public partial class DataWorkbenchViewModel : ObservableObject
             return Task.CompletedTask;
         }
 
+        if (HasActiveView && _viewIndex is { } view)
+        {
+            if (!long.TryParse(GoToRowText, out var sourceRow) ||
+                sourceRow < 1 || sourceRow > SourceTotalRows)
+            {
+                StatusText = TotalRows == 0
+                    ? "No rows match the view."
+                    : $"Row must be between 1 and {SourceTotalRows:N0}.";
+                return Task.CompletedTask;
+            }
+
+            if (!view.TryGetPosition(sourceRow - 1, out var position))
+            {
+                StatusText = $"Row {sourceRow:N0} is not part of the current view.";
+                return Task.CompletedTask;
+            }
+
+            return LoadPageAsync(position / PageSize + 1);
+        }
+
         if (!long.TryParse(GoToRowText, out var row) || row < 1 || row > TotalRows)
         {
             StatusText = TotalRows == 0
@@ -405,21 +512,36 @@ public partial class DataWorkbenchViewModel : ObservableObject
             var totalPages = TotalPages;
             page = Math.Clamp(page, 1, totalPages);
             var startRow = (page - 1) * PageSize;
-            var pageRows = await _reader.ReadPageAsync(startRow, PageSize, cancellationToken);
+            IReadOnlyList<DatasetRow> pageRows;
+            if (HasActiveView && _viewIndex is { } view)
+            {
+                pageRows = await _reader.ReadRowsAsync(
+                    view.GetSourceRows(startRow, PageSize), cancellationToken);
+            }
+            else
+            {
+                pageRows = await _reader.ReadPageAsync(startRow, PageSize, cancellationToken);
+            }
 
             if (version != _pageLoadVersion)
             {
                 return;
             }
 
+            var prepared = PreparePageRows(pageRows);
             Rows.Clear();
-            foreach (var row in pageRows)
+            foreach (var item in prepared)
             {
-                AddInsertedRows(row.LineNumber);
-                Rows.Add(CreateRowViewModel(row));
+                if (!HasActiveView)
+                {
+                    AddInsertedRows(item.Row.LineNumber);
+                }
+
+                Rows.Add(CreateRowViewModel(
+                    item.Row, item.Json, item.Fields, item.IsModified, item.IsDeleted));
             }
 
-            if (startRow + pageRows.Count >= TotalRows)
+            if (!HasActiveView && startRow + pageRows.Count >= TotalRows)
             {
                 AddInsertedRows(TotalRows);
             }
@@ -434,7 +556,16 @@ public partial class DataWorkbenchViewModel : ObservableObject
             }
 
             CurrentPage = page;
-            Search.SetPageWindow(startRow, pageRows.Count);
+            if (HasActiveView && pageRows.Count > 0)
+            {
+                var lines = pageRows.Select(row => row.LineNumber).ToArray();
+                Search.SetPageWindow(lines.Min(), (int)(lines.Max() - lines.Min() + 1));
+            }
+            else
+            {
+                Search.SetPageWindow(startRow, pageRows.Count);
+            }
+
             var lastRow = startRow + pageRows.Count;
             if (TotalRows == 0)
             {
@@ -446,7 +577,7 @@ public partial class DataWorkbenchViewModel : ObservableObject
                 GoToRowText = (startRow + 1).ToString();
             }
             StatusText = TotalRows == 0
-                ? "The dataset is empty."
+                ? HasActiveView ? "No rows match the view." : "The dataset is empty."
                 : $"Rows {startRow + 1:N0}-{lastRow:N0} of {TotalRows:N0}.";
         }
         catch (OperationCanceledException)
@@ -465,17 +596,315 @@ public partial class DataWorkbenchViewModel : ObservableObject
         }
     }
 
-    public Task JumpToLineAsync(long lineNumber)
+    public async Task JumpToLineAsync(long lineNumber)
     {
-        if (_reader is null || TotalRows == 0)
+        if (_reader is null)
         {
-            return Task.CompletedTask;
+            return;
+        }
+
+        if (HasActiveView)
+        {
+            ClearViewState();
+            TotalRows = SourceTotalRows;
+            ViewStatusText = "View cleared to jump to a source row.";
+        }
+
+        if (TotalRows == 0)
+        {
+            return;
         }
 
         var target = Math.Clamp(lineNumber, 1, TotalRows);
         GoToRowText = target.ToString();
-        return LoadPageAsync((target - 1) / PageSize + 1);
+        await LoadPageAsync((target - 1) / PageSize + 1);
     }
+
+    #region Dataset view
+
+    [RelayCommand]
+    private async Task SortByColumnAsync(DatasetColumnViewModel? column)
+    {
+        if (column is null || _reader is null)
+        {
+            return;
+        }
+
+        var descending = column.IsSorted && !column.SortDescending;
+        var spec = _viewSpec with { SortField = column.Name, SortDescending = descending };
+        await ApplyViewAsync(spec);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanApplyFilter))]
+    private async Task ApplyFilterAsync()
+    {
+        if (SelectedFilterColumn is null || SelectedFilterOperator is null)
+        {
+            return;
+        }
+
+        var spec = _viewSpec with
+        {
+            FilterField = SelectedFilterColumn.Name,
+            FilterOperator = SelectedFilterOperator.Operator,
+            FilterValue = FilterValue,
+            FilterCaseSensitive = FilterCaseSensitive
+        };
+        await ApplyViewAsync(spec);
+    }
+
+    private bool CanApplyFilter() =>
+        _reader is not null &&
+        SelectedFilterColumn is not null &&
+        SelectedFilterOperator is not null &&
+        !IsBuildingView &&
+        !IsBusy &&
+        !IsConverting &&
+        !IsSavingEdits;
+
+    [RelayCommand(CanExecute = nameof(CanClearView))]
+    private async Task ClearViewAsync()
+    {
+        ClearViewState();
+        TotalRows = SourceTotalRows;
+        ViewStatusText = "View cleared.";
+        if (_reader is not null)
+        {
+            await LoadPageAsync(1);
+        }
+    }
+
+    private bool CanClearView() => HasActiveView && !IsBuildingView;
+
+    [RelayCommand(CanExecute = nameof(IsBuildingView))]
+    private void CancelView() => _viewCancellation?.Cancel();
+
+    private async Task ApplyViewAsync(DatasetViewSpec spec)
+    {
+        if (_reader is null || !spec.IsActive)
+        {
+            return;
+        }
+
+        if (HasPendingEdits || IsSavingEdits)
+        {
+            ViewStatusText = "Save or discard pending edits before sorting or filtering.";
+            return;
+        }
+
+        if (IsConverting)
+        {
+            ViewStatusText = "Wait for the conversion to finish.";
+            return;
+        }
+
+        var version = ++_viewVersion;
+        _viewCancellation?.Cancel();
+        _viewCancellation?.Dispose();
+        var cancellation = new CancellationTokenSource();
+        _viewCancellation = cancellation;
+        CancelLoad();
+        IsBuildingView = true;
+        ViewProgress = 0;
+        ViewStatusText = "Building view...";
+
+        try
+        {
+            var progress = new Progress<double>(value =>
+            {
+                if (version == _viewVersion)
+                {
+                    ViewProgress = value;
+                }
+            });
+            var reader = _reader;
+            var sourceTotal = SourceTotalRows;
+            var index = await Task.Run(
+                () => DatasetViewBuilder.BuildAsync(
+                    reader, sourceTotal, spec, progress,
+                    cancellationToken: cancellation.Token),
+                cancellation.Token);
+
+            if (version != _viewVersion || cancellation.IsCancellationRequested)
+            {
+                return;
+            }
+
+            _viewIndex = index;
+            _viewSpec = spec;
+            HasActiveView = true;
+            TotalRows = index.Count;
+            MergeColumns(index.FieldNames);
+            UpdateColumnSortIndicators();
+            await LoadPageAsync(1);
+            if (version == _viewVersion)
+            {
+                ViewStatusText = BuildViewSummary(spec, index.Count);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            if (version == _viewVersion)
+            {
+                ViewStatusText = "View build cancelled.";
+            }
+        }
+        catch (DatasetViewLimitException ex)
+        {
+            if (version == _viewVersion)
+            {
+                ViewStatusText = ex.Message;
+            }
+        }
+        catch (ArgumentException ex)
+        {
+            if (version == _viewVersion)
+            {
+                ViewStatusText = ex.Message;
+            }
+        }
+        catch (System.Text.RegularExpressions.RegexMatchTimeoutException)
+        {
+            if (version == _viewVersion)
+            {
+                ViewStatusText = "The filter regular expression timed out.";
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                                       or DatasetFormatException or ObjectDisposedException
+                                       or InvalidOperationException)
+        {
+            if (version == _viewVersion)
+            {
+                ViewStatusText = $"View failed: {ex.Message}";
+            }
+        }
+        finally
+        {
+            if (version == _viewVersion)
+            {
+                IsBuildingView = false;
+                ViewProgress = 0;
+            }
+
+            if (ReferenceEquals(_viewCancellation, cancellation))
+            {
+                _viewCancellation = null;
+                cancellation.Dispose();
+            }
+        }
+    }
+
+    private static string BuildViewSummary(DatasetViewSpec spec, long rowCount)
+    {
+        var parts = new List<string>();
+        if (spec.HasFilter)
+        {
+            parts.Add($"filter '{spec.FilterField}' {spec.FilterOperator} '{spec.FilterValue}'");
+        }
+
+        if (spec.HasSort)
+        {
+            parts.Add($"sorted by '{spec.SortField}' {(spec.SortDescending ? "descending" : "ascending")}");
+        }
+
+        return $"View: {rowCount:N0} row(s), {string.Join(", ", parts)}.";
+    }
+
+    private void CancelViewBuild()
+    {
+        _viewVersion++;
+        _viewCancellation?.Cancel();
+        _viewCancellation?.Dispose();
+        _viewCancellation = null;
+        IsBuildingView = false;
+        ViewProgress = 0;
+    }
+
+    private void ClearViewState()
+    {
+        CancelViewBuild();
+        _viewIndex = null;
+        _viewSpec = new DatasetViewSpec();
+        HasActiveView = false;
+        UpdateColumnSortIndicators();
+    }
+
+    private void ResetViewState()
+    {
+        ClearViewState();
+        ViewStatusText = string.Empty;
+    }
+
+    private void UpdateColumnSortIndicators()
+    {
+        foreach (var column in Columns)
+        {
+            var isSorted = _viewSpec.HasSort &&
+                           string.Equals(column.Name, _viewSpec.SortField, StringComparison.Ordinal);
+            column.IsSorted = isSorted;
+            column.SortDescending = isSorted && _viewSpec.SortDescending;
+        }
+    }
+
+    private void MergeColumns(IEnumerable<string> names)
+    {
+        var known = new HashSet<string>(
+            Columns.Select(column => column.Name), StringComparer.Ordinal);
+        foreach (var name in names)
+        {
+            if (name.Length == 0 || known.Count >= DatasetViewBuilder.MaxDiscoveredFields)
+            {
+                continue;
+            }
+
+            if (!known.Add(name))
+            {
+                continue;
+            }
+
+            Columns.Add(new DatasetColumnViewModel(name, GetSavedColumnWidth(name))
+            {
+                SortCommand = SortByColumnCommand
+            });
+        }
+
+        SelectedFilterColumn ??= Columns.FirstOrDefault();
+        ApplyFilterCommand.NotifyCanExecuteChanged();
+    }
+
+    private double GetSavedColumnWidth(string name) =>
+        _settingsService.Current.DataWorkbenchColumnWidths.TryGetValue(name, out var width)
+            ? width
+            : DatasetColumnViewModel.DefaultWidth;
+
+    /// <summary>Applies a drag delta from the column header resizer.</summary>
+    public void ResizeColumn(DatasetColumnViewModel column, double delta)
+    {
+        ArgumentNullException.ThrowIfNull(column);
+        column.Width = Math.Clamp(
+            column.Width + delta, DatasetColumnViewModel.MinWidth, DatasetColumnViewModel.MaxWidth);
+    }
+
+    /// <summary>Writes the current column widths to settings and asks the shell to persist them.</summary>
+    public void CommitColumnWidths()
+    {
+        if (Columns.Count == 0)
+        {
+            return;
+        }
+
+        var widths = _settingsService.Current.DataWorkbenchColumnWidths;
+        widths.Clear();
+        foreach (var column in Columns)
+        {
+            widths[column.Name] = Math.Round(column.Width);
+        }
+
+        SettingsPersistenceRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    #endregion
 
     #region Row editing
 
@@ -904,15 +1333,42 @@ public partial class DataWorkbenchViewModel : ObservableObject
             : Math.Clamp(pageStart + PageSize, 0, TotalRows);
     }
 
-    private DatasetRowViewModel CreateRowViewModel(DatasetRow row)
+    private List<PreparedRow> PreparePageRows(IReadOnlyList<DatasetRow> pageRows)
     {
-        var replacement = _editSession?.GetReplacement(row.LineNumber);
+        var prepared = new List<PreparedRow>(pageRows.Count);
+        foreach (var row in pageRows)
+        {
+            var replacement = _editSession?.GetReplacement(row.LineNumber);
+            var json = replacement ?? row.Json;
+            var fields = DatasetJsonFields.TryRead(json, out var parsed)
+                ? parsed
+                : Array.Empty<DatasetFieldText>();
+            MergeColumns(fields.Select(field => field.Name));
+            prepared.Add(new PreparedRow(
+                row,
+                json,
+                fields,
+                replacement is not null,
+                _editSession?.IsDeleted(row.LineNumber) == true));
+        }
+
+        return prepared;
+    }
+
+    private DatasetRowViewModel CreateRowViewModel(
+        DatasetRow row,
+        string json,
+        IReadOnlyList<DatasetFieldText> fields,
+        bool isModified,
+        bool isDeleted)
+    {
         var model = new DatasetRowViewModel(
             row.LineNumber + 1,
-            replacement ?? row.Json,
+            json,
             originalIndex: row.LineNumber,
-            isDeleted: _editSession?.IsDeleted(row.LineNumber) == true,
-            isModified: replacement is not null);
+            isDeleted: isDeleted,
+            isModified: isModified);
+        model.SetFields(fields, Columns);
         ApplyHighlight(model);
         return model;
     }
@@ -928,10 +1384,22 @@ public partial class DataWorkbenchViewModel : ObservableObject
                 inserted.Json,
                 insertId: inserted.Id,
                 isInserted: true);
+            var fields = DatasetJsonFields.TryRead(inserted.Json, out var parsed)
+                ? parsed
+                : Array.Empty<DatasetFieldText>();
+            MergeColumns(fields.Select(field => field.Name));
+            model.SetFields(fields, Columns);
             ApplyHighlight(model);
             Rows.Add(model);
         }
     }
+
+    private sealed record PreparedRow(
+        DatasetRow Row,
+        string Json,
+        IReadOnlyList<DatasetFieldText> Fields,
+        bool IsModified,
+        bool IsDeleted);
 
     private Task ReloadPageAsync() => LoadPageAsync(CurrentPage);
 
@@ -967,10 +1435,13 @@ public partial class DataWorkbenchViewModel : ObservableObject
         var reader = DatasetIO.CreateReader(_sourceFileType, _settingsService.Current);
         await reader.OpenAsync(SourcePath);
         _reader = reader;
+        ResetViewState();
+        SourceTotalRows = reader.TotalRows;
         TotalRows = reader.TotalRows;
         ResetEditSession(TotalRows);
         SelectedRow = null;
         GoToRowText = TotalRows == 0 ? "0" : "1";
+        ApplyFilterCommand.NotifyCanExecuteChanged();
         await LoadPageAsync(1);
     }
 
@@ -988,7 +1459,8 @@ public partial class DataWorkbenchViewModel : ObservableObject
         }
     }
 
-    private bool CanInsertRow() => _editSession is not null && !IsBusy && !IsConverting && !IsSavingEdits;
+    private bool CanInsertRow() =>
+        _editSession is not null && !IsBusy && !IsConverting && !IsSavingEdits && !HasActiveView;
 
     private bool CanEditSelectedRow() => CanInsertRow() && SelectedRow is { IsDeleted: false };
 
@@ -1334,13 +1806,39 @@ public partial class DataWorkbenchViewModel : ObservableObject
     partial void OnSelectedFieldChanged(DatasetFieldViewModel? value) =>
         RemoveFieldCommand.NotifyCanExecuteChanged();
 
-    partial void OnIsBusyChanged(bool value) => NotifyEditCommands();
+    partial void OnIsBusyChanged(bool value)
+    {
+        NotifyEditCommands();
+        ApplyFilterCommand.NotifyCanExecuteChanged();
+    }
 
-    partial void OnIsConvertingChanged(bool value) => NotifyEditCommands();
+    partial void OnIsConvertingChanged(bool value)
+    {
+        NotifyEditCommands();
+        ApplyFilterCommand.NotifyCanExecuteChanged();
+    }
 
-    partial void OnIsSavingEditsChanged(bool value) => NotifyEditCommands();
+    partial void OnIsSavingEditsChanged(bool value)
+    {
+        NotifyEditCommands();
+        ApplyFilterCommand.NotifyCanExecuteChanged();
+    }
 
     partial void OnHasPendingEditsChanged(bool value) => NotifyEditCommands();
+
+    partial void OnHasActiveViewChanged(bool value)
+    {
+        NotifyEditCommands();
+        ClearViewCommand.NotifyCanExecuteChanged();
+        ApplyFilterCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnIsBuildingViewChanged(bool value)
+    {
+        CancelViewCommand.NotifyCanExecuteChanged();
+        ClearViewCommand.NotifyCanExecuteChanged();
+        ApplyFilterCommand.NotifyCanExecuteChanged();
+    }
 
     partial void OnHighlightQueryChanged(string value) => UpdateRowHighlight();
 
@@ -1374,6 +1872,61 @@ public partial class DataWorkbenchViewModel : ObservableObject
 }
 
 public sealed record DatasetFormatOption(DatasetFormat Format, string Name)
+{
+    public override string ToString() => Name;
+}
+
+/// <summary>One displayed dataset column. Widths are shared by header and cells.</summary>
+public sealed partial class DatasetColumnViewModel : ObservableObject
+{
+    public const double MinWidth = 60;
+    public const double MaxWidth = 600;
+    public const double DefaultWidth = 180;
+
+    public DatasetColumnViewModel(string name, double width)
+    {
+        Name = name;
+        _width = double.IsFinite(width)
+            ? Math.Clamp(width, MinWidth, MaxWidth)
+            : DefaultWidth;
+    }
+
+    public string Name { get; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SortIndicator))]
+    private double _width;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SortIndicator))]
+    private bool _isSorted;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SortIndicator))]
+    private bool _sortDescending;
+
+    public string SortIndicator => IsSorted ? (SortDescending ? "▼" : "▲") : string.Empty;
+
+    public ICommand? SortCommand { get; internal set; }
+}
+
+/// <summary>One field value of a preview row in the field table.</summary>
+public sealed class DatasetCellViewModel
+{
+    public DatasetCellViewModel(DatasetColumnViewModel column, string text)
+    {
+        Column = column;
+        Text = text;
+    }
+
+    public DatasetColumnViewModel Column { get; }
+
+    public string Text { get; }
+}
+
+public sealed record DatasetFilterOperatorOption(
+    DatasetFilterOperator Operator,
+    string Name)
 {
     public override string ToString() => Name;
 }
@@ -1516,7 +2069,32 @@ public sealed partial class DatasetRowViewModel : ObservableObject
 
     public string Preview { get; }
 
+    public IReadOnlyList<DatasetCellViewModel> Cells { get; private set; } =
+        Array.Empty<DatasetCellViewModel>();
+
     public bool IsEditable => !IsDeleted;
+
+    internal void SetFields(
+        IReadOnlyList<DatasetFieldText> fields,
+        IReadOnlyList<DatasetColumnViewModel> columns)
+    {
+        var values = new Dictionary<string, string>(fields.Count, StringComparer.Ordinal);
+        foreach (var field in fields)
+        {
+            values[field.Name] = field.Text;
+        }
+
+        var cells = new DatasetCellViewModel[columns.Count];
+        for (var i = 0; i < columns.Count; i++)
+        {
+            cells[i] = new DatasetCellViewModel(
+                columns[i],
+                values.TryGetValue(columns[i].Name, out var text) ? text : string.Empty);
+        }
+
+        Cells = cells;
+        OnPropertyChanged(nameof(Cells));
+    }
 
     public bool IsSearchMatch => HighlightMatcher.HasMatch(
         Preview, HighlightQuery, HighlightUseRegex, HighlightCaseSensitive);

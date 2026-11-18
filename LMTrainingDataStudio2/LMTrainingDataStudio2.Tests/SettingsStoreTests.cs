@@ -419,6 +419,44 @@ public sealed class SettingsStoreTests
         Assert.That(File.Exists(_path + ".tmp"), Is.False);
     }
 
+    [Test]
+    public void Load_SanitizesWorkbenchColumnWidths()
+    {
+        File.WriteAllText(_path, """
+        {
+          "dataWorkbenchColumnWidths": {
+            "id": 240,
+            "tooSmall": 5,
+            "tooLarge": 5000,
+            "  ": 100
+          }
+        }
+        """);
+
+        var result = _store.Load();
+
+        Assert.That(result.Settings.DataWorkbenchColumnWidths["id"], Is.EqualTo(240));
+        Assert.That(
+            result.Settings.DataWorkbenchColumnWidths["tooSmall"],
+            Is.EqualTo(SettingsStore.MinWorkbenchColumnWidth));
+        Assert.That(
+            result.Settings.DataWorkbenchColumnWidths["tooLarge"],
+            Is.EqualTo(SettingsStore.MaxWorkbenchColumnWidth));
+        Assert.That(result.Settings.DataWorkbenchColumnWidths.Count, Is.EqualTo(3));
+    }
+
+    [Test]
+    public async Task SaveAndLoad_RoundTripsWorkbenchColumnWidths()
+    {
+        var settings = new AppSettings();
+        settings.DataWorkbenchColumnWidths["messages"] = 320;
+
+        await _store.SaveAsync(settings);
+        var result = _store.Load();
+
+        Assert.That(result.Settings.DataWorkbenchColumnWidths["messages"], Is.EqualTo(320));
+    }
+
     private sealed class FakeApiKeyProtector : IApiKeyProtector
     {
         public const string Marker = "fake:v1:";

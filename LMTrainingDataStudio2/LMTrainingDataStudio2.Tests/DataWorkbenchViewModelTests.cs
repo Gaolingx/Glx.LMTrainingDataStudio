@@ -336,6 +336,170 @@ public sealed class DataWorkbenchViewModelTests
         Assert.Fail("Timed out waiting for the expected state.");
     }
 
+    [Test]
+    public async Task ApplyFilter_RestrictsRowsAcrossPages_AndClearViewRestores()
+    {
+        var path = CreateJsonl(250);
+        var vm = new DataWorkbenchViewModel(_settings);
+        await vm.OpenDatasetAsync(path);
+
+        vm.SelectedFilterColumn = vm.Columns.First(column => column.Name == "id");
+        vm.SelectedFilterOperator = vm.FilterOperators.First(
+            option => option.Operator == DatasetFilterOperator.GreaterThan);
+        vm.FilterValue = "240";
+        await vm.ApplyFilterCommand.ExecuteAsync(null);
+
+        Assert.That(vm.HasActiveView, Is.True, vm.ViewStatusText);
+        Assert.That(vm.TotalRows, Is.EqualTo(10));
+        Assert.That(vm.SourceTotalRows, Is.EqualTo(250));
+        Assert.That(vm.TotalPages, Is.EqualTo(1));
+        Assert.That(vm.Rows, Has.Count.EqualTo(10));
+        Assert.That(vm.Rows[0].Number, Is.EqualTo(241));
+        var idCell = vm.Rows[0].Cells.First(cell => cell.Column.Name == "id");
+        Assert.That(idCell.Text, Is.EqualTo("241"));
+        Assert.That(vm.InsertRowBelowCommand.CanExecute(null), Is.False);
+
+        await vm.ClearViewCommand.ExecuteAsync(null);
+
+        Assert.That(vm.HasActiveView, Is.False);
+        Assert.That(vm.TotalRows, Is.EqualTo(250));
+        Assert.That(vm.Rows[0].Number, Is.EqualTo(1));
+        Assert.That(vm.InsertRowBelowCommand.CanExecute(null), Is.True);
+    }
+
+    [Test]
+    public async Task SortByColumn_ReordersAcrossPages_AndTogglesDirection()
+    {
+        var path = CreateJsonl(250);
+        var vm = new DataWorkbenchViewModel(_settings);
+        await vm.OpenDatasetAsync(path);
+
+        var idColumn = vm.Columns.First(column => column.Name == "id");
+        await vm.SortByColumnCommand.ExecuteAsync(idColumn);
+
+        Assert.That(vm.HasActiveView, Is.True, vm.ViewStatusText);
+        Assert.That(idColumn.IsSorted, Is.True);
+        Assert.That(idColumn.SortDescending, Is.False);
+        Assert.That(vm.Rows[0].Number, Is.EqualTo(1));
+
+        await vm.SortByColumnCommand.ExecuteAsync(idColumn);
+
+        Assert.That(idColumn.SortDescending, Is.True);
+        Assert.That(vm.Rows[0].Number, Is.EqualTo(250));
+
+        await vm.NextPageCommand.ExecuteAsync(null);
+
+        Assert.That(vm.CurrentPage, Is.EqualTo(2));
+        Assert.That(vm.Rows[0].Number, Is.EqualTo(150));
+    }
+
+    [Test]
+    public async Task ApplyFilter_WithPendingEdits_IsRejected()
+    {
+        var path = CreateJsonl(10);
+        var vm = new DataWorkbenchViewModel(_settings);
+        await vm.OpenDatasetAsync(path);
+        await vm.InsertRowBelowCommand.ExecuteAsync(null);
+        Assert.That(vm.HasPendingEdits, Is.True);
+
+        vm.SelectedFilterColumn = vm.Columns.First(column => column.Name == "id");
+        vm.FilterValue = "1";
+        await vm.ApplyFilterCommand.ExecuteAsync(null);
+
+        Assert.That(vm.HasActiveView, Is.False);
+        Assert.That(vm.ViewStatusText, Does.Contain("pending edits"));
+    }
+
+    [Test]
+    public async Task GoToRow_InView_UsesSourceLineAndRejectsHiddenRows()
+    {
+        var path = CreateJsonl(250);
+        var vm = new DataWorkbenchViewModel(_settings);
+        await vm.OpenDatasetAsync(path);
+
+        vm.SelectedFilterColumn = vm.Columns.First(column => column.Name == "id");
+        vm.SelectedFilterOperator = vm.FilterOperators.First(
+            option => option.Operator == DatasetFilterOperator.GreaterThan);
+        vm.FilterValue = "40";
+        await vm.ApplyFilterCommand.ExecuteAsync(null);
+        Assert.That(vm.TotalRows, Is.EqualTo(210));
+
+        vm.GoToRowText = "200";
+        await vm.GoToRowCommand.ExecuteAsync(null);
+
+        Assert.That(vm.CurrentPage, Is.EqualTo(2));
+        Assert.That(vm.Rows.Any(row => row.Number == 200), Is.True);
+
+        vm.GoToRowText = "5";
+        await vm.GoToRowCommand.ExecuteAsync(null);
+
+        Assert.That(vm.CurrentPage, Is.EqualTo(2));
+        Assert.That(vm.StatusText, Does.Contain("not part of the current view"));
+    }
+
+    [Test]
+    public async Task JumpToLine_ClearsActiveView()
+    {
+        var path = CreateJsonl(250);
+        var vm = new DataWorkbenchViewModel(_settings);
+        await vm.OpenDatasetAsync(path);
+
+        vm.SelectedFilterColumn = vm.Columns.First(column => column.Name == "id");
+        vm.SelectedFilterOperator = vm.FilterOperators.First(
+            option => option.Operator == DatasetFilterOperator.GreaterThan);
+        vm.FilterValue = "240";
+        await vm.ApplyFilterCommand.ExecuteAsync(null);
+        Assert.That(vm.HasActiveView, Is.True);
+
+        await vm.JumpToLineAsync(5);
+
+        Assert.That(vm.HasActiveView, Is.False);
+        Assert.That(vm.CurrentPage, Is.EqualTo(1));
+        Assert.That(vm.Rows[4].Number, Is.EqualTo(5));
+    }
+
+    [Test]
+    public async Task ColumnWidths_LoadFromSettingsAndPersistOnCommit()
+    {
+        _settings.DataWorkbenchColumnWidths["id"] = 240;
+        var path = CreateJsonl(3);
+        var vm = new DataWorkbenchViewModel(_settings);
+        await vm.OpenDatasetAsync(path);
+
+        var idColumn = vm.Columns.First(column => column.Name == "id");
+        var textColumn = vm.Columns.First(column => column.Name == "text");
+        Assert.That(idColumn.Width, Is.EqualTo(240));
+        Assert.That(textColumn.Width, Is.EqualTo(DatasetColumnViewModel.DefaultWidth));
+
+        var persisted = 0;
+        vm.SettingsPersistenceRequested += (_, _) => persisted++;
+        vm.ResizeColumn(idColumn, 30);
+        Assert.That(idColumn.Width, Is.EqualTo(270));
+        vm.CommitColumnWidths();
+
+        Assert.That(persisted, Is.EqualTo(1));
+        Assert.That(_settings.DataWorkbenchColumnWidths["id"], Is.EqualTo(270));
+    }
+
+    [Test]
+    public async Task Columns_MergeWhenLaterPagesIntroduceFields()
+    {
+        var path = Path.Combine(_directory, "mixed.jsonl");
+        var lines = Enumerable.Range(1, 100)
+            .Select(id => $$"""{"id":{{id}}}""")
+            .Append("""{"id":101,"extra":"x"}""");
+        await File.WriteAllLinesAsync(path, lines);
+
+        var vm = new DataWorkbenchViewModel(_settings);
+        await vm.OpenDatasetAsync(path);
+        Assert.That(vm.Columns.Select(column => column.Name), Is.EquivalentTo(new[] { "id" }));
+
+        await vm.NextPageCommand.ExecuteAsync(null);
+
+        Assert.That(vm.Columns.Select(column => column.Name), Does.Contain("extra"));
+        Assert.That(vm.Rows[0].Cells.Select(cell => cell.Column.Name), Does.Contain("extra"));
+    }
+
     private string CreateJsonl(int rows, bool chatRows = false)
     {
         var path = Path.Combine(_directory, $"data-{Guid.NewGuid():N}.jsonl");

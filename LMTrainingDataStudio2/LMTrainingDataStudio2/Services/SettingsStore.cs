@@ -24,6 +24,8 @@ public sealed class SettingsStore : ISettingsStore
     public const long MaxCheckpointQuotaMb = 1_000_000;
     public const int MaxExecutionHistoryLimit = 10_000;
     public const int MaxExecutionRetentionDays = 3_650;
+    public const double MinWorkbenchColumnWidth = 48;
+    public const double MaxWorkbenchColumnWidth = 800;
 
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -198,6 +200,8 @@ public sealed class SettingsStore : ISettingsStore
             settings.ExecutionHistoryRetentionDays = defaults.ExecutionHistoryRetentionDays;
         }
 
+        settings.DataWorkbenchColumnWidths = SanitizeColumnWidths(settings.DataWorkbenchColumnWidths);
+
         settings.RecentFiles = settings.RecentFiles?
             .Where(path => !string.IsNullOrWhiteSpace(path))
             .Select(path => path.Trim())
@@ -221,6 +225,27 @@ public sealed class SettingsStore : ISettingsStore
         }
 
         return new SettingsLoadResult(settings, warnings);
+    }
+
+    private static Dictionary<string, double> SanitizeColumnWidths(Dictionary<string, double>? widths)
+    {
+        var sanitized = new Dictionary<string, double>(StringComparer.Ordinal);
+        if (widths is null)
+        {
+            return sanitized;
+        }
+
+        foreach (var (name, width) in widths)
+        {
+            if (string.IsNullOrWhiteSpace(name) || !double.IsFinite(width))
+            {
+                continue;
+            }
+
+            sanitized[name.Trim()] = Math.Clamp(width, MinWorkbenchColumnWidth, MaxWorkbenchColumnWidth);
+        }
+
+        return sanitized;
     }
 
     public async Task SaveAsync(AppSettings settings, CancellationToken cancellationToken = default)

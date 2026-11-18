@@ -1,7 +1,9 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.VisualTree;
 using LMTrainingDataStudio2.Localization;
 using LMTrainingDataStudio2.Models;
 using LMTrainingDataStudio2.Services.Datasets;
@@ -14,6 +16,7 @@ public partial class DataWorkbenchView : UserControl
     public DataWorkbenchView()
     {
         InitializeComponent();
+        AddHandler(ScrollViewer.ScrollChangedEvent, OnFieldRowsScrollChanged);
     }
 
     private async void OnOpenDatasetClick(object? sender, RoutedEventArgs e)
@@ -319,6 +322,40 @@ public partial class DataWorkbenchView : UserControl
         }
 
         return builder.ToString();
+    }
+
+    private void OnColumnResizeDragDelta(object? sender, VectorEventArgs e)
+    {
+        if (DataContext is DataWorkbenchViewModel vm &&
+            (sender as Control)?.DataContext is DatasetColumnViewModel column)
+        {
+            vm.ResizeColumn(column, e.Vector.X);
+        }
+    }
+
+    private void OnColumnResizeCompleted(object? sender, VectorEventArgs e)
+    {
+        if (DataContext is DataWorkbenchViewModel vm)
+        {
+            vm.CommitColumnWidths();
+        }
+    }
+
+    private void OnFieldRowsScrollChanged(object? sender, ScrollChangedEventArgs e)
+    {
+        if (e.Source is not ScrollViewer rows)
+        {
+            return;
+        }
+
+        var list = this.FindControl<ListBox>("FieldRowList");
+        var header = this.FindControl<ScrollViewer>("FieldHeaderScroll");
+        if (list is null || header is null || !rows.GetVisualAncestors().Contains(list))
+        {
+            return;
+        }
+
+        header.Offset = new Vector(rows.Offset.X, header.Offset.Y);
     }
 
     private static string Truncate(string text) =>

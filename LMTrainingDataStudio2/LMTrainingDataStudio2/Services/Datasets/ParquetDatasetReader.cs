@@ -132,6 +132,77 @@ public sealed class ParquetDatasetReader : IDatasetReader, IDisposable
         return rows;
     }
 
+    /// <summary>
+    /// Reads arbitrary rows while decoding each touched row group only once.
+    /// </summary>
+    public async Task<IReadOnlyList<DatasetRow>> ReadRowsAsync(
+        IReadOnlyList<long> rowNumbers, CancellationToken cancellationToken = default)
+    {
+        EnsureOpen();
+        ArgumentNullException.ThrowIfNull(rowNumbers);
+        if (rowNumbers.Count == 0)
+        {
+            return Array.Empty<DatasetRow>();
+        }
+
+        var ordered = new DatasetRow?[rowNumbers.Count];
+        var positions = Enumerable.Range(0, rowNumbers.Count)
+            .OrderBy(index => rowNumbers[index])
+            .ToArray();
+
+        await _ioLock.WaitAsync(cancellationToken);
+        try
+        {
+            var position = 0;
+            while (position < positions.Length)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var groupIndex = FindRowGroup(rowNumbers[positions[position]]);
+                var groupStart = _rowGroupStarts[groupIndex];
+                var groupEnd = groupStart + _rowGroupRows[groupIndex];
+                var end = position;
+                while (end < positions.Length && rowNumbers[positions[end]] < groupEnd)
+                {
+                    end++;
+                }
+
+                var columns = await _reader!.ReadEntireRowGroupAsync(groupIndex, cancellationToken);
+                for (var i = position; i < end; i++)
+                {
+                    var target = positions[i];
+                    var rowNumber = rowNumbers[target];
+                    var offset = (int)(rowNumber - groupStart);
+                    var obj = new JsonObject();
+                    foreach (var column in columns)
+                    {
+                        var value = column.Data.GetValue(offset);
+                        obj[column.Field.Name] = ToJsonNode(value, _jsonFields.Contains(column.Field.Name));
+                    }
+
+                    ordered[target] = new DatasetRow(rowNumber, obj.ToJsonString());
+                }
+
+                position = end;
+            }
+        }
+        finally
+        {
+            _ioLock.Release();
+        }
+
+        var rows = new List<DatasetRow>(rowNumbers.Count);
+        foreach (var row in ordered)
+        {
+            if (row is not null)
+            {
+                rows.Add(row);
+            }
+        }
+
+        return rows;
+    }
+
     public void Dispose()
     {
         if (_disposed) return;

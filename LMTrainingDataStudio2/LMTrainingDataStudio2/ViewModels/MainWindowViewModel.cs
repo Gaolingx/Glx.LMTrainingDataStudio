@@ -221,6 +221,7 @@ public partial class MainWindowViewModel : ObservableObject
         ThemeManager.Apply(Settings.IsDarkTheme);
         Executions = new ExecutionsViewModel(_executionStore);
         DataWorkbench = new DataWorkbenchViewModel(_settingsService);
+        DataWorkbench.SettingsPersistenceRequested += OnWorkbenchSettingsPersistenceRequested;
 
         LoadSettingsSnapshot();
         InitializeBlockTemplates();
@@ -769,6 +770,22 @@ public partial class MainWindowViewModel : ObservableObject
         while (RecentFiles.Count > SettingsStore.MaxRecentFiles)
         {
             RecentFiles.RemoveAt(RecentFiles.Count - 1);
+        }
+    }
+
+    private void OnWorkbenchSettingsPersistenceRequested(object? sender, EventArgs e) =>
+        _ = PersistWorkbenchSettingsAsync();
+
+    private async Task PersistWorkbenchSettingsAsync()
+    {
+        try
+        {
+            await _settingsStore.SaveAsync(Settings);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                                       or ArgumentException or NotSupportedException)
+        {
+            LogMessages.Add($"[Warning] Could not persist workbench view settings: {ex.Message}");
         }
     }
 
@@ -1532,7 +1549,9 @@ public partial class MainWindowViewModel : ObservableObject
             OpenAiApiKey = NullIfBlank(OpenAiApiKey),
             AnthropicApiKey = NullIfBlank(AnthropicApiKey),
             RecentFiles = RecentFiles.ToList(),
-            LastRecipePath = string.IsNullOrWhiteSpace(CurrentFilePath) ? null : CurrentFilePath
+            LastRecipePath = string.IsNullOrWhiteSpace(CurrentFilePath) ? null : CurrentFilePath,
+            DataWorkbenchColumnWidths = new Dictionary<string, double>(
+                Settings.DataWorkbenchColumnWidths, StringComparer.Ordinal)
         };
 
         try

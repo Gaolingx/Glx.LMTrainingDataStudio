@@ -130,6 +130,80 @@
                 </StackPanel>
             </Border>
 
+            <!-- View toolbar: field table, filter, sort -->
+            <Border DockPanel.Dock="Top" Height="38"
+                    Background="{DynamicResource AppSurfaceAltBrush}"
+                    BorderBrush="{DynamicResource PanelBorderBrush}"
+                    BorderThickness="0,0,0,1">
+                <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                              VerticalScrollBarVisibility="Disabled">
+                    <StackPanel Orientation="Horizontal" Spacing="6" Margin="10,0"
+                                VerticalAlignment="Center">
+                        <ToggleButton x:Name="FieldsViewToggle"
+                                      Content="{loc:Loc data.fields_view}"
+                                      IsChecked="{Binding ShowFields, Mode=TwoWay}"
+                                      FontSize="11" Padding="10,4"
+                                      ToolTip.Tip="{loc:Loc data.sort_hint}"
+                                      Background="{DynamicResource ButtonSurfaceBrush}"
+                                      Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
+                        <Border Width="1" Height="18" Background="{DynamicResource ButtonSurfaceBrush}" Margin="4,0" />
+                        <TextBlock Text="{loc:Loc data.filter_column}" FontSize="10"
+                                   Foreground="{DynamicResource TextDimBrush}" VerticalAlignment="Center" />
+                        <ComboBox x:Name="FilterColumnBox"
+                                  ItemsSource="{Binding Columns}"
+                                  SelectedItem="{Binding SelectedFilterColumn, Mode=TwoWay}"
+                                  Width="130" FontSize="11" VerticalAlignment="Center">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:DatasetColumnViewModel">
+                                    <TextBlock Text="{Binding Name}" FontSize="11" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <ComboBox x:Name="FilterOperatorBox"
+                                  ItemsSource="{Binding FilterOperators}"
+                                  SelectedItem="{Binding SelectedFilterOperator, Mode=TwoWay}"
+                                  Width="140" FontSize="11" VerticalAlignment="Center">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:DatasetFilterOperatorOption">
+                                    <TextBlock Text="{Binding Name}" FontSize="11" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <TextBox x:Name="FilterValueBox"
+                                 Text="{Binding FilterValue, Mode=TwoWay}"
+                                 Width="150" FontSize="11" VerticalAlignment="Center"
+                                 Watermark="{loc:Loc data.filter_value}" />
+                        <CheckBox IsChecked="{Binding FilterCaseSensitive, Mode=TwoWay}"
+                                  Content="{loc:Loc data.case_sensitive}" FontSize="10"
+                                  VerticalAlignment="Center" />
+                        <Button x:Name="ApplyFilterButton"
+                                Content="{loc:Loc common.apply}"
+                                Command="{Binding ApplyFilterCommand}"
+                                Background="{DynamicResource AccentBrush}"
+                                Foreground="{DynamicResource AccentForegroundBrush}"
+                                FontSize="11" Padding="10,4" />
+                        <Button x:Name="ClearViewButton"
+                                Content="{loc:Loc data.clear_view}"
+                                Command="{Binding ClearViewCommand}"
+                                Background="Transparent" Foreground="{DynamicResource TextMutedBrush}"
+                                FontSize="11" Padding="8,4" />
+                        <Button Content="{loc:Loc common.cancel}"
+                                Command="{Binding CancelViewCommand}"
+                                IsVisible="{Binding IsBuildingView}"
+                                Background="{DynamicResource DangerSurfaceBrush}"
+                                Foreground="{DynamicResource DangerBrush}"
+                                FontSize="11" Padding="8,4" />
+                        <ProgressBar Value="{Binding ViewProgress}" Minimum="0" Maximum="1"
+                                     Width="90" Height="4" VerticalAlignment="Center"
+                                     IsVisible="{Binding IsBuildingView}" />
+                        <TextBlock Text="{Binding ViewStatusText}"
+                                   FontSize="10" Foreground="{DynamicResource TextDimBrush}"
+                                   VerticalAlignment="Center" Margin="4,0"
+                                   MaxWidth="360" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+
             <!-- Edit toolbar -->
             <Border DockPanel.Dock="Top" Height="38"
                     Background="{DynamicResource AppSurfaceAltBrush}"
@@ -186,6 +260,10 @@
                         <TextBlock Text="{Binding PendingEditText}"
                                    FontSize="10" Foreground="{DynamicResource WarningBrush}"
                                    VerticalAlignment="Center" Margin="6,0" />
+                        <TextBlock Text="{loc:Loc data.editing_disabled_hint}"
+                                   FontSize="10" Foreground="{DynamicResource WarningBrush}"
+                                   VerticalAlignment="Center" Margin="6,0"
+                                   IsVisible="{Binding HasActiveView}" />
                         <ProgressBar Value="{Binding EditProgress}" Minimum="0" Maximum="1"
                                      Width="80" Height="3" VerticalAlignment="Center"
                                      IsVisible="{Binding IsSavingEdits}" />
@@ -404,48 +482,159 @@
             </StackPanel>
 
             <!-- Virtualized rows -->
-            <ListBox ItemsSource="{Binding Rows}"
-                     SelectedItem="{Binding SelectedRow, Mode=TwoWay}"
-                     SelectionMode="Single"
-                     IsVisible="{Binding IsDatasetOpen}"
-                     Background="Transparent" BorderThickness="0"
-                     Margin="0,4"
-                     DoubleTapped="OnRowDoubleTapped">
-                <ListBox.ItemTemplate>
-                    <DataTemplate x:DataType="vm:DatasetRowViewModel">
-                        <Border Classes="rowCard"
-                                Classes.inserted="{Binding IsInserted}"
-                                Classes.deleted="{Binding IsDeleted}"
-                                Classes.match="{Binding IsSearchMatch}"
-                                Margin="6,3">
-                            <Grid ColumnDefinitions="48,*">
-                                <StackPanel Grid.Column="0" Margin="0,3,0,0">
-                                    <TextBlock Text="{Binding NumberText}" FontSize="10"
-                                               Foreground="{DynamicResource TextFaintBrush}"
-                                               HorizontalAlignment="Right"
-                                               Margin="0,0,4,0" />
-                                    <TextBlock Classes="tag" Text="{loc:Loc data.row_tag_new}"
-                                               Foreground="{DynamicResource SuccessBrush}"
-                                               IsVisible="{Binding IsInserted}" />
-                                    <TextBlock Classes="tag" Text="{loc:Loc data.row_tag_edited}"
-                                               Foreground="{DynamicResource WarningBrush}"
-                                               IsVisible="{Binding IsModified}" />
-                                    <TextBlock Classes="tag" Text="{loc:Loc data.row_tag_deleted}"
-                                               Foreground="{DynamicResource DangerBrush}"
-                                               IsVisible="{Binding IsDeleted}" />
-                                </StackPanel>
-                                <TextBlock Grid.Column="1"
-                                           Classes="rowJson"
-                                           Classes.deleted="{Binding IsDeleted}"
-                                           controls:TextHighlightBehavior.HighlightText="{Binding Preview}"
-                                           controls:TextHighlightBehavior.HighlightQuery="{Binding HighlightQuery}"
-                                           controls:TextHighlightBehavior.HighlightUseRegex="{Binding HighlightUseRegex}"
-                                           controls:TextHighlightBehavior.HighlightCaseSensitive="{Binding HighlightCaseSensitive}" />
-                            </Grid>
-                        </Border>
-                    </DataTemplate>
-                </ListBox.ItemTemplate>
-            </ListBox>
+            <Grid IsVisible="{Binding IsDatasetOpen}" Margin="0,4">
+                <ListBox x:Name="JsonRowList"
+                         ItemsSource="{Binding Rows}"
+                         SelectedItem="{Binding SelectedRow, Mode=TwoWay}"
+                         SelectionMode="Single"
+                         IsVisible="{Binding !ShowFields}"
+                         Background="Transparent" BorderThickness="0"
+                         DoubleTapped="OnRowDoubleTapped">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:DatasetRowViewModel">
+                            <Border Classes="rowCard"
+                                    Classes.inserted="{Binding IsInserted}"
+                                    Classes.deleted="{Binding IsDeleted}"
+                                    Classes.match="{Binding IsSearchMatch}"
+                                    Margin="6,3">
+                                <Grid ColumnDefinitions="48,*">
+                                    <StackPanel Grid.Column="0" Margin="0,3,0,0">
+                                        <TextBlock Text="{Binding NumberText}" FontSize="10"
+                                                   Foreground="{DynamicResource TextFaintBrush}"
+                                                   HorizontalAlignment="Right"
+                                                   Margin="0,0,4,0" />
+                                        <TextBlock Classes="tag" Text="{loc:Loc data.row_tag_new}"
+                                                   Foreground="{DynamicResource SuccessBrush}"
+                                                   IsVisible="{Binding IsInserted}" />
+                                        <TextBlock Classes="tag" Text="{loc:Loc data.row_tag_edited}"
+                                                   Foreground="{DynamicResource WarningBrush}"
+                                                   IsVisible="{Binding IsModified}" />
+                                        <TextBlock Classes="tag" Text="{loc:Loc data.row_tag_deleted}"
+                                                   Foreground="{DynamicResource DangerBrush}"
+                                                   IsVisible="{Binding IsDeleted}" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1"
+                                               Classes="rowJson"
+                                               Classes.deleted="{Binding IsDeleted}"
+                                               controls:TextHighlightBehavior.HighlightText="{Binding Preview}"
+                                               controls:TextHighlightBehavior.HighlightQuery="{Binding HighlightQuery}"
+                                               controls:TextHighlightBehavior.HighlightUseRegex="{Binding HighlightUseRegex}"
+                                               controls:TextHighlightBehavior.HighlightCaseSensitive="{Binding HighlightCaseSensitive}" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <!-- Field table -->
+                <Grid x:Name="FieldsViewGrid"
+                      IsVisible="{Binding ShowFields}"
+                      RowDefinitions="Auto,*">
+                    <Border Grid.Row="0"
+                            Background="{DynamicResource AppSurfaceAltBrush}"
+                            BorderBrush="{DynamicResource PanelBorderBrush}"
+                            BorderThickness="0,0,0,1">
+                        <ScrollViewer x:Name="FieldHeaderScroll"
+                                      HorizontalScrollBarVisibility="Auto"
+                                      VerticalScrollBarVisibility="Disabled">
+                            <StackPanel Orientation="Horizontal">
+                            <Border Width="60" Height="28"
+                                    BorderBrush="{DynamicResource AppBorderBrush}"
+                                    BorderThickness="0,0,1,0" />
+                            <ItemsControl ItemsSource="{Binding Columns}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:DatasetColumnViewModel">
+                                        <Border Width="{Binding Width}" Height="28"
+                                                BorderBrush="{DynamicResource AppBorderBrush}"
+                                                BorderThickness="0,0,1,0">
+                                            <Grid ColumnDefinitions="*,8">
+                                                <Button Command="{Binding SortCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        Background="Transparent"
+                                                        HorizontalAlignment="Stretch"
+                                                        HorizontalContentAlignment="Left"
+                                                        Padding="6,2">
+                                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
+                                                        <TextBlock Text="{Binding Name}" FontSize="10"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                                                   TextTrimming="CharacterEllipsis"
+                                                                   VerticalAlignment="Center" />
+                                                        <TextBlock Grid.Column="1"
+                                                                   Text="{Binding SortIndicator}"
+                                                                   FontSize="8"
+                                                                   Foreground="{DynamicResource AccentBrush}"
+                                                                   VerticalAlignment="Center" />
+                                                    </Grid>
+                                                </Button>
+                                                <Thumb Grid.Column="1"
+                                                       Background="Transparent"
+                                                       Cursor="SizeWestEast"
+                                                       DragDelta="OnColumnResizeDragDelta"
+                                                       DragCompleted="OnColumnResizeCompleted" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Border>
+
+                    <ListBox x:Name="FieldRowList"
+                             Grid.Row="1"
+                             ItemsSource="{Binding Rows}"
+                             SelectedItem="{Binding SelectedRow, Mode=TwoWay}"
+                             SelectionMode="Single"
+                             Background="Transparent" BorderThickness="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                             DoubleTapped="OnRowDoubleTapped">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:DatasetRowViewModel">
+                                <Border Classes="rowCard"
+                                        Classes.match="{Binding IsSearchMatch}"
+                                        Margin="6,3">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding NumberText}" Width="48"
+                                                   FontSize="10"
+                                                   Foreground="{DynamicResource TextFaintBrush}"
+                                                   TextAlignment="Right"
+                                                   Margin="0,5,6,0" />
+                                        <ItemsControl ItemsSource="{Binding Cells}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Horizontal" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:DatasetCellViewModel">
+                                                    <Border Width="{Binding Column.Width}"
+                                                            Padding="6,4"
+                                                            BorderBrush="{DynamicResource AppBorderBrush}"
+                                                            BorderThickness="0,0,1,0"
+                                                            ClipToBounds="True">
+                                                        <TextBlock Text="{Binding Text}"
+                                                                   FontFamily="Consolas, Menlo, monospace"
+                                                                   FontSize="10"
+                                                                   Foreground="{DynamicResource RowJsonBrush}"
+                                                                   TextTrimming="CharacterEllipsis"
+                                                                   ToolTip.Tip="{Binding Text}" />
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Grid>
         </DockPanel>
 
         <!-- Tool tabs -->

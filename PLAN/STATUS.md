@@ -1,7 +1,7 @@
 # STATUS — 功能清单、节点能力矩阵与下一阶段规划
 
-> 最后核对：2026-11-18（Round 29 完成）
-> 验证基线：`dotnet build` 0 警告 0 错误（分析器开启）；`dotnet test` 677 通过 + 7 个 gated 测试（2 个真实 provider 冒烟 + 5 个性能 gated，默认跳过），另有 1 个 `[Explicit]` 示例生成；`--list-tests` 685 个用例；`dotnet format --verify-no-changes` 通过；覆盖率总行 76.64%、Services/Commands 84.95%；Headless UI 测试通过；1M 行 JSONL、1M 行质量操作与 1M 行编辑保存基线通过；10M 行链路与 CSV/Parquet 大规模基线入口已提供；win-x64 单文件发布与 Debug 启动冒烟通过。
+> 最后核对：2026-11-18（Round 30 完成）
+> 验证基线：`dotnet build` 0 警告 0 错误（分析器开启）；`dotnet test` 701 通过 + 7 个 gated 测试（2 个真实 provider 冒烟 + 5 个性能 gated，默认跳过），另有 1 个 `[Explicit]` 示例生成；`--list-tests` 709 个用例；`dotnet format --verify-no-changes` 通过；覆盖率总行 77.15%、Services/Commands 85.16%；Headless UI 测试通过；1M 行 JSONL、1M 行质量操作与 1M 行编辑保存基线通过；10M 行链路与 CSV/Parquet 大规模基线入口已提供；win-x64 单文件发布与 Debug 启动冒烟通过。
 >
 > 图例：`[x]` 已完成并有测试/验证；`[部分]` 可用但有明确缺口；`[ ]` 未实现。
 >
@@ -20,7 +20,7 @@
 - Validator 支持表达式与 JSON Schema 规则、reject 文件、失败率日志；Sampler 支持确定性多文件切分。
 - Tool Profile 支持参数树编辑（含 Enum 与默认值）与 JSON 导入导出，并被 Simulation/LLM 复用。
 - 统一数据集 IO：JSONL / CSV / Parquet 随机分页读取与原子写出；Seed 节点支持三种格式。
-- 数据工作台（Data 视图）：分页预览、行号跳转、页面大小切换，JSONL 走 SQLite 索引，CSV 走记录边界索引，Parquet 按 row group 读取。
+- 数据工作台（Data 视图）：分页预览、行号跳转、页面大小切换、字段表格视图、全量字段筛选/排序与列宽持久化，JSONL 走 SQLite 索引，CSV 走记录边界索引，Parquet 按 row group 读取。
 - 数据逐行编辑：插入/复制/删除/恢复、字段级单元格编辑与整行 JSON 编辑、`messages` 角色/内容/tool_calls 结构化表单（保留其余消息字段）、跨页待保存编辑、撤销/重做、保存前差异摘要、另存或确认后覆盖源文件；流式重写与原子替换。
 - 搜索命中行内高亮（字面量/正则）；校验问题按级别与错误码筛选，并支持按级别/错误码的分组树。
 - 统一样本预览弹窗：SFT Export 输出、Validator 拒绝行、Simulation 失败样本、Cleaner 前后 diff；可跳转数据工作台。
@@ -61,12 +61,12 @@
 - 发布：MSIX 清单/打包脚本、Inno Setup 安装脚本；`examples/` 6 个示例 Recipe；README Dark/Light 截图。
 - 工程质量：`.editorconfig`、.NET 分析器 `latest-recommended`、警告即错误；构建 0 警告。
 - 工程化：滚动日志与全局异常、GitHub Actions CI、win-x64 单文件发布脚本、Headless UI 测试、MIT LICENSE、应用图标。
-- 685 个自动化测试：677 个常规通过 + 7 个 gated（2 个真实 provider 冒烟 + 5 个性能 gated）+ 1 个 Explicit 示例生成。
+- 709 个自动化测试：701 个常规通过 + 7 个 gated（2 个真实 provider 冒烟 + 5 个性能 gated）+ 1 个 Explicit 示例生成。
 
 ### 1.2 当前最大缺口（按优先级）
 
 1. **执行韧性残余**：已补输出 SHA256、Recipe 指纹、溢写行/字节双阈值、检查点磁盘配额与启动清理、执行历史按数量/天数保留；剩余缺口为跨进程并发写锁、CI 取消门禁与 10M 行结果记录。
-2. **数据编辑残余**：已支持跨格式保存；`messages` 已有角色/内容/tool_calls 结构化表单并保留其他字段；非 `messages` 嵌套结构仍按 JSON 文本编辑；列排序/筛选/列宽持久化未做。
+2. **数据编辑残余**：已支持跨格式保存、`messages` 结构化表单与列排序/筛选/列宽持久化；非 `messages` 嵌套结构仍按 JSON 文本编辑；CSV 类型推断与列类型展示未做；视图索引最多 100 万行且常驻内存。
 3. **节点能力残余**：LLM 已支持 tool_calls 回填、Anthropic 结构化输出、OpenAI Chat 流式与模型列表；Responses/Anthropic 流式未做；Validator script 为 Fluid 布尔表达式而非任意脚本；Sampler 分层仅对 ratio/splits 生效；Tool Profile 无 MCP。
 4. **发布残余**：MSIX/Inno 安装包未在本机实际安装验证；单实例管道未做双进程自动化测试；10M 行结果需按本机实测记录。
 
@@ -96,7 +96,7 @@
 
 **未实现（下一阶段工作池）**
 
-- 数据工作台列排序/条件筛选/列宽持久化与 CSV 类型推断。
+- 数据工作台 CSV 类型推断与列类型展示；视图索引的磁盘化与 10M 行实测。
 - LLM Responses/Anthropic 流式输出（OpenAI Chat 已支持）。
 - Validator 失败样本独立 UI、任意代码沙箱规则。
 - Sampler count 模式分层、切分内再混洗选项。
@@ -370,7 +370,8 @@
 - [x] 搜索命中行内高亮；校验问题按级别/错误码筛选与分组树。
 - [x] 统一样本/输出预览弹窗（SFT Export、Validator reject、Simulation 失败样本、Cleaner 前后 diff）。
 - [x] 跨格式编辑保存。
-- [ ] 消息/角色级表单编辑、匹配项导航、预览窗口分页。
+- [x] 消息/角色级表单编辑、匹配项导航、预览窗口分页。
+- [x] 数据工作台字段表格、全量筛选/排序与列宽持久化（视图期间禁用行编辑）。
 - [ ] CSV 类型推断与列类型展示；CSV/Parquet 1M 行质量基线；10M 行实测。
 - [ ] Seed 节点内过滤/列映射/多文件/目录/HuggingFace/HTTP 源。
 - [x] Tool Profile 参数 Enum 与默认值编辑。
@@ -463,6 +464,7 @@
 | 27 | 执行韧性收尾 | 溢写行/字节双阈值、检查点磁盘配额与启动/运行结束清理、执行历史按数量/天数保留与手动清理 | 659 用例（651 通过 + 7 gated + 1 Explicit） |
 | 28 | 执行并发与溢写清理 | 运行期输出写锁、目标定义统一、溢写目录启动清理、CI 取消门禁 | 669 用例（661 通过 + 7 gated + 1 Explicit） |
 | 29 | LLM 流式与模型列表 | OpenAI Chat SSE 流式（delta/tool_calls/usage + 重试）、模型列表服务与面板下拉/刷新 | 685 用例（677 通过 + 7 gated + 1 Explicit） |
+| 30 | 数据工作台视图 | 字段表格、全量字段筛选/排序、列宽持久化、散列行读取（Parquet 按 row group 批量） | 709 用例（701 通过 + 7 gated + 1 Explicit） |
 
 ---
 

@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless.NUnit;
 using Avalonia.Media;
 using Avalonia.Threading;
@@ -256,6 +257,56 @@ public sealed class HeadlessUiTests
                 .ToArray();
             Assert.That(fieldLabels, Does.Contain("messages"));
             Assert.That(fieldLabels, Does.Contain("tools"));
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaTest]
+    public async Task DataWorkbench_FieldsView_RendersTableAndFilterControls()
+    {
+        var vm = new MainWindowViewModel(new SettingsStore(Path.Combine(_directory, "settings.json")));
+        var window = new MainWindow { DataContext = vm };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        try
+        {
+            var path = Path.Combine(_directory, "fields.jsonl");
+            await File.WriteAllLinesAsync(path, new[]
+            {
+                """{"id":1,"text":"alpha"}""",
+                """{"id":2,"text":"beta"}"""
+            });
+
+            vm.SwitchToDataCommand.Execute(null);
+            await vm.DataWorkbench.OpenDatasetAsync(path);
+            vm.DataWorkbench.ShowFields = true;
+            Dispatcher.UIThread.RunJobs();
+
+            var descendants = window.GetVisualDescendants().ToList();
+            var names = descendants.Select(control => control.Name).ToList();
+            Assert.That(names, Does.Contain("FieldsViewToggle"));
+            Assert.That(names, Does.Contain("FilterColumnBox"));
+            Assert.That(names, Does.Contain("FilterOperatorBox"));
+            Assert.That(names, Does.Contain("FilterValueBox"));
+            Assert.That(names, Does.Contain("ApplyFilterButton"));
+            Assert.That(names, Does.Contain("ClearViewButton"));
+            Assert.That(names, Does.Contain("FieldHeaderScroll"));
+            Assert.That(names, Does.Contain("FieldRowList"));
+
+            var toggle = descendants.OfType<ToggleButton>()
+                .First(control => control.Name == "FieldsViewToggle");
+            Assert.That(toggle.IsChecked, Is.True);
+
+            var rows = descendants.OfType<ListBox>()
+                .First(control => control.Name == "FieldRowList");
+            Assert.That(rows.ItemCount, Is.EqualTo(2));
+            Assert.That(
+                vm.DataWorkbench.Columns.Select(column => column.Name),
+                Is.EquivalentTo(new[] { "id", "text" }));
         }
         finally
         {

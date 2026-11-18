@@ -72,5 +72,15 @@ public sealed class AppSettings
     /// <summary>Recipe file restored on the next launch; empty starts a blank document.</summary>
     public string? LastRecipePath { get; set; }
 
-    internal AppSettings Clone() => (AppSettings)MemberwiseClone();
+    /// <summary>Data workbench column widths in pixels, keyed by top-level field name.</summary>
+    public Dictionary<string, double> DataWorkbenchColumnWidths { get; set; } = new(StringComparer.Ordinal);
+
+    internal AppSettings Clone()
+    {
+        var clone = (AppSettings)MemberwiseClone();
+        clone.RecentFiles = new List<string>(RecentFiles);
+        clone.DataWorkbenchColumnWidths = new Dictionary<string, double>(
+            DataWorkbenchColumnWidths, StringComparer.Ordinal);
+        return clone;
+    }
 }
