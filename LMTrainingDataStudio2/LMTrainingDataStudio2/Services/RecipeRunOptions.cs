@@ -13,6 +13,10 @@ public sealed record RecipeRunOptions(
     string? SpillDirectory = null,
     bool PersistNodeOutputs = true)
 {
+    /// <summary>Spill root used when no directory is configured.</summary>
+    public static string DefaultSpillDirectory { get; } =
+        Path.Combine(Path.GetTempPath(), "LMTrainingDataStudio", "run-spill");
+
     public int EffectiveMaxParallelism => Math.Clamp(MaxParallelism, 1, 64);
 
     public int EffectiveRetryCount => Math.Max(0, NodeRetryCount);
@@ -23,6 +27,6 @@ public sealed record RecipeRunOptions(
     public long EffectiveSpillThresholdBytes => Math.Max(0, SpillThresholdBytes);
 
     public string EffectiveSpillDirectory => string.IsNullOrWhiteSpace(SpillDirectory)
-        ? Path.Combine(Path.GetTempPath(), "LMTrainingDataStudio", "run-spill")
+        ? DefaultSpillDirectory
         : Path.GetFullPath(SpillDirectory.Trim());
 }

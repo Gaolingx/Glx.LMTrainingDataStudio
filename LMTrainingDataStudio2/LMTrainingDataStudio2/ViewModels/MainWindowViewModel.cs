@@ -1171,6 +1171,12 @@ public partial class MainWindowViewModel : ObservableObject
                     $"[Info] Removed {removed} execution record(s) outside the retention policy.");
             }
 
+            var removedSpill = SpillDirectoryMaintenance.Cleanup(Settings.RunTempDirectory);
+            if (removedSpill > 0)
+            {
+                LogMessages.Add($"[Info] Removed {removedSpill} stale spill directories.");
+            }
+
             await Executions.RefreshAsync();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

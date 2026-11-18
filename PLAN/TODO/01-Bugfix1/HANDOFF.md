@@ -1,6 +1,6 @@
 # HANDOFF — 01-Bugfix1（全仓缺陷修复与门禁补齐）
 
-> 状态：进行中（Round 26）
+> 状态：进行中（Round 28）
 > 创建：2026-11-17
 > 基线：`895c08e feat(release): Round 16 发布与体验`
 > 上一阶段归档：[PLAN/Done/01-BuildALL/HANDOFF.md](../../Done/01-BuildALL/HANDOFF.md)
@@ -448,6 +448,7 @@
 | 2026-11-18 | Batch 14：API Key DPAPI 加密 | `dotnet build -c Release`；`dotnet test -c Release`；`dotnet format --verify-no-changes` | 见第 16.3 节 | `SettingsStoreTests`（6 项新增）、DPAPI 落盘与迁移断言 |
 | 2026-11-18 | Batch 15：web_fetch DNS 加固与设置通知 | `dotnet build -c Release`；`dotnet test -c Release`；`dotnet format --verify-no-changes` | 0 警告；630 通过 / 0 失败 / 7 跳过；格式通过 | 见第 17.3 节；`SandboxTests`、`AppSettingsServiceTests`、`DataWorkbenchViewModelTests`、`SettingsPanelTests` |
 | 2026-11-18 | Batch 16：诊断脱敏与目录 ACL | `dotnet build -c Release`；`dotnet test -c Release`；`dotnet format --verify-no-changes` | 0 警告；638 通过 / 0 失败 / 7 跳过；格式通过 | 见第 18.3 节；`DiagnosticSecurityTests` |
+| 2026-11-18 | Batch 18：输出写锁、溢写目录启动清理、CI 取消门禁 | `dotnet build -c Release`；`dotnet test -c Release`；`dotnet format --verify-no-changes`；`scripts/check-coverage.ps1` | 0 警告；661 通过 / 0 失败 / 7 跳过；覆盖率 76.46% / 84.9% | 见第 20.3 节 |
 
 ---
 
@@ -608,9 +609,9 @@
 - [x] **[执行/P2] 恢复未做逐字节/哈希比对**：只验证行数与内容；Round 13 验收目标中的“哈希一致”未落地。
 - [x] **[执行/P2] 溢写阈值只按行数**：已补 `SpillThresholdBytes`，与行数阈值取先到者（Round 27）。
 - [x] **[执行/P2] 检查点无磁盘配额**：启动与运行结束按运行输出目录大小清理最旧检查点，保护当前运行（Round 27）。
-- [部分] **[执行/P2] 无并发写同一目标文件的检测**：同一 Recipe 内的节点级重复目标已在 Round 23 校验；两次独立运行同时写同一路径仍无跨进程锁。
+- [x] **[执行/P2] 无并发写同一目标文件的检测**：同一 Recipe 内的节点级重复目标已在 Round 23 校验；Round 28 新增运行期跨进程锁——每个输出文件同级 `.lmtds.lock` 以 `FileShare.None` 独占打开，运行前获取、结束或失败后释放，冲突时拒绝启动并列出目标。
 - [x] **[执行/P2] 无执行历史批量清理/保留策略**：`ExecutionStore.Prune` 按数量/天数清理，启动自动应用，Executions 提供手动入口（Round 27）。
-- [ ] **[执行/P2] 取消 1s 断言依赖本机调度**：CI 未设性能门禁。
+- [x] **[执行/P2] 取消 1s 断言依赖本机调度**：Round 28 起测试读取 `LMTDS_CANCEL_BUDGET_MS`（本机默认 1000ms，CI 设 3000ms），CI 以 3s 作为取消门禁；本机仍按 1s 验收。
 - [ ] **[执行/P3] 10M 行执行/质量/转换基线未实测**：入口已有，结果未记录。
 - [ ] **[执行/P3] 执行日志/状态/摘要未本地化**：保持英文技术文本。
 - [ ] **[执行/P3] 无执行指标图表**：LiveCharts2/OxyPlot 未接入。
@@ -770,7 +771,7 @@
 
 #### 8.3.7 执行与恢复（192–193）
 
-- [ ] **192 [P2] 崩溃后溢写/检查点临时目录无启动清理**：`RecipeRunner` 只在 `finally` 中清理（`Services/RecipeRunner.cs:178-189`）；进程崩溃/断电会留下 `run-spill`、`run-temp` 与检查点目录，长期累积。建议启动时按时间/大小清理。
+- [x] **192 [P2] 崩溃后溢写/检查点临时目录无启动清理**：Round 28 新增 `SpillDirectoryMaintenance`，启动时删除溢写根下所有 run-scoped 残留目录（正常结束由 `finally` 删除），删除失败的目录留待下次重试；检查点目录由 Round 27 的 `CheckpointQuota` 在启动时按配额约束。
 - [ ] **193 [P3] 无整体运行超时/最大时长**：只有节点级 `TimeoutSeconds`；一个卡住的 DAG 可能需要人工取消。可加运行级超时设置与 UI 提示。
 
 #### 8.3.8 编辑器 UI（194–196）
@@ -1224,3 +1225,37 @@
 - CI 取消性能门禁、10M 行执行/质量/转换结果按本机实测记录（7.7 P2/P3）。
 - 溢写目录启动清理（当前按运行临时目录前缀随运行结束删除，异常退出残留未单独处理）。
 - LLM 流式输出与模型列表；数据工作台列排序/筛选/列宽持久化（191）与 CSV 类型推断；SFT 比例拆片与输出路径存在性提示（206）。
+
+---
+
+## 20. Round 28 执行记录（2026-11-18）
+
+### 20.1 已完成项
+
+| 项 | 范围 | 提交 |
+| --- | --- | --- |
+| Batch 18 | 执行韧性收尾：输出写锁、溢写目录启动清理、CI 取消门禁 | 本次提交 |
+
+### 20.2 具体改动
+
+- 新增 `RecipeOutputTargets`：把 SFT 输出、LLM/Simulation 失败样本、Validator reject 与 Sampler 分片文件的目标收集从校验服务抽出，校验与运行期锁共用同一份定义。
+- 新增 `RunOutputLock`：每个输出文件在同级创建 `<target>.lmtds.lock`，以 `FileShare.None` 独占打开并写入 PID/run/目标；按序获取避免死锁，`Dispose` 释放并删除锁文件。
+- `RecipeRunner` 在校验通过后、执行前获取锁；冲突时运行标记失败、未执行节点标记跳过并写入 run summary，日志列出冲突目标；锁在 `finally` 中释放。
+- 新增 `SpillDirectoryMaintenance`：启动时删除溢写根下所有 run-scoped 残留目录（正常结束由 `finally` 删除），无法删除的目录留待下次启动重试；接入 `RunStartupMaintenanceAsync` 并记录清理数量。
+- `RecipeRunOptions` 暴露 `DefaultSpillDirectory`，与启动清理共用默认值。
+- 取消性能测试改为读取 `LMTDS_CANCEL_BUDGET_MS`（未设置时 1000ms）；CI 全局设置 3000ms，本地仍按严格 1s 验收。
+
+### 20.3 当前验证
+
+- `dotnet build -c Release`：0 警告，0 错误。
+- `dotnet test -c Release`：661 通过，0 失败，7 跳过（5 性能 gated + 2 provider gated）；`--list-tests` 669 个用例（含 1 个 `[Explicit]`）。
+- `dotnet format --verify-no-changes`：通过。
+- 覆盖率（本地）：总行 76.46%，Services/Commands 行 84.9%（门槛 60% / 70%）。
+- 新增测试 10 项：`RunOutputLockTests` 4 项、`SpillDirectoryMaintenanceTests` 3 项、`RecipeRunnerTests` 2 项（目标被占用则拒绝执行、失败后释放锁）、`ExecutionsViewModelTests` 1 项（启动清理残留溢写目录）。
+- 锁的跨进程语义依赖 `FileShare.None`，测试在同一进程内以第二次独占打开模拟冲突；未做真实双进程端到端验证。
+
+### 20.4 本轮未做（保留在 7.x / 8.3）
+
+- 10M 行执行/质量/转换基线按本机实测记录（7.7 P3）。
+- LLM 流式输出与模型列表；数据工作台列排序/筛选/列宽持久化（191）与 CSV 类型推断；SFT 比例拆片与输出路径存在性提示（206）。
+

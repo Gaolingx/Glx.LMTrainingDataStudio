@@ -321,53 +321,26 @@ public sealed class RecipeValidationService
     /// </summary>
     private static void ValidateOutputTargets(Recipe recipe, ValidationResult result)
     {
-        var targets = new List<(RecipeBlock Block, string Path, bool IsDirectory)>();
-        foreach (var block in recipe.Blocks)
-        {
-            switch (block.Config)
-            {
-                case LlmBlockConfig llm when !string.IsNullOrWhiteSpace(llm.FailureOutputPath):
-                    targets.Add((block, llm.FailureOutputPath, false));
-                    break;
-                case SimulationBlockConfig simulation when !string.IsNullOrWhiteSpace(simulation.FailureOutputPath):
-                    targets.Add((block, simulation.FailureOutputPath, false));
-                    break;
-                case ValidatorBlockConfig validator when !string.IsNullOrWhiteSpace(validator.RejectOutputPath):
-                    targets.Add((block, validator.RejectOutputPath, false));
-                    break;
-                case SftExportBlockConfig export when !string.IsNullOrWhiteSpace(export.OutputPath):
-                    targets.Add((block, export.OutputPath, false));
-                    break;
-                case SamplerBlockConfig sampler when !string.IsNullOrWhiteSpace(sampler.OutputDirectory):
-                    targets.Add((block, sampler.OutputDirectory, true));
-                    foreach (var split in sampler.Splits)
-                    {
-                        if (string.IsNullOrWhiteSpace(split)) continue;
-                        targets.Add((block, Path.Combine(sampler.OutputDirectory, $"{split}.jsonl"), false));
-                    }
-
-                    break;
-            }
-        }
+        var targets = RecipeOutputTargets.Collect(recipe);
 
         for (var left = 0; left < targets.Count; left++)
         {
             for (var right = left + 1; right < targets.Count; right++)
             {
-                if (targets[left].Block.Id == targets[right].Block.Id) continue;
+                if (targets[left].BlockId == targets[right].BlockId) continue;
                 if (!TargetsCollide(targets[left], targets[right])) continue;
 
                 AddError(result,
-                    $"Blocks '{targets[left].Block.Name}' and '{targets[right].Block.Name}' " +
+                    $"Blocks '{targets[left].BlockName}' and '{targets[right].BlockName}' " +
                     $"write to overlapping output targets ('{targets[left].Path}' / '{targets[right].Path}').",
-                    targets[right].Block.Id);
+                    targets[right].BlockId);
             }
         }
     }
 
     private static bool TargetsCollide(
-        (RecipeBlock Block, string Path, bool IsDirectory) left,
-        (RecipeBlock Block, string Path, bool IsDirectory) right)
+        RecipeOutputTarget left,
+        RecipeOutputTarget right)
     {
         if (left.IsDirectory != right.IsDirectory) return false;
 

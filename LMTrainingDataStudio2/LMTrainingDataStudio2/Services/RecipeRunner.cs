@@ -81,6 +81,7 @@ public sealed class RecipeRunner
         var spillRoot = GetSpillRoot(run);
         var outputs = new ConcurrentDictionary<string, RowSpillBuffer>();
         var state = new RunState();
+        RunOutputLock? outputLock = null;
 
         try
         {
@@ -115,6 +116,11 @@ public sealed class RecipeRunner
             }
 
             var results = BuildResults(run, recipe);
+            if (!TryLockOutputTargets(run, recipe, results, out outputLock))
+            {
+                return run;
+            }
+
             var reused = new HashSet<string>(StringComparer.Ordinal);
             if (resuming)
             {
@@ -190,8 +196,44 @@ public sealed class RecipeRunner
                 await buffer.DisposeAsync();
             }
 
+            outputLock?.Dispose();
             DeleteSpillRoot(spillRoot);
         }
+    }
+
+    /// <summary>
+    /// Takes cross-process locks on every file this recipe writes. Sampler output
+    /// directories are skipped; their concrete split files are locked instead.
+    /// </summary>
+    private bool TryLockOutputTargets(
+        ExecutionRun run,
+        Recipe recipe,
+        IReadOnlyDictionary<string, NodeExecutionResult> results,
+        out RunOutputLock? outputLock)
+    {
+        outputLock = null;
+        var targets = RecipeOutputTargets.Collect(recipe)
+            .Where(target => !target.IsDirectory)
+            .Select(target => target.Path)
+            .ToList();
+        if (targets.Count == 0)
+        {
+            return true;
+        }
+
+        outputLock = RunOutputLock.TryAcquire(targets, $"run {run.RunId}", out var conflicts);
+        if (outputLock is not null)
+        {
+            return true;
+        }
+
+        const string reason = "Output target is locked by another run.";
+        MarkPendingSkipped(results.Values, reason);
+        run.Status = RunStatus.Failed;
+        run.FinishedAt = _timeProvider.GetUtcNow();
+        Log(run, $"Run rejected: {reason} {string.Join("; ", conflicts)}");
+        WriteSummary(run);
+        return false;
     }
 
     private async Task<BlockOutcome> ExecuteBlockAsync(

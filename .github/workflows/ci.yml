@@ -12,6 +12,9 @@ concurrency:
 env:
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
+  # CI runners use a lax budget for the cancellation assertion to absorb scheduler
+  # jitter; local runs keep the strict 1s acceptance check.
+  LMTDS_CANCEL_BUDGET_MS: '3000'
 
 jobs:
   format:

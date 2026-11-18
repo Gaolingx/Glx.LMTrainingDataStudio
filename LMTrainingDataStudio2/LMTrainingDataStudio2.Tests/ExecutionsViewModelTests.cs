@@ -165,6 +165,23 @@ public sealed class ExecutionsViewModelTests
         Assert.That(Directory.Exists(newCheckpoint), Is.True);
     }
 
+    [Test]
+    public async Task RunStartupMaintenance_RemovesStaleSpillDirectories()
+    {
+        var settingsPath = CreateSettingsFile(historyLimit: 0, retentionDays: 0, checkpointQuotaMb: 0);
+        var spillRoot = Path.Combine(_directory, "temp");
+        var stale = Path.Combine(spillRoot, "run-1-abc");
+        Directory.CreateDirectory(stale);
+        File.WriteAllText(Path.Combine(stale, "rows.tmp"), "stale");
+        var viewModel = new MainWindowViewModel(
+            new SettingsStore(settingsPath), executionStore: _store);
+
+        await viewModel.RunStartupMaintenanceAsync();
+
+        Assert.That(Directory.Exists(stale), Is.False);
+        Assert.That(Directory.Exists(spillRoot), Is.True);
+    }
+
     private string CreateSettingsFile(int historyLimit, int retentionDays, long checkpointQuotaMb)
     {
         var path = Path.Combine(_directory, "config", "settings.json");
