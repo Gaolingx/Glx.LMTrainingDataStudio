@@ -14,6 +14,8 @@ public partial class ExpressionConfigEditorViewModel : ObservableObject
     private const string DefaultSampleJson =
         """{"messages":[{"role":"user","content":"hello"}],"score":42}""";
 
+    private static readonly JsonSerializerOptions IndentedJson = new() { WriteIndented = true };
+
     private readonly Action<ExpressionBlockConfig> _apply;
     private Dictionary<string, string> _fields;
 
@@ -43,9 +45,7 @@ public partial class ExpressionConfigEditorViewModel : ObservableObject
         _apply = apply;
         _fields = new Dictionary<string, string>(config.Fields);
         _template = config.Template;
-        _fieldsJson = JsonSerializer.Serialize(
-            config.Fields,
-            new JsonSerializerOptions { WriteIndented = true });
+        _fieldsJson = JsonSerializer.Serialize(config.Fields, IndentedJson);
         RefreshTemplateValidation();
     }
 

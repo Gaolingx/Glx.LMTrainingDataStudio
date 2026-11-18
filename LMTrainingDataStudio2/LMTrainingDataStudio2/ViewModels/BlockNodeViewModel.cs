@@ -313,24 +313,6 @@ public partial class BlockNodeViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Gets the header color brush key based on block type.
-    /// </summary>
-    public string HeaderColorKey => Type switch
-    {
-        BlockType.Seed => "SeedBlockBrush",
-        BlockType.Llm => "LlmBlockBrush",
-        BlockType.Expression => "ExpressionBlockBrush",
-        BlockType.Validator => "ValidatorBlockBrush",
-        BlockType.Sampler => "SamplerBlockBrush",
-        BlockType.ToolProfile => "ToolProfileBlockBrush",
-        BlockType.QuerySource => "QuerySourceBlockBrush",
-        BlockType.Simulation => "SimulationBlockBrush",
-        BlockType.Cleaner => "CleanerBlockBrush",
-        BlockType.SftExport => "SftExportBlockBrush",
-        _ => "SeedBlockBrush"
-    };
-
-    /// <summary>
     /// Gets the icon text for the block type.
     /// </summary>
     public string IconText => Type switch

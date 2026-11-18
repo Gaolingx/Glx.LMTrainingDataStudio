@@ -1,7 +1,7 @@
 # STATUS — 功能清单、节点能力矩阵与下一阶段规划
 
-> 最后核对：2026-11-18（Round 30 完成）
-> 验证基线：`dotnet build` 0 警告 0 错误（分析器开启）；`dotnet test` 701 通过 + 7 个 gated 测试（2 个真实 provider 冒烟 + 5 个性能 gated，默认跳过），另有 1 个 `[Explicit]` 示例生成；`--list-tests` 709 个用例；`dotnet format --verify-no-changes` 通过；覆盖率总行 77.15%、Services/Commands 85.16%；Headless UI 测试通过；1M 行 JSONL、1M 行质量操作与 1M 行编辑保存基线通过；10M 行链路与 CSV/Parquet 大规模基线入口已提供；win-x64 单文件发布与 Debug 启动冒烟通过。
+> 最后核对：2026-11-18（Round 31 完成）
+> 验证基线：`dotnet build` 0 警告 0 错误（分析器开启，NoWarn 已审计至 7 项）；`dotnet test` 701 通过 + 7 个 gated 测试（2 个真实 provider 冒烟 + 5 个性能 gated，默认跳过），另有 1 个 `[Explicit]` 示例生成；`--list-tests` 709 个用例；`dotnet format --verify-no-changes` 通过；覆盖率总行 77.34%、Services/Commands 85.15%；Headless UI 测试通过；1M 行 JSONL、1M 行质量操作与 1M 行编辑保存基线通过；10M 行链路与 CSV/Parquet 大规模基线入口已提供；win-x64 单文件发布与 Debug 启动冒烟通过。
 >
 > 图例：`[x]` 已完成并有测试/验证；`[部分]` 可用但有明确缺口；`[ ]` 未实现。
 >
@@ -465,6 +465,7 @@
 | 28 | 执行并发与溢写清理 | 运行期输出写锁、目标定义统一、溢写目录启动清理、CI 取消门禁 | 669 用例（661 通过 + 7 gated + 1 Explicit） |
 | 29 | LLM 流式与模型列表 | OpenAI Chat SSE 流式（delta/tool_calls/usage + 重试）、模型列表服务与面板下拉/刷新 | 685 用例（677 通过 + 7 gated + 1 Explicit） |
 | 30 | 数据工作台视图 | 字段表格、全量字段筛选/排序、列宽持久化、散列行读取（Parquet 按 row group 批量） | 709 用例（701 通过 + 7 gated + 1 Explicit） |
+| 31 | 代码质量清理 | 删除未引用转换器与颜色键、NoWarn 55→7 审计、CA1068/CA1725/CA1806/CA1869/CA1310 修复 | 709 用例（701 通过 + 7 gated + 1 Explicit） |
 
 ---
 

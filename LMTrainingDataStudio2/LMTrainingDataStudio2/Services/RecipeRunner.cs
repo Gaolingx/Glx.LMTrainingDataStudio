@@ -24,6 +24,8 @@ public sealed class RecipeRunner
     private const string RecipeFingerprintFileName = "recipe.fingerprint";
     private const char PortKeySeparator = '\u001f';
 
+    private static readonly JsonSerializerOptions IndentedJson = new() { WriteIndented = true };
+
     private readonly RecipeValidationService _validation;
     private readonly Dictionary<BlockType, IBlockExecutor> _executors;
     private readonly TimeProvider _timeProvider;
@@ -44,9 +46,9 @@ public sealed class RecipeRunner
     public async Task<ExecutionRun> RunAsync(
         Recipe recipe,
         IProgress<ExecutionProgress>? progress = null,
-        CancellationToken cancellationToken = default,
         ExecutionPauseController? pause = null,
-        ExecutionRun? resumeFrom = null)
+        ExecutionRun? resumeFrom = null,
+        CancellationToken cancellationToken = default)
     {
         var resuming = resumeFrom is not null;
         var run = resumeFrom ?? new ExecutionRun
@@ -941,7 +943,7 @@ public sealed class RecipeRunner
 
             File.WriteAllText(
                 Path.Combine(run.OutputDirectory, "run-summary.json"),
-                JsonSerializer.Serialize(summary, new JsonSerializerOptions { WriteIndented = true }));
+                JsonSerializer.Serialize(summary, IndentedJson));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

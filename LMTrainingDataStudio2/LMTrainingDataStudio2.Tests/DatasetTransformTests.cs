@@ -181,7 +181,9 @@ public sealed class DatasetTransformTests
                 OutputDirectory: directory));
 
         Assert.That(result.Splits.Sum(split => split.Rows), Is.EqualTo(4));
-        Assert.That(result.Splits.All(split => split.Path.EndsWith(".csv")), Is.True);
+        Assert.That(
+            result.Splits.All(split => split.Path.EndsWith(".csv", StringComparison.Ordinal)),
+            Is.True);
     }
 
     [Test]

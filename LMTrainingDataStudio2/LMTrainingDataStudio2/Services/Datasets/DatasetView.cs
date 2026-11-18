@@ -232,7 +232,10 @@ public static class DatasetViewBuilder
             var values = new double[keys.Count];
             for (var i = 0; i < keys.Count; i++)
             {
-                TryParseNumber(keys[i], out values[i]);
+                if (!TryParseNumber(keys[i], out values[i]))
+                {
+                    values[i] = double.NaN;
+                }
             }
 
             Array.Sort(order, (left, right) =>

@@ -2,6 +2,26 @@
 
 本文件记录用户可见变更与工程化修复。完整未完成清单见 [PLAN/TODO/01-Bugfix1/HANDOFF.md](PLAN/TODO/01-Bugfix1/HANDOFF.md)。
 
+## [Unreleased] — 2026-11-18（Round 31 / 代码质量清理）
+
+### Removed
+
+- 删除未引用的 `BlockTypeToColorConverter`、`InverseBoolConverter` 与 `BlockTemplateViewModel.ColorKey`、`BlockNodeViewModel.HeaderColorKey`；块头颜色仍由主题 `*BlockBrush` 资源提供。
+
+### Changed
+
+- `Directory.Build.props` 的 `NoWarn` 从 55 项缩减到 7 项并注明保留理由；`CA1707` 仅对测试项目抑制。
+- 修复 CA1068（`RecipeRunner.RunAsync` 令牌参数置末）、CA1725（`ReadPageAsync` 参数名）、CA1806（数值排序解析结果）、CA1869（复用 `JsonSerializerOptions`）、CA1310（测试断言补 `StringComparison`）。
+
+### Tests
+
+- `--list-tests`：709 个用例；`dotnet test`：701 通过 / 0 失败 / 7 跳过（另 1 个 `[Explicit]`）。
+- 关闭抑制的全量重建仅剩 8 个规则码（7 个全局 + 测试 CA1707）；本轮为删除/重构，无新增测试。
+
+### Known Issues
+
+- CA1001（可释放字段未接线）与 CA1305/CA1822/CA1859/CA1861/CA1863 仍保留抑制，已在 HANDOFF 7.11 记录跟进项。
+
 ## [Unreleased] — 2026-11-18（Round 30 / 数据工作台视图）
 
 ### Added

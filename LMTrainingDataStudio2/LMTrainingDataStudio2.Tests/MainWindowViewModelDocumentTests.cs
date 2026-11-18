@@ -308,7 +308,9 @@ public sealed class MainWindowViewModelDocumentTests
         Assert.That(duplicate, Is.False);
         Assert.That(_viewModel.Edges, Has.Count.EqualTo(1));
         Assert.That(_viewModel.StatusText, Does.Contain("already exists"));
-        Assert.That(_viewModel.LogMessages.Any(message => message.StartsWith("[Error]")), Is.True);
+        Assert.That(
+            _viewModel.LogMessages.Any(message => message.StartsWith("[Error]", StringComparison.Ordinal)),
+            Is.True);
     }
 
     private sealed class FakeSettingsStore(string filePath, AppSettings settings) : ISettingsStore

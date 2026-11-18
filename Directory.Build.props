@@ -11,10 +11,11 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <!-- Test naming and fixture patterns intentionally differ from library rules. -->
-    <NoWarn>$(NoWarn);CA1707;CA2007;CA1031;CA1062;CA1305;CA1307;CA1310;CA1416;CA1812;CA1859;CA1861;CA1869;CA2201</NoWarn>
-    <NoWarn>$(NoWarn);CA1002;CA1051;CA1308;CA1508;CA1725;CA1806;CA1816;CA1822;CA1848;CA1849;CA1852;CA2000;CA2016;CA2200;CA2208;CA2211;CA2213;CA2254;CA5394;CA5350;CA5351;CA5384</NoWarn>
-    <NoWarn>$(NoWarn);CA1863;CA1001;CA1068</NoWarn>
-    <NoWarn>$(NoWarn);IDE0005;IDE0011;IDE0021;IDE0022;IDE0028;IDE0032;IDE0040;IDE0044;IDE0055;IDE0057;IDE0058;IDE0073;IDE0161;IDE0290;IDE0300;IDE0301;IDE0305</NoWarn>
+    <!-- Audited in Round 31 with `dotnet build -p:NoWarn=`; only rules that still fire remain. -->
+    <!-- CA1305/CA1822/CA1859/CA1861/CA1863: style/perf advice; current-culture UI text,
+         instance-bound members and small constant arrays are intentional. -->
+    <!-- CA1416: Windows-only DPAPI/ACL calls are runtime-guarded in the cross-platform net9.0 target. -->
+    <!-- CA1001: disposable fields have owner-bound lifetimes; IDisposable wiring is tracked in HANDOFF 7.11. -->
+    <NoWarn>$(NoWarn);CA1001;CA1305;CA1416;CA1822;CA1859;CA1861;CA1863</NoWarn>
   </PropertyGroup>
 </Project>

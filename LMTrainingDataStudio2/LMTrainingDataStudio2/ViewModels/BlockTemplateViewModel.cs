@@ -41,22 +41,4 @@ public partial class BlockTemplateViewModel : ObservableObject
         BlockType.SftExport => "⇩",
         _ => "?"
     };
-
-    /// <summary>
-    /// Gets the color key for the block type.
-    /// </summary>
-    public string ColorKey => Type switch
-    {
-        BlockType.Seed => "#4A90D9",
-        BlockType.Llm => "#7B61FF",
-        BlockType.Expression => "#F5A623",
-        BlockType.Validator => "#D0021B",
-        BlockType.Sampler => "#417505",
-        BlockType.ToolProfile => "#9B9B9B",
-        BlockType.QuerySource => "#E67E22",
-        BlockType.Simulation => "#00A3A3",
-        BlockType.Cleaner => "#8E44AD",
-        BlockType.SftExport => "#2E8B57",
-        _ => "#FFFFFF"
-    };
 }

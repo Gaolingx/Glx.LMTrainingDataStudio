@@ -1138,7 +1138,7 @@ public partial class MainWindowViewModel : ObservableObject
             var pause = _runPause;
 
             var run = await Task.Run(() =>
-                runner.RunAsync(recipe, progress, cancellationToken, pause, resumeFrom));
+                runner.RunAsync(recipe, progress, pause, resumeFrom, cancellationToken));
 
             try
             {

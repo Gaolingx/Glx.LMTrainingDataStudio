@@ -1,6 +1,6 @@
 # HANDOFF — 01-Bugfix1（全仓缺陷修复与门禁补齐）
 
-> 状态：进行中（Round 30）
+> 状态：进行中（Round 31）
 > 创建：2026-11-17
 > 基线：`895c08e feat(release): Round 16 发布与体验`
 > 上一阶段归档：[PLAN/Done/01-BuildALL/HANDOFF.md](../../Done/01-BuildALL/HANDOFF.md)
@@ -501,7 +501,7 @@
 - [ ] **[CI][P3] 无 PR 测试摘要/注解**：仅上传 TRX artifact，PR 页面看不到失败用例摘要。
 - [x] **[CI][P3] 无 concurrency/timeout/cache**：重复推送会并行跑完整流程，NuGet 未缓存。
 - [ ] **[CI][P3] 无 PR/Issue 模板与贡献指南**（低优先）。
-- [ ] **[工程][P2] 分析器 `NoWarn` 清单较大**：`Directory.Build.props` 集中抑制了 CA1001/CA1068/CA1863 等，未逐条评估/修复。
+- [x] **[工程][P2] 分析器 `NoWarn` 清单较大**：Round 31 用 `-p:NoWarn=` 全量构建逐条审计，55 项缩减到 7 项并注明理由；CA1707 移入测试项目，CA1068/CA1725/CA1806/CA1869/CA1310 已改代码消除。
 - [ ] **[工程][P3] Release 仍引用 `Avalonia.Diagnostics`**：见 7.1。
 - [ ] **[工程][P3] 无 BenchmarkDotNet 专项基准**：仅有 NUnit gated 大文件测试。
 
@@ -658,11 +658,12 @@
 
 ### 7.11 代码质量与死代码
 
-- [ ] **[质量/P2] `BlockTypeToColorConverter` 未被引用**（`Converters/BlockTypeToColorConverter.cs`）。
-- [ ] **[质量/P2] `InverseBoolConverter` 未被引用**（同文件）。
-- [ ] **[质量/P2] `BlockTemplateViewModel.ColorKey` 未被引用**（`ViewModels/BlockTemplateViewModel.cs:48`）。
-- [ ] **[质量/P2] `BlockNodeViewModel.HeaderColorKey` 未被引用**（`ViewModels/BlockNodeViewModel.cs:298`）。
-- [ ] **[质量/P2] 分析器 `NoWarn` 清单未清理**：见 7.3。
+- [x] **[质量/P2] `BlockTypeToColorConverter` 未被引用**（`Converters/BlockTypeToColorConverter.cs`）：Round 31 删除文件。
+- [x] **[质量/P2] `InverseBoolConverter` 未被引用**（同文件）：Round 31 随文件删除。
+- [x] **[质量/P2] `BlockTemplateViewModel.ColorKey` 未被引用**（`ViewModels/BlockTemplateViewModel.cs:48`）：Round 31 删除。
+- [x] **[质量/P2] `BlockNodeViewModel.HeaderColorKey` 未被引用**（`ViewModels/BlockNodeViewModel.cs:298`）：Round 31 删除。
+- [x] **[质量/P2] 分析器 `NoWarn` 清单未清理**：见 7.3；Round 31 完成审计。
+- [ ] **[质量/P3] CA1001 可释放字段未接线**：6 个视图模型与 `RequestRateLimiter`、`AutoFixWriter` 持有 CTS/SemaphoreSlim/MemoryStream，当前依赖所有者生命周期，未实现 `IDisposable`（Round 31 保留抑制）。
 - [ ] **[质量/P3] `async void` 事件处理器较多**：28 处，异常主要依赖全局处理器；建议逐项确认边界。
 - [ ] **[质量/P3] `Task.Run` + UI 回调模式**：异常传播路径需复核。
 - [ ] **[质量/P3] 大文件职责偏重**：`MainWindowViewModel`（约 1420 行）、`RecipeValidationService`（约 970 行）、`RecipeRunner`（约 840 行），可择机拆分。
@@ -1330,3 +1331,38 @@
 - CSV 类型推断与列类型展示未做。
 - 列宽仅按字段名全局保存，不区分数据集；表头与行的横向滚动同步依赖可视树查找。
 - SFT 比例拆片与输出路径存在性提示（206）。
+
+## 23. Round 31 执行记录（2026-11-18）
+
+### 23.1 已完成项
+
+| 项 | 范围 | 提交 |
+| --- | --- | --- |
+| Batch 21 | 代码质量：删除未引用转换器/颜色键、NoWarn 清单审计与低频告警修复（7.11 / 7.3） | 本次提交 |
+
+### 23.2 具体改动
+
+- 删除 `Converters/BlockTypeToColorConverter.cs`（`BlockTypeToColorConverter`、`InverseBoolConverter` 均无 XAML/代码引用），以及 `BlockTemplateViewModel.ColorKey`、`BlockNodeViewModel.HeaderColorKey`；块头颜色统一由 `Themes/Colors.axaml` 的 `*BlockBrush` 资源提供。
+- `Directory.Build.props` 的 `NoWarn` 从 55 项缩减到 7 项（CA1001/CA1305/CA1416/CA1822/CA1859/CA1861/CA1863）并逐组注明理由；`CA1707` 移入测试项目。移除的 48 项中，43 项在 `-p:NoWarn=` 全量构建中零命中（含全部 17 个 IDE 规则），5 项通过修改代码消除。
+- 修复的低频告警：
+  - `JsonlDatasetReader.ReadPageAsync` 参数 `startLine` 改名 `startRow`，与接口一致（CA1725）。
+  - `DatasetView.Sort` 数值分支显式处理 `TryParseNumber` 失败（CA1806）。
+  - `ExpressionConfigEditorViewModel` 与 `RecipeRunner` 复用静态 `JsonSerializerOptions`（CA1869）。
+  - `RecipeRunner.RunAsync` 将 `CancellationToken` 移到参数末尾，`MainWindowViewModel` 调用点同步（CA1068）。
+  - 两处测试断言补 `StringComparison.Ordinal`（CA1310）。
+
+### 23.3 当前验证
+
+- `dotnet build -c Release`：0 警告，0 错误。
+- `dotnet build -c Release -t:Rebuild -p:NoWarn=`（并关闭警告即错误）：仅剩 8 个规则码（7 个全局 + 测试项目 CA1707），其余已清零。
+- `dotnet test -c Release`：701 通过，0 失败，7 跳过；`--list-tests` 709 个用例（含 1 个 `[Explicit]`）。
+- `dotnet format --verify-no-changes`：通过。
+- 覆盖率（本地）：总行 77.34%，Services/Commands 行 85.15%（门槛 60% / 70%）。
+- 本轮为删除与重构，无新增测试；既有 701 项全部通过。
+
+### 23.4 本轮未做（保留在 7.x / 8.3）
+
+- CA1001：6 个视图模型与 `RequestRateLimiter`、`AutoFixWriter` 尚未接入 `IDisposable`，当前按所有者生命周期管理；已在 7.11 新增跟进项。
+- CA1305/CA1822/CA1859/CA1861/CA1863 仍保留抑制：属风格/性能建议，修复需跨文件批量改动，未纳入本批次。
+- `async void` 边界、`Task.Run` 异常传播与大文件拆分（7.11 P3）未动。
+- Responses/Anthropic 流式输出；SFT 比例拆片与输出路径存在性提示（206）。

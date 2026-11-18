@@ -68,24 +68,24 @@ public sealed class JsonlDatasetReader : IDatasetReader, IDisposable
     /// Reads up to <paramref name="count"/> rows starting at a zero-based line number.
     /// </summary>
     public async Task<IReadOnlyList<DatasetRow>> ReadPageAsync(
-        long startLine, int count, CancellationToken cancellationToken = default)
+        long startRow, int count, CancellationToken cancellationToken = default)
     {
         EnsureOpen();
-        ArgumentOutOfRangeException.ThrowIfNegative(startLine);
+        ArgumentOutOfRangeException.ThrowIfNegative(startRow);
         ArgumentOutOfRangeException.ThrowIfNegative(count);
 
-        if (count == 0 || startLine >= TotalLines)
+        if (count == 0 || startRow >= TotalLines)
         {
             return Array.Empty<DatasetRow>();
         }
 
-        var endLine = Math.Min(TotalLines, startLine + count);
-        var rows = new List<DatasetRow>((int)(endLine - startLine));
+        var endLine = Math.Min(TotalLines, startRow + count);
+        var rows = new List<DatasetRow>((int)(endLine - startRow));
 
         await _ioLock.WaitAsync(cancellationToken);
         try
         {
-            for (var line = startLine; line < endLine; line++)
+            for (var line = startRow; line < endLine; line++)
             {
                 var row = await ReadLineCoreAsync(line, cancellationToken);
                 if (row is not null)
