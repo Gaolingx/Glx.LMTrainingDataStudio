@@ -71,6 +71,101 @@ public sealed class LlmApiClientTests
     }
 
     [Test]
+    public async Task OpenAiChat_Streaming_AccumulatesContentToolCallsAndUsage()
+    {
+        string? body = null;
+        var client = CreateClient((_, content) =>
+        {
+            body = content;
+            return SseResponse(string.Join(
+                "\n\n",
+                """data: {"choices":[{"delta":{"content":"Hel"}}]}""",
+                """data: {"choices":[{"delta":{"content":"lo"}}]}""",
+                """data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","function":{"name":"python","arguments":"{\"code\":"}}]}}]}""",
+                """data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\"1\"}"}}]}}]}""",
+                """data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}""",
+                """data: {"choices":[],"usage":{"prompt_tokens":7,"completion_tokens":9}}""",
+                "data: [DONE]",
+                string.Empty));
+        });
+
+        var result = await client.CompleteAsync(
+            new LlmCompletionRequest([new LlmChatTurn("user", "run")]),
+            CreateConfig(LlmProviderIds.OpenAiChat) with { Streaming = true });
+
+        Assert.That(result.Content, Is.EqualTo("Hello"));
+        Assert.That(result.ToolCalls, Has.Count.EqualTo(1));
+        Assert.That(result.ToolCalls![0].Id, Is.EqualTo("call_1"));
+        Assert.That(result.ToolCalls[0].Name, Is.EqualTo("python"));
+        Assert.That(result.ToolCalls[0].ArgumentsJson, Is.EqualTo("""{"code":"1"}"""));
+        Assert.That(result.Usage!.PromptTokens, Is.EqualTo(7));
+        Assert.That(result.Usage.CompletionTokens, Is.EqualTo(9));
+
+        using var document = JsonDocument.Parse(body!);
+        Assert.That(document.RootElement.GetProperty("stream").GetBoolean(), Is.True);
+        Assert.That(
+            document.RootElement.GetProperty("stream_options").GetProperty("include_usage").GetBoolean(),
+            Is.True);
+    }
+
+    [Test]
+    public async Task Streaming_NonOpenAiChatProvider_UsesSingleResponse()
+    {
+        string? body = null;
+        var client = CreateClient((_, content) =>
+        {
+            body = content;
+            return JsonResponse(
+                HttpStatusCode.OK,
+                """{"content":[{"type":"text","text":"claude answer"}]}""");
+        });
+
+        var result = await client.CompleteAsync(
+            "Hello",
+            CreateConfig(LlmProviderIds.Anthropic, "claude-sonnet-4-5") with { Streaming = true });
+
+        Assert.That(result, Is.EqualTo("claude answer"));
+        using var document = JsonDocument.Parse(body!);
+        Assert.That(document.RootElement.TryGetProperty("stream", out _), Is.False);
+    }
+
+    [Test]
+    public async Task Streaming_TransientServerError_IsRetried()
+    {
+        var calls = 0;
+        var client = CreateClient((_, _) =>
+        {
+            calls++;
+            return calls == 1
+                ? JsonResponse(HttpStatusCode.InternalServerError, "boom")
+                : SseResponse(
+                    "data: {\"choices\":[{\"delta\":{\"content\":\"ok\"}}]}\n\ndata: [DONE]\n\n");
+        });
+
+        var result = await client.CompleteAsync(
+            "hi",
+            CreateConfig(LlmProviderIds.OpenAiChat, maxRetries: 2) with { Streaming = true });
+
+        Assert.That(result, Is.EqualTo("ok"));
+        Assert.That(calls, Is.EqualTo(2));
+    }
+
+    [Test]
+    public void Streaming_RetriesExhausted_ThrowsWithOperationName()
+    {
+        var client = CreateClient((_, _) =>
+            JsonResponse(HttpStatusCode.InternalServerError, "boom"));
+
+        var ex = Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await client.CompleteAsync(
+                "hi",
+                CreateConfig(LlmProviderIds.OpenAiChat, maxRetries: 0) with { Streaming = true }));
+
+        Assert.That(ex!.Message, Does.Contain("OpenAI chat streaming completion"));
+        Assert.That(ex.Message, Does.Contain("500"));
+    }
+
+    [Test]
     public async Task OpenAiResponses_SendsExpectedRequestAndParsesOutput()
     {
         HttpRequestMessage? captured = null;
@@ -393,6 +488,11 @@ public sealed class LlmApiClientTests
     private static HttpResponseMessage JsonResponse(HttpStatusCode status, string body) => new(status)
     {
         Content = new StringContent(body, Encoding.UTF8, "application/json")
+    };
+
+    private static HttpResponseMessage SseResponse(string body) => new(HttpStatusCode.OK)
+    {
+        Content = new StringContent(body, Encoding.UTF8, "text/event-stream")
     };
 
     private sealed class StubHandler(Func<HttpRequestMessage, string, HttpResponseMessage> responder)

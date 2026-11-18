@@ -223,7 +223,7 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 | 节点 | 执行状态 | 专属面板 | 主要缺口 |
 | --- | --- | --- | --- |
 | Seed | JSONL / CSV / Parquet 可用 | 有 | Streaming 开关、节点内过滤/列映射 |
-| LLM | 三种 provider + tools/多轮/结构化输出/并发/成本 + 工具回填与 Anthropic 强制 JSON | 有 | 流式输出、模型列表 |
+| LLM | 三种 provider + tools/多轮/结构化输出/并发/成本 + 工具回填 + OpenAI Chat 流式 + 模型列表 | 有 | Responses/Anthropic 流式 |
 | Expression | Fluid 模板 + JSON 校验 | 有 | 沙箱/超时、外部函数 |
 | Validator | 多规则（表达式/Schema/正则/脚本）+ 超时 + pass/reject | 有 | 独立失败摘要 UI、任意代码沙箱 |
 | Sampler | 数量/比例 + 多文件 splits + 多端口 + 分层 + 统计预览 | 有 | count 模式分层、再混洗 |

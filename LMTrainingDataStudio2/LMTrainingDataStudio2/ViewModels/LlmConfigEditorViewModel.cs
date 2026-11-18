@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LMTrainingDataStudio2.Localization;
@@ -79,10 +80,36 @@ public partial class LlmConfigEditorViewModel : ObservableObject
     [ObservableProperty]
     private ToolExecutionModeOption _selectedToolMode;
 
-    public LlmConfigEditorViewModel(LlmBlockConfig config, Action<LlmBlockConfig> apply)
+    [ObservableProperty]
+    private bool _streaming;
+
+    [ObservableProperty]
+    private ILlmModelCatalog? _modelCatalog;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RefreshModelsCommand))]
+    private bool _isLoadingModels;
+
+    [ObservableProperty]
+    private string? _modelListError;
+
+    [ObservableProperty]
+    private string? _modelListStatus;
+
+    [ObservableProperty]
+    private string? _selectedModel;
+
+    public ObservableCollection<string> Models { get; } = new();
+
+    public LlmConfigEditorViewModel(
+        LlmBlockConfig config,
+        Action<LlmBlockConfig> apply,
+        ILlmModelCatalog? modelCatalog = null)
     {
         _apply = apply;
         _base = config;
+        _modelCatalog = modelCatalog;
+        _streaming = config.Streaming;
         _modelAlias = config.ModelAlias;
         _temperature = config.Temperature;
         _maxTokens = config.MaxTokens;
@@ -119,9 +146,28 @@ public partial class LlmConfigEditorViewModel : ObservableObject
         new ToolExecutionModeOption(ToolExecutionMode.Real, "Real sandbox tools")
     };
 
-    partial void OnSelectedProviderChanged(LlmProviderOption value) => Push();
+    partial void OnSelectedProviderChanged(LlmProviderOption value)
+    {
+        Models.Clear();
+        ModelListStatus = null;
+        ModelListError = null;
+        Push();
+    }
 
     partial void OnModelAliasChanged(string value) => Push();
+
+    partial void OnStreamingChanged(bool value) => Push();
+
+    partial void OnModelCatalogChanged(ILlmModelCatalog? value) =>
+        RefreshModelsCommand.NotifyCanExecuteChanged();
+
+    partial void OnSelectedModelChanged(string? value)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            ModelAlias = value;
+        }
+    }
 
     partial void OnTemperatureChanged(double value) => Push();
 
@@ -163,6 +209,49 @@ public partial class LlmConfigEditorViewModel : ObservableObject
 
     partial void OnSelectedToolModeChanged(ToolExecutionModeOption value) => Push();
 
+    [RelayCommand(CanExecute = nameof(CanRefreshModels))]
+    private async Task RefreshModelsAsync()
+    {
+        if (ModelCatalog is null)
+        {
+            return;
+        }
+
+        IsLoadingModels = true;
+        ModelListError = null;
+        ModelListStatus = LocalizationService.L("property.models_loading");
+        try
+        {
+            var provider = SelectedProvider.Id;
+            var endpoint = Endpoint;
+            var models = await ModelCatalog.ListModelsAsync(provider, endpoint);
+            if (!string.Equals(provider, SelectedProvider.Id, StringComparison.Ordinal) ||
+                !string.Equals(endpoint, Endpoint, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            Models.Clear();
+            foreach (var model in models)
+            {
+                Models.Add(model);
+            }
+
+            ModelListStatus = string.Format(LocalizationService.L("property.models_loaded"), Models.Count);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            ModelListStatus = null;
+            ModelListError = string.Format(LocalizationService.L("property.models_load_failed"), ex.Message);
+        }
+        finally
+        {
+            IsLoadingModels = false;
+        }
+    }
+
+    private bool CanRefreshModels() => ModelCatalog is not null && !IsLoadingModels;
+
     [RelayCommand]
     private void ValidateSchema()
     {
@@ -203,6 +292,7 @@ public partial class LlmConfigEditorViewModel : ObservableObject
         OutputCostPerMillionTokens = OutputCostPerMillionTokens,
         ContinueOnError = ContinueOnError,
         MaxToolRounds = MaxToolRounds,
-        ToolMode = SelectedToolMode.Mode
+        ToolMode = SelectedToolMode.Mode,
+        Streaming = Streaming
     });
 }

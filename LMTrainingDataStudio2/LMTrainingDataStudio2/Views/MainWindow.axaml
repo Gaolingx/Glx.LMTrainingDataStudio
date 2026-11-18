@@ -328,7 +328,7 @@
                         </Border>
 
                         <ScrollViewer>
-                            <views:PropertyPanelView DataContext="{Binding}" />
+                            <views:PropertyPanelView x:Name="PropertyPanel" DataContext="{Binding}" />
                         </ScrollViewer>
                     </DockPanel>
                 </Border>

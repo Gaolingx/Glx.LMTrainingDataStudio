@@ -1,7 +1,7 @@
 # STATUS — 功能清单、节点能力矩阵与下一阶段规划
 
-> 最后核对：2026-11-18（Round 27 完成）
-> 验证基线：`dotnet build` 0 警告 0 错误（分析器开启）；`dotnet test` 651 通过 + 7 个 gated 测试（2 个真实 provider 冒烟 + 5 个性能 gated，默认跳过），另有 1 个 `[Explicit]` 示例生成；`--list-tests` 659 个用例；`dotnet format --verify-no-changes` 通过；覆盖率总行 76.4%、Services/Commands 84.87%；Headless UI 测试通过；1M 行 JSONL、1M 行质量操作与 1M 行编辑保存基线通过；10M 行链路与 CSV/Parquet 大规模基线入口已提供；win-x64 单文件发布与 Debug 启动冒烟通过。
+> 最后核对：2026-11-18（Round 29 完成）
+> 验证基线：`dotnet build` 0 警告 0 错误（分析器开启）；`dotnet test` 677 通过 + 7 个 gated 测试（2 个真实 provider 冒烟 + 5 个性能 gated，默认跳过），另有 1 个 `[Explicit]` 示例生成；`--list-tests` 685 个用例；`dotnet format --verify-no-changes` 通过；覆盖率总行 76.64%、Services/Commands 84.95%；Headless UI 测试通过；1M 行 JSONL、1M 行质量操作与 1M 行编辑保存基线通过；10M 行链路与 CSV/Parquet 大规模基线入口已提供；win-x64 单文件发布与 Debug 启动冒烟通过。
 >
 > 图例：`[x]` 已完成并有测试/验证；`[部分]` 可用但有明确缺口；`[ ]` 未实现。
 >
@@ -48,7 +48,7 @@
 - 节点说明：10 类节点具备本地化名称、简介、详细说明与端口摘要；属性面板 Node Guide 与画布悬停提示复用同一份目录。
 - 界面本地化：zh-CN / en-US 资源化静态 UI（约 260 个键），设置面板切换语言后即时刷新；运行日志/执行状态仍为英文技术文本。
 - 多输出端口：Validator `pass`/`reject`、Sampler 按 splits 动态端口；Runner 按端口缓冲、检查点与恢复，旧单端口 Recipe 回落主端口。
-- LLM 请求侧 tools、多行 `messages`、`response_format` JSON Schema、并发与保序、token/成本日志、失败样本 JSONL。
+- LLM 请求侧 tools、多行 `messages`、`response_format` JSON Schema、并发与保序、token/成本日志、失败样本 JSONL；OpenAI Chat 可选 SSE 流式输出（累积 delta/tool_calls/usage）；LLM 面板可按 provider 拉取模型列表并选择。
 - Validator 多规则组合、expression/schema/regex/script、规则超时、取反与 pass/reject 双端口。
 - Sampler 多端口切分、分层字段、切分统计预览。
 - Simulation Tools/Rules/Script 可视化编辑器、OpenAI Chat 流式 delta、RequestsPerMinute 限速与价格预设。
@@ -61,13 +61,13 @@
 - 发布：MSIX 清单/打包脚本、Inno Setup 安装脚本；`examples/` 6 个示例 Recipe；README Dark/Light 截图。
 - 工程质量：`.editorconfig`、.NET 分析器 `latest-recommended`、警告即错误；构建 0 警告。
 - 工程化：滚动日志与全局异常、GitHub Actions CI、win-x64 单文件发布脚本、Headless UI 测试、MIT LICENSE、应用图标。
-- 651 个自动化测试：644 个常规通过 + 7 个 gated（2 个真实 provider 冒烟 + 5 个性能 gated）+ 1 个 Explicit 示例生成。
+- 685 个自动化测试：677 个常规通过 + 7 个 gated（2 个真实 provider 冒烟 + 5 个性能 gated）+ 1 个 Explicit 示例生成。
 
 ### 1.2 当前最大缺口（按优先级）
 
 1. **执行韧性残余**：已补输出 SHA256、Recipe 指纹、溢写行/字节双阈值、检查点磁盘配额与启动清理、执行历史按数量/天数保留；剩余缺口为跨进程并发写锁、CI 取消门禁与 10M 行结果记录。
 2. **数据编辑残余**：已支持跨格式保存；`messages` 已有角色/内容/tool_calls 结构化表单并保留其他字段；非 `messages` 嵌套结构仍按 JSON 文本编辑；列排序/筛选/列宽持久化未做。
-3. **节点能力残余**：LLM 已支持 tool_calls 回填与 Anthropic 结构化输出；Validator script 为 Fluid 布尔表达式而非任意脚本；Sampler 分层仅对 ratio/splits 生效；Tool Profile 无 MCP。
+3. **节点能力残余**：LLM 已支持 tool_calls 回填、Anthropic 结构化输出、OpenAI Chat 流式与模型列表；Responses/Anthropic 流式未做；Validator script 为 Fluid 布尔表达式而非任意脚本；Sampler 分层仅对 ratio/splits 生效；Tool Profile 无 MCP。
 4. **发布残余**：MSIX/Inno 安装包未在本机实际安装验证；单实例管道未做双进程自动化测试；10M 行结果需按本机实测记录。
 
 ### 1.3 一页总览
@@ -85,7 +85,7 @@
 **部分完成（可用但有缺口）**
 
 - Seed：三种格式可读；Streaming UI 已暴露，仅 JSONL + 关闭索引缓存时生效；无节点内过滤/列映射。
-- LLM：三种 provider、tools/多轮/结构化输出/并发/成本/失败样本可用；工具回填（模拟/真实沙箱）与 Anthropic 强制 JSON 输出已接入。
+- LLM：三种 provider、tools/多轮/结构化输出/并发/成本/失败样本可用；工具回填（模拟/真实沙箱）与 Anthropic 强制 JSON 输出已接入；OpenAI Chat 流式与模型列表已接入。
 - Validator：表达式/JSON Schema/正则/Fluid 脚本、多规则、超时与 pass/reject 双端口可用；非任意代码脚本。
 - Sampler：count/ratio/splits、多输出端口、分层（ratio/splits）与统计预览可用；count 模式不分层。
 - Cleaner：5 个布尔规则 + 正则规则可用；正则规则 UI 与清洗前后 diff 预览已接入；无坏行报告。
@@ -97,7 +97,7 @@
 **未实现（下一阶段工作池）**
 
 - 数据工作台列排序/条件筛选/列宽持久化与 CSV 类型推断。
-- LLM 模型列表与流式输出。
+- LLM Responses/Anthropic 流式输出（OpenAI Chat 已支持）。
 - Validator 失败样本独立 UI、任意代码沙箱规则。
 - Sampler count 模式分层、切分内再混洗选项。
 - Simulation 非 OpenAI 流式 delta、严格令牌桶限速、容器级隔离。
@@ -165,7 +165,7 @@
 | 结构化输出（JSON Schema） | [x] | OpenAI Chat/Responses `response_format`；Anthropic 强制 `structured_output` 工具；非法 JSON 计为失败 |
 | 并发调用 / token/成本统计 | [x] | `MaxConcurrency` 保序并发；token 与估算成本写日志 |
 | 失败样本单独输出 | [x] | `ContinueOnError` + `FailureOutputPath` 原子写 `{lineNumber,error,data}` |
-| 流式输出 / 模型列表 | [ ] | LLM 节点无流式；Simulation 支持 OpenAI Chat SSE |
+| 流式输出 / 模型列表 | [x] | `Streaming` 开启时 OpenAI Chat 走 SSE（累积 delta/tool_calls/usage，沿用超时重试）；模型下拉调用 OpenAI `/models`、Anthropic `/v1/models`；Responses/Anthropic 流式未做 |
 
 ### 2.3 Expression（字段变换）
 
@@ -390,7 +390,7 @@
 
 **节点能力**
 
-- [x] LLM 请求侧 tools、结构化输出、多轮上下文、并发、token/成本统计、失败样本。
+- [x] LLM 请求侧 tools、结构化输出、多轮上下文、并发、token/成本统计、失败样本、OpenAI Chat 流式输出与模型列表。
 - [x] Validator 受限代码规则、超时、多规则组合、失败样本预览、独立 pass/reject 端口。
 - [x] Sampler 多输出端口、分层/分组采样、统计预览。
 - [部分] Simulation Tools/Rules/Script 可视化编辑器、流式 delta、速率限制/价格预设已完成；容器级隔离未做。
@@ -461,6 +461,8 @@
 | 25 | 网络安全与设置通知 | web_fetch 固定已校验解析地址（SocketsHttpHandler.ConnectCallback）、混合公网/私网结果拒绝、设置变更事件与数据工作台自动刷新 | 638 用例（630 通过 + 7 gated + 1 Explicit） |
 | 26 | 诊断脱敏与目录 ACL | 诊断包日志/summary/执行摘要全文脱敏；Windows 设置、日志与崩溃目录仅保留当前用户/SYSTEM/Administrators 权限 | 646 用例（638 通过 + 7 gated + 1 Explicit） |
 | 27 | 执行韧性收尾 | 溢写行/字节双阈值、检查点磁盘配额与启动/运行结束清理、执行历史按数量/天数保留与手动清理 | 659 用例（651 通过 + 7 gated + 1 Explicit） |
+| 28 | 执行并发与溢写清理 | 运行期输出写锁、目标定义统一、溢写目录启动清理、CI 取消门禁 | 669 用例（661 通过 + 7 gated + 1 Explicit） |
+| 29 | LLM 流式与模型列表 | OpenAI Chat SSE 流式（delta/tool_calls/usage + 重试）、模型列表服务与面板下拉/刷新 | 685 用例（677 通过 + 7 gated + 1 Explicit） |
 
 ---
 

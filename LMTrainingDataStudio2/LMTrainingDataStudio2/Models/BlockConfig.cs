@@ -166,7 +166,8 @@ public sealed record LlmBlockConfig(
     bool ContinueOnError = false,
     int MaxToolRounds = 0,
     ToolExecutionMode ToolMode = ToolExecutionMode.Simulated,
-    SandboxLimits? Sandbox = null) : BlockConfig;
+    SandboxLimits? Sandbox = null,
+    bool Streaming = false) : BlockConfig;
 
 public sealed record ExpressionBlockConfig(
     string Template,

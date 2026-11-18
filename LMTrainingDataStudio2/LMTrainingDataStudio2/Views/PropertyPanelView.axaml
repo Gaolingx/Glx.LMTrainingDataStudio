@@ -220,6 +220,36 @@
                              Watermark="gpt-4o / claude-sonnet-4-5" />
                 </StackPanel>
 
+                <StackPanel Spacing="4">
+                    <TextBlock Text="{loc:Loc property.model_list}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
+                    <Grid ColumnDefinitions="*,8,Auto">
+                        <ComboBox x:Name="LlmModelListBox" Grid.Column="0"
+                                  ItemsSource="{Binding SelectedBlock.LlmEditor.Models}"
+                                  SelectedItem="{Binding SelectedBlock.LlmEditor.SelectedModel, Mode=TwoWay}"
+                                  FontSize="11" HorizontalAlignment="Stretch" />
+                        <Button x:Name="RefreshLlmModelsButton" Grid.Column="2"
+                                Content="{loc:Loc property.refresh_models}"
+                                Command="{Binding SelectedBlock.LlmEditor.RefreshModelsCommand}"
+                                FontSize="11" Padding="10,6"
+                                Background="{DynamicResource ButtonSurfaceBrush}" Foreground="{DynamicResource ButtonSurfaceTextBrush}" />
+                    </Grid>
+                    <TextBlock Text="{Binding SelectedBlock.LlmEditor.ModelListStatus}"
+                               FontSize="10" Foreground="{DynamicResource TextFaintBrush}" TextWrapping="Wrap"
+                               IsVisible="{Binding SelectedBlock.LlmEditor.ModelListStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <TextBlock Text="{Binding SelectedBlock.LlmEditor.ModelListError}"
+                               FontSize="10" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap"
+                               IsVisible="{Binding SelectedBlock.LlmEditor.ModelListError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                </StackPanel>
+
+                <StackPanel Spacing="4">
+                    <CheckBox x:Name="LlmStreamingBox"
+                              Content="{loc:Loc property.llm_streaming}"
+                              FontSize="11" Foreground="{DynamicResource TextPrimaryBrush}"
+                              IsChecked="{Binding SelectedBlock.LlmEditor.Streaming, Mode=TwoWay}" />
+                    <TextBlock Text="{loc:Loc property.llm_streaming_hint}"
+                               FontSize="10" Foreground="{DynamicResource TextFaintBrush}" TextWrapping="Wrap" />
+                </StackPanel>
+
                 <Grid ColumnDefinitions="*,8,*">
                     <StackPanel Grid.Column="0" Spacing="4">
                         <TextBlock Text="{loc:Loc common.temperature}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />

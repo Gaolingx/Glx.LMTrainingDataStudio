@@ -67,6 +67,45 @@ public sealed class HeadlessUiTests
     }
 
     [AvaloniaTest]
+    public void LlmPanel_WiresModelListAndStreamingControls()
+    {
+        var vm = new MainWindowViewModel(new SettingsStore(Path.Combine(_directory, "settings.json")));
+        var window = new MainWindow { DataContext = vm };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        try
+        {
+            vm.AddBlockCommand.Execute(BlockType.Llm);
+            Dispatcher.UIThread.RunJobs();
+
+            var panel = window.FindControl<PropertyPanelView>("PropertyPanel")!;
+            Assert.That(panel, Is.Not.Null);
+            var models = panel.FindControl<ComboBox>("LlmModelListBox");
+            var refresh = panel.FindControl<Button>("RefreshLlmModelsButton");
+            var streaming = panel.FindControl<CheckBox>("LlmStreamingBox");
+            Assert.That(models, Is.Not.Null);
+            Assert.That(refresh, Is.Not.Null);
+            Assert.That(streaming, Is.Not.Null);
+
+            var editor = vm.SelectedBlock!.LlmEditor!;
+            Assert.That(models!.ItemsSource, Is.SameAs(editor.Models));
+            Assert.That(refresh!.Command, Is.SameAs(editor.RefreshModelsCommand));
+            Assert.That(refresh.IsEnabled, Is.True, "the model catalog is available in the app");
+
+            editor.Streaming = true;
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.That(streaming!.IsChecked, Is.True);
+            Assert.That(((LlmBlockConfig)vm.SelectedBlock.Config).Streaming, Is.True);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaTest]
     public void LanguageSwitch_UpdatesStaticUiAndBlockLibrary()
     {
         var vm = new MainWindowViewModel(new SettingsStore(Path.Combine(_directory, "settings.json")));

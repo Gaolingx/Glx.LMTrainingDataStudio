@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -63,6 +64,11 @@ public sealed class LlmApiClient : ILlmClient
 
         var provider = LlmProviderIds.Normalize(config.Provider)
             ?? throw new InvalidOperationException($"LLM provider '{config.Provider}' is not supported.");
+
+        if (config.Streaming && provider == LlmProviderIds.OpenAiChat)
+        {
+            return await CompleteOpenAiChatStreamAsync(request, config, cancellationToken);
+        }
 
         return provider switch
         {
@@ -131,6 +137,170 @@ public sealed class LlmApiClient : ILlmClient
             content,
             ParseOpenAiChatToolCalls(message),
             ParseUsage(document.RootElement, "prompt_tokens", "completion_tokens"));
+    }
+
+    /// <summary>
+    /// OpenAI Chat Completions with <c>stream=true</c>. Deltas are accumulated into a
+    /// normal completion result so the executor does not need a streaming contract.
+    /// </summary>
+    private async Task<LlmCompletionResult> CompleteOpenAiChatStreamAsync(
+        LlmCompletionRequest request, LlmBlockConfig config, CancellationToken ct)
+    {
+        var apiKey = RequireApiKey(LlmProviderIds.OpenAiChat, "OPENAI_API_KEY");
+        var baseUrl = ResolveBaseUrl(config, LlmProviderIds.OpenAiChat, DefaultOpenAiBaseUrl);
+        var tools = BuildOpenAiChatTools(request.Tools);
+        var payload = new
+        {
+            model = config.ModelAlias,
+            messages = request.Messages
+                .Select(message => new
+                {
+                    role = message.Role,
+                    content = message.Content ?? string.Empty,
+                    tool_calls = message.ToolCalls?.Select(call => new
+                    {
+                        id = call.Id,
+                        type = "function",
+                        function = new { name = call.Name, arguments = call.ArgumentsJson }
+                    }).ToArray(),
+                    tool_call_id = message.ToolCallId
+                })
+                .ToArray(),
+            temperature = config.Temperature,
+            max_tokens = config.MaxTokens,
+            tools,
+            tool_choice = tools is null ? null : "auto",
+            response_format = BuildOpenAiChatResponseFormat(request.ResponseSchema),
+            stream = true,
+            stream_options = new { include_usage = true }
+        };
+
+        return await SendStreamingWithRetryAsync(
+            () =>
+            {
+                var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/chat/completions")
+                {
+                    Content = JsonContent.Create(payload, options: JsonOptions)
+                };
+                httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+                return httpRequest;
+            },
+            ReadOpenAiChatStreamAsync,
+            "OpenAI chat streaming completion",
+            config,
+            ct);
+    }
+
+    private static async Task<LlmCompletionResult> ReadOpenAiChatStreamAsync(
+        HttpResponseMessage response, CancellationToken ct)
+    {
+        await using var stream = await response.Content.ReadAsStreamAsync(ct);
+        using var reader = new StreamReader(stream, Encoding.UTF8);
+        var content = new StringBuilder();
+        var toolCalls = new Dictionary<int, StreamingToolCall>();
+        LlmTokenUsage? usage = null;
+
+        while (await reader.ReadLineAsync(ct) is { } line)
+        {
+            if (!line.StartsWith("data:", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var data = line[5..].Trim();
+            if (data.Length == 0)
+            {
+                continue;
+            }
+
+            if (data == "[DONE]")
+            {
+                break;
+            }
+
+            using var document = JsonDocument.Parse(data);
+            var root = document.RootElement;
+            usage = ParseUsage(root, "prompt_tokens", "completion_tokens") ?? usage;
+
+            if (!root.TryGetProperty("choices", out var choices) ||
+                choices.ValueKind != JsonValueKind.Array ||
+                choices.GetArrayLength() == 0)
+            {
+                continue;
+            }
+
+            var choice = choices[0];
+            if (!choice.TryGetProperty("delta", out var delta))
+            {
+                continue;
+            }
+
+            if (delta.TryGetProperty("content", out var deltaContent) &&
+                deltaContent.ValueKind == JsonValueKind.String)
+            {
+                content.Append(deltaContent.GetString());
+            }
+
+            if (delta.TryGetProperty("tool_calls", out var deltaCalls) &&
+                deltaCalls.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var call in deltaCalls.EnumerateArray())
+                {
+                    var index = call.TryGetProperty("index", out var indexElement) &&
+                                indexElement.TryGetInt32(out var parsedIndex)
+                        ? parsedIndex
+                        : 0;
+                    if (!toolCalls.TryGetValue(index, out var builder))
+                    {
+                        builder = new StreamingToolCall();
+                        toolCalls[index] = builder;
+                    }
+
+                    if (call.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.String)
+                    {
+                        builder.Id = id.GetString();
+                    }
+
+                    if (call.TryGetProperty("function", out var function))
+                    {
+                        if (function.TryGetProperty("name", out var name) &&
+                            name.ValueKind == JsonValueKind.String)
+                        {
+                            builder.Name = name.GetString();
+                        }
+
+                        if (function.TryGetProperty("arguments", out var arguments) &&
+                            arguments.ValueKind == JsonValueKind.String)
+                        {
+                            builder.Arguments.Append(arguments.GetString());
+                        }
+                    }
+                }
+            }
+        }
+
+        List<LlmToolCall>? calls = null;
+        if (toolCalls.Count > 0)
+        {
+            calls = toolCalls
+                .OrderBy(pair => pair.Key)
+                .Select(pair => new LlmToolCall(
+                    pair.Value.Id ?? $"call_{pair.Key}",
+                    pair.Value.Name ?? string.Empty,
+                    pair.Value.Arguments.Length == 0 ? "{}" : pair.Value.Arguments.ToString()))
+                .ToList();
+        }
+
+        return new LlmCompletionResult(content.ToString(), calls, usage);
+    }
+
+    private sealed class StreamingToolCall
+    {
+        public string? Id { get; set; }
+
+        public string? Name { get; set; }
+
+        public StringBuilder Arguments { get; } = new();
     }
 
     private async Task<LlmCompletionResult> CompleteOpenAiResponsesAsync(
@@ -635,6 +805,73 @@ public sealed class LlmApiClient : ILlmClient
                     $"{operation} timed out after {timeout.TotalSeconds:0.#}s.");
             }
             catch (HttpRequestException ex)
+            {
+                lastFailure = ex;
+            }
+
+            if (attempt < attempts - 1)
+            {
+                await _delay(ComputeBackoff(attempt), ct);
+            }
+        }
+
+        throw new InvalidOperationException(
+            $"{operation} failed after {attempts} attempt(s): {lastFailure?.Message ?? "unknown error"}",
+            lastFailure);
+    }
+
+    /// <summary>
+    /// Streaming variant of <see cref="SendWithRetryAsync"/>. Each attempt rebuilds the
+    /// request and re-reads the stream, so a retry restarts from a clean accumulator.
+    /// </summary>
+    private async Task<LlmCompletionResult> SendStreamingWithRetryAsync(
+        Func<HttpRequestMessage> requestFactory,
+        Func<HttpResponseMessage, CancellationToken, Task<LlmCompletionResult>> readResponse,
+        string operation,
+        LlmBlockConfig config,
+        CancellationToken ct)
+    {
+        var attempts = config.MaxRetries + 1;
+        var timeout = TimeSpan.FromSeconds(config.TimeoutSeconds);
+        Exception? lastFailure = null;
+
+        for (var attempt = 0; attempt < attempts; attempt++)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            using var request = requestFactory();
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeoutCts.CancelAfter(timeout);
+
+            try
+            {
+                using var response = await _httpClient.SendAsync(
+                    request, HttpCompletionOption.ResponseHeadersRead, timeoutCts.Token);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    return await readResponse(response, timeoutCts.Token);
+                }
+
+                var errorBody = await response.Content.ReadAsStringAsync(timeoutCts.Token);
+                var error = CreateHttpError(operation, response.StatusCode, errorBody);
+                if (!IsRetryable(response.StatusCode))
+                {
+                    throw error;
+                }
+
+                lastFailure = error;
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                lastFailure = new TimeoutException(
+                    $"{operation} timed out after {timeout.TotalSeconds:0.#}s.");
+            }
+            catch (HttpRequestException ex)
+            {
+                lastFailure = ex;
+            }
+            catch (IOException ex)
             {
                 lastFailure = ex;
             }

@@ -1,6 +1,6 @@
 # HANDOFF — 01-Bugfix1（全仓缺陷修复与门禁补齐）
 
-> 状态：进行中（Round 28）
+> 状态：进行中（Round 29）
 > 创建：2026-11-17
 > 基线：`895c08e feat(release): Round 16 发布与体验`
 > 上一阶段归档：[PLAN/Done/01-BuildALL/HANDOFF.md](../../Done/01-BuildALL/HANDOFF.md)
@@ -531,8 +531,8 @@
 
 - [x] **[节点/P1] `tool_calls` 只记录不执行**：已加 `MaxToolRounds`（默认 0 保持只记录）与 `ToolMode`（模拟/真实沙箱）；工具结果作为 tool 消息回灌并再次调用模型，超轮次该行记失败，未知工具/执行错误以 JSON 错误回灌。输出完整 assistant/tool 轨迹；OpenAI Chat/Responses 与 Anthropic 均支持工具消息往返。
 - [x] **[节点/P2] Anthropic 无结构化输出约束**：`ResponseSchema` 在 Anthropic 下通过强制 `structured_output` 工具实现，响应 input 作为内容返回；同时配置 tools + schema + 工具回填时校验给出警告。
-- [ ] **[节点/P2] LLM 节点无流式输出**：仅 Simulation 的 OpenAI Chat 支持 SSE delta。
-- [ ] **[节点/P2] 无模型列表/探测**：ModelAlias 纯手输。
+- [x] **[节点/P2] LLM 节点无流式输出**：Round 29 新增 `LlmBlockConfig.Streaming`，OpenAI Chat 走 SSE（累积 content/tool_calls/usage，沿用超时与重试，重试从空累积器重启）；Responses/Anthropic 仍为一次性响应，面板已注明。
+- [x] **[节点/P2] 无模型列表/探测**：Round 29 新增 `LlmModelCatalog`（OpenAI `/models`、Anthropic `/v1/models`）与 LLM 面板模型下拉/刷新按钮；密钥与 Base URL 复用 `ILlmCredentials`，失败在面板内提示。
 - [ ] **[节点/P3] 编辑期无 Prompt 语法校验与渲染预览**：仅在执行期校验。
 - [ ] **[节点/P3] 多模态消息未支持**。
 
@@ -1258,4 +1258,41 @@
 
 - 10M 行执行/质量/转换基线按本机实测记录（7.7 P3）。
 - LLM 流式输出与模型列表；数据工作台列排序/筛选/列宽持久化（191）与 CSV 类型推断；SFT 比例拆片与输出路径存在性提示（206）。
+
+---
+
+## 21. Round 29 执行记录（2026-11-18）
+
+### 21.1 已完成项
+
+| 项 | 范围 | 提交 |
+| --- | --- | --- |
+| Batch 19 | 节点能力：LLM OpenAI Chat 流式输出、模型列表探测与面板选择 | 本次提交 |
+
+### 21.2 具体改动
+
+- `LlmBlockConfig` 新增 `Streaming`（默认 false，追加在参数末尾，兼容既有 Recipe/JSON）；LLM 面板新增“流式输出（仅 OpenAI Chat）”开关与说明。
+- `LlmApiClient` 在 `Streaming && provider == openai_chat` 时发送 `stream=true` + `stream_options.include_usage`，逐行解析 SSE `data:`，累积 content、按 index 合并 tool_calls（id/name/arguments 增量）与 usage，返回既有 `LlmCompletionResult`；工具回填循环无需改动。
+- 新增 `SendStreamingWithRetryAsync`：沿用 `TimeoutSeconds`/`MaxRetries` 与指数退避，每次重试重建请求并从空累积器读取，支持 5xx/429/超时/HTTP/IO 失败重试。
+- Responses/Anthropic 在 `Streaming=true` 时保持一次性响应（与面板说明一致），未做非 OpenAI SSE。
+- 新增 `ILlmModelCatalog`/`LlmModelCatalog`：OpenAI GET `{base}/models`、Anthropic GET `{base}/v1/models?limit=1000`，复用 `ILlmCredentials`（设置中的 DPAPI 密钥或环境变量、Base URL），固定 30s 超时，返回去重排序后的模型 id。
+- `LlmConfigEditorViewModel` 增加模型下拉、刷新命令与状态/错误文本；选中模型写回 `ModelAlias`。`BlockNodeViewModel.ModelCatalog` 由 `MainWindowViewModel` 在块加入集合时注入，画布/粘贴/文档加载创建的编辑器共享同一实例。
+- 新增本地化键 7 个（en-US/zh-CN）：模型列表、刷新、加载中/完成/失败、流式开关与说明。
+- `MainWindow.axaml`/属性面板增加 `x:Name` 以便 Headless UI 测试断言绑定与命令。
+
+### 21.3 当前验证
+
+- `dotnet build -c Release`：0 警告，0 错误。
+- `dotnet test -c Release`：677 通过，0 失败，7 跳过（5 性能 gated + 2 provider gated）；`--list-tests` 685 个用例（含 1 个 `[Explicit]`）。
+- `dotnet format --verify-no-changes`：通过。
+- 覆盖率（本地）：总行 76.64%，Services/Commands 行 84.95%（门槛 60% / 70%）。
+- 新增测试 16 项：`LlmApiClientTests` 流式 4 项（内容/工具/usage 累积、非 Chat 回落、瞬时错误重试、重试耗尽）、`LlmModelCatalogTests` 6 项（OpenAI/Anthropic/自定义端点/错误/缺密钥/未知 provider）、`LlmConfigEditorTests` 5 项（Streaming 写回、目录注入、刷新成功/失败、无目录禁用）、`HeadlessUiTests` 1 项（面板绑定与命令）；`BlockConfigSerializationTests` Round-trip 增加 `Streaming`。
+- 未用真实 API Key 验证 SSE 与模型接口，测试使用本地 SSE/JSON 桩；真实 provider 冒烟仍为 gated。
+
+### 21.4 本轮未做（保留在 7.x / 8.3）
+
+- Responses/Anthropic 流式输出（当前仅 OpenAI Chat）。
+- 模型列表缓存与手动输入候选提示（每次点击刷新实时请求）。
+- 10M 行执行/质量/转换基线按本机实测记录（7.7 P3）。
+- 数据工作台列排序/筛选/列宽持久化（191）与 CSV 类型推断；SFT 比例拆片与输出路径存在性提示（206）。
 

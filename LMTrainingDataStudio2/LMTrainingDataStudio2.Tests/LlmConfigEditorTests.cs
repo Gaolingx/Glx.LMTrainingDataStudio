@@ -1,4 +1,5 @@
 using LMTrainingDataStudio2.Models;
+using LMTrainingDataStudio2.Services.Executors;
 using LMTrainingDataStudio2.ViewModels;
 
 namespace LMTrainingDataStudio2.Tests;
@@ -77,6 +78,80 @@ public sealed class LlmConfigEditorTests
     }
 
     [Test]
+    public void Streaming_TogglesConfig()
+    {
+        var block = CreateLlmBlock(
+            new LlmBlockConfig(LlmProviderIds.OpenAiChat, "gpt-4o", Temperature: 0.7, MaxTokens: 2048, Prompt: null));
+
+        block.LlmEditor!.Streaming = true;
+
+        Assert.That(((LlmBlockConfig)block.Config).Streaming, Is.True);
+    }
+
+    [Test]
+    public void ModelCatalog_IsSharedWithEditors()
+    {
+        var catalog = new FakeModelCatalog(["gpt-4o"]);
+        var block = CreateLlmBlock(
+            new LlmBlockConfig(LlmProviderIds.OpenAiChat, "gpt-4o", Temperature: 0.7, MaxTokens: 2048, Prompt: null));
+
+        block.ModelCatalog = catalog;
+
+        Assert.That(block.LlmEditor!.ModelCatalog, Is.SameAs(catalog));
+
+        block.Config = new LlmBlockConfig(
+            LlmProviderIds.OpenAiResponses, "gpt-4o-mini", Temperature: 0.1, MaxTokens: 1024, Prompt: null);
+
+        Assert.That(block.LlmEditor!.ModelCatalog, Is.SameAs(catalog));
+    }
+
+    [Test]
+    public async Task RefreshModels_PopulatesModelsAndSelectingOneUpdatesAlias()
+    {
+        var current = new LlmBlockConfig(
+            LlmProviderIds.OpenAiChat, "gpt-4o", Temperature: 0.7, MaxTokens: 2048, Prompt: null);
+        var editor = new LlmConfigEditorViewModel(
+            current,
+            config => current = config,
+            new FakeModelCatalog(["gpt-4o", "gpt-4o-mini"]));
+
+        await editor.RefreshModelsCommand.ExecuteAsync(null);
+
+        Assert.That(editor.Models, Is.EqualTo(new[] { "gpt-4o", "gpt-4o-mini" }));
+        Assert.That(editor.ModelListStatus, Does.Contain("2"));
+        Assert.That(editor.ModelListError, Is.Null);
+
+        editor.SelectedModel = "gpt-4o-mini";
+
+        Assert.That(current.ModelAlias, Is.EqualTo("gpt-4o-mini"));
+    }
+
+    [Test]
+    public async Task RefreshModels_FailureShowsErrorAndKeepsExistingModels()
+    {
+        var editor = new LlmConfigEditorViewModel(
+            new LlmBlockConfig(LlmProviderIds.OpenAiChat, "gpt-4o", 0.7, 2048, null),
+            _ => { },
+            new FakeModelCatalog([], new InvalidOperationException("HTTP 401")));
+
+        await editor.RefreshModelsCommand.ExecuteAsync(null);
+
+        Assert.That(editor.ModelListError, Does.Contain("HTTP 401"));
+        Assert.That(editor.ModelListStatus, Is.Null);
+        Assert.That(editor.Models, Is.Empty);
+    }
+
+    [Test]
+    public void RefreshModels_WithoutCatalog_IsDisabled()
+    {
+        var editor = new LlmConfigEditorViewModel(
+            new LlmBlockConfig(LlmProviderIds.OpenAiChat, "gpt-4o", 0.7, 2048, null),
+            _ => { });
+
+        Assert.That(editor.RefreshModelsCommand.CanExecute(null), Is.False);
+    }
+
+    [Test]
     public void NonLlmBlock_HasNoLlmEditor()
     {
         var block = new BlockNodeViewModel
@@ -97,4 +172,17 @@ public sealed class LlmConfigEditorTests
         DisplayName = "LLM Generator",
         Config = config
     };
+
+    private sealed class FakeModelCatalog(
+        IReadOnlyList<string> models,
+        Exception? failure = null) : ILlmModelCatalog
+    {
+        public Task<IReadOnlyList<string>> ListModelsAsync(
+            string provider,
+            string? endpoint,
+            CancellationToken cancellationToken = default) =>
+            failure is null
+                ? Task.FromResult(models)
+                : Task.FromException<IReadOnlyList<string>>(failure);
+    }
 }

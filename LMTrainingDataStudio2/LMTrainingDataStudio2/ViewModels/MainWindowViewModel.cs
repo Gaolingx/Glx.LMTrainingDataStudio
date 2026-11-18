@@ -23,6 +23,7 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly RecipePresetStore _presetStore;
     private readonly ExecutionStore _executionStore;
     private readonly HttpClient _llmHttpClient = new();
+    private readonly ILlmModelCatalog _modelCatalog;
     private readonly List<string> _presetLoadWarnings = new();
     private CancellationTokenSource? _runCancellation;
     private ExecutionPauseController? _runPause;
@@ -215,6 +216,7 @@ public partial class MainWindowViewModel : ObservableObject
         _executionStore = executionStore ?? new ExecutionStore();
         var loadResult = _settingsStore.Load();
         _settingsService = new AppSettingsService(loadResult.Settings);
+        _modelCatalog = new LlmModelCatalog(_llmHttpClient, () => new LlmCredentials(Settings));
         LocalizationService.Instance.SetLanguage(Settings.Language);
         ThemeManager.Apply(Settings.IsDarkTheme);
         Executions = new ExecutionsViewModel(_executionStore);
@@ -801,6 +803,7 @@ public partial class MainWindowViewModel : ObservableObject
             foreach (BlockNodeViewModel block in e.NewItems)
             {
                 block.PropertyChanged += OnBlockPropertyChanged;
+                block.ModelCatalog = _modelCatalog;
                 block.ConfigCommandSink = command =>
                     CommandHistory.ExecuteMerged(command, MergeConfigCommands);
             }

@@ -33,7 +33,8 @@ public sealed class BlockConfigSerializationTests
             ToolProfileName: "agent_tools",
             MaxToolRounds: 3,
             ToolMode: ToolExecutionMode.Real,
-            Sandbox: new SandboxLimits { TimeoutMs = 5000, AllowNetwork = true });
+            Sandbox: new SandboxLimits { TimeoutMs = 5000, AllowNetwork = true },
+            Streaming: true);
 
         var loaded = RoundTrip(config);
 

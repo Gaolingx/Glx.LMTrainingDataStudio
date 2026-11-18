@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using LMTrainingDataStudio2.Commands;
 using LMTrainingDataStudio2.Models;
 using LMTrainingDataStudio2.Services;
+using LMTrainingDataStudio2.Services.Executors;
 
 namespace LMTrainingDataStudio2.ViewModels;
 
@@ -61,6 +62,25 @@ public partial class BlockNodeViewModel : ObservableObject
     [ObservableProperty]
     private LlmConfigEditorViewModel? _llmEditor;
 
+    private ILlmModelCatalog? _modelCatalog;
+
+    /// <summary>
+    /// Supplies the model list for LLM editors. Set by the owning view model so that
+    /// editors created for canvas, clipboard and document loads all share it.
+    /// </summary>
+    public ILlmModelCatalog? ModelCatalog
+    {
+        get => _modelCatalog;
+        set
+        {
+            if (!SetProperty(ref _modelCatalog, value)) return;
+            if (LlmEditor is { } editor)
+            {
+                editor.ModelCatalog = value;
+            }
+        }
+    }
+
     [ObservableProperty]
     private ExpressionConfigEditorViewModel? _expressionEditor;
 
@@ -117,7 +137,7 @@ public partial class BlockNodeViewModel : ObservableObject
                 : null;
 
             LlmEditor = value is LlmBlockConfig llm
-                ? new LlmConfigEditorViewModel(llm, ApplyLlmConfig)
+                ? new LlmConfigEditorViewModel(llm, ApplyLlmConfig, _modelCatalog)
                 : null;
 
             ExpressionEditor = value is ExpressionBlockConfig expression
