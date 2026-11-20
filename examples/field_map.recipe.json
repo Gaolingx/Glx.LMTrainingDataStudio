@@ -85,7 +85,8 @@
         "outputPath": "out/mapped-sft.jsonl",
         "append": false,
         "targetFormat": "Auto",
-        "splitMaxRows": 0
+        "splitMaxRows": 0,
+        "splitSeed": 42
       }
     }
   ],

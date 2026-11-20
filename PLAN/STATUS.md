@@ -1,7 +1,7 @@
 # STATUS — 功能清单、节点能力矩阵与下一阶段规划
 
-> 最后核对：2026-11-18（Round 31 完成）
-> 验证基线：`dotnet build` 0 警告 0 错误（分析器开启，NoWarn 已审计至 7 项）；`dotnet test` 701 通过 + 7 个 gated 测试（2 个真实 provider 冒烟 + 5 个性能 gated，默认跳过），另有 1 个 `[Explicit]` 示例生成；`--list-tests` 709 个用例；`dotnet format --verify-no-changes` 通过；覆盖率总行 77.34%、Services/Commands 85.15%；Headless UI 测试通过；1M 行 JSONL、1M 行质量操作与 1M 行编辑保存基线通过；10M 行链路与 CSV/Parquet 大规模基线入口已提供；win-x64 单文件发布与 Debug 启动冒烟通过。
+> 最后核对：2026-11-20（Round 32 完成）
+> 验证基线：`dotnet build` 0 警告 0 错误（分析器开启，NoWarn 已审计至 7 项）；`dotnet test` 736 通过 + 7 个 gated 测试（2 个真实 provider 冒烟 + 5 个性能 gated，默认跳过），另有 1 个 `[Explicit]` 示例生成；`--list-tests` 744 个用例；`dotnet format --verify-no-changes` 通过；覆盖率总行 77.55%、Services/Commands 85.07%；Headless UI 测试通过；1M 行 JSONL、1M 行质量操作与 1M 行编辑保存基线通过；10M 行链路与 CSV/Parquet 大规模基线入口已提供；win-x64 单文件发布冒烟通过；新增 nightly/release/依赖审计工作流与 Dependabot。
 >
 > 图例：`[x]` 已完成并有测试/验证；`[部分]` 可用但有明确缺口；`[ ]` 未实现。
 >
@@ -20,7 +20,7 @@
 - Validator 支持表达式与 JSON Schema 规则、reject 文件、失败率日志；Sampler 支持确定性多文件切分。
 - Tool Profile 支持参数树编辑（含 Enum 与默认值）与 JSON 导入导出，并被 Simulation/LLM 复用。
 - 统一数据集 IO：JSONL / CSV / Parquet 随机分页读取与原子写出；Seed 节点支持三种格式。
-- 数据工作台（Data 视图）：分页预览、行号跳转、页面大小切换、字段表格视图、全量字段筛选/排序与列宽持久化，JSONL 走 SQLite 索引，CSV 走记录边界索引，Parquet 按 row group 读取。
+- 数据工作台（Data 视图）：分页预览、行号跳转、页面大小切换、字段表格视图、全量字段筛选/排序与列宽持久化，JSONL 走 SQLite 索引，CSV 走记录边界索引，Parquet 按 row group 读取；CSV 字段视图展示推断类型（integer/number/bool/date/json/string），仅展示不改写。
 - 数据逐行编辑：插入/复制/删除/恢复、字段级单元格编辑与整行 JSON 编辑、`messages` 角色/内容/tool_calls 结构化表单（保留其余消息字段）、跨页待保存编辑、撤销/重做、保存前差异摘要、另存或确认后覆盖源文件；流式重写与原子替换。
 - 搜索命中行内高亮（字面量/正则）；校验问题按级别与错误码筛选，并支持按级别/错误码的分组树。
 - 统一样本预览弹窗：SFT Export 输出、Validator 拒绝行、Simulation 失败样本、Cleaner 前后 diff；可跳转数据工作台。
@@ -48,9 +48,9 @@
 - 节点说明：10 类节点具备本地化名称、简介、详细说明与端口摘要；属性面板 Node Guide 与画布悬停提示复用同一份目录。
 - 界面本地化：zh-CN / en-US 资源化静态 UI（约 260 个键），设置面板切换语言后即时刷新；运行日志/执行状态仍为英文技术文本。
 - 多输出端口：Validator `pass`/`reject`、Sampler 按 splits 动态端口；Runner 按端口缓冲、检查点与恢复，旧单端口 Recipe 回落主端口。
-- LLM 请求侧 tools、多行 `messages`、`response_format` JSON Schema、并发与保序、token/成本日志、失败样本 JSONL；OpenAI Chat 可选 SSE 流式输出（累积 delta/tool_calls/usage）；LLM 面板可按 provider 拉取模型列表并选择。
+- LLM 请求侧 tools、多行 `messages`、`response_format` JSON Schema、并发与保序、token/成本日志、失败样本 JSONL；OpenAI Chat / Responses / Anthropic 均支持 SSE 流式输出（累积 content/delta/tool_calls/usage），流式失败沿用超时与重试；LLM 面板可按 provider 拉取模型列表并选择。
 - Validator 多规则组合、expression/schema/regex/script、规则超时、取反与 pass/reject 双端口。
-- Sampler 多端口切分、分层字段、切分统计预览。
+- Sampler 多端口切分、分层字段、切分统计预览；count/ratio/splits 三种模式均支持按顶层字段分层，count 使用确定性的最大余数配额分配。
 - Simulation Tools/Rules/Script 可视化编辑器、OpenAI Chat 流式 delta、RequestsPerMinute 限速与价格预设。
 - Query Source Fluid 模板变量与外部 JSONL/CSV/Parquet query 源。
 - 画布 polish：节点尺寸手柄（持久化 + 撤销）、边 hover 流动动画、边标签避让；Undo/Redo 菜单与 `Ctrl+Shift+Z`；属性名称/配置修改进入撤销历史并自动合并。
@@ -60,15 +60,15 @@
 - 诊断与崩溃报告：Help → Export Diagnostics（脱敏设置 + 日志 + 最近运行摘要）；summary、日志与执行摘要统一清除 Authorization/Bearer、常见密钥字段与 Key 字面量；未处理异常自动写崩溃 zip；Windows 上设置、日志与崩溃目录仅保留当前用户/SYSTEM/Administrators 权限。
 - 发布：MSIX 清单/打包脚本、Inno Setup 安装脚本；`examples/` 6 个示例 Recipe；README Dark/Light 截图。
 - 工程质量：`.editorconfig`、.NET 分析器 `latest-recommended`、警告即错误；构建 0 警告。
-- 工程化：滚动日志与全局异常、GitHub Actions CI、win-x64 单文件发布脚本、Headless UI 测试、MIT LICENSE、应用图标。
-- 709 个自动化测试：701 个常规通过 + 7 个 gated（2 个真实 provider 冒烟 + 5 个性能 gated）+ 1 个 Explicit 示例生成。
+- 工程化：滚动日志与全局异常、GitHub Actions CI、nightly/release 工作流、依赖漏洞审计与 Dependabot、win-x64 单文件发布脚本、Headless UI 测试、MIT LICENSE、应用图标。
+- 744 个自动化测试：736 个常规通过 + 7 个 gated（2 个真实 provider 冒烟 + 5 个性能 gated）+ 1 个 Explicit 示例生成。
 
 ### 1.2 当前最大缺口（按优先级）
 
-1. **执行韧性残余**：已补输出 SHA256、Recipe 指纹、溢写行/字节双阈值、检查点磁盘配额与启动清理、执行历史按数量/天数保留；剩余缺口为跨进程并发写锁、CI 取消门禁与 10M 行结果记录。
-2. **数据编辑残余**：已支持跨格式保存、`messages` 结构化表单与列排序/筛选/列宽持久化；非 `messages` 嵌套结构仍按 JSON 文本编辑；CSV 类型推断与列类型展示未做；视图索引最多 100 万行且常驻内存。
-3. **节点能力残余**：LLM 已支持 tool_calls 回填、Anthropic 结构化输出、OpenAI Chat 流式与模型列表；Responses/Anthropic 流式未做；Validator script 为 Fluid 布尔表达式而非任意脚本；Sampler 分层仅对 ratio/splits 生效；Tool Profile 无 MCP。
-4. **发布残余**：MSIX/Inno 安装包未在本机实际安装验证；单实例管道未做双进程自动化测试；10M 行结果需按本机实测记录。
+1. **节点扩展残余**：Tool Profile MCP（stdio/HTTP）、共享工具库与鉴权；Query Source 随机/模型生成与去重/权重；Simulation 容器级隔离、严格令牌桶与非 OpenAI 流式（Simulation 侧）；Validator 独立失败摘要与任意代码沙箱。
+2. **数据规模残余**：视图索引最多 100 万行且常驻内存，10M 行筛选/排序未做磁盘索引与实测；CSV/Parquet 1M 行质量基线、10M 行质量/转换基线未实测；Seed 多文件/目录/HuggingFace/HTTP 源与节点内过滤/列映射未做。
+3. **发布残余**：MSIX/Inno 安装包未在干净机器实际安装验证，安装包默认未签名；单实例管道未做双进程自动化测试；依赖锁定未启用（Debug-only `Avalonia.Diagnostics` 导致配置相关锁文件冲突，保留依赖审计与 Dependabot）。
+4. **体验与质量残余**：系统剪贴板/跨实例粘贴、全局快捷键焦点治理、分栏宽度持久化、节点分组/注释、运行日志本地化；`async void`/CA1001/大文件拆分未动。
 
 ### 1.3 一页总览
 
@@ -85,28 +85,27 @@
 **部分完成（可用但有缺口）**
 
 - Seed：三种格式可读；Streaming UI 已暴露，仅 JSONL + 关闭索引缓存时生效；无节点内过滤/列映射。
-- LLM：三种 provider、tools/多轮/结构化输出/并发/成本/失败样本可用；工具回填（模拟/真实沙箱）与 Anthropic 强制 JSON 输出已接入；OpenAI Chat 流式与模型列表已接入。
-- Validator：表达式/JSON Schema/正则/Fluid 脚本、多规则、超时与 pass/reject 双端口可用；非任意代码脚本。
-- Sampler：count/ratio/splits、多输出端口、分层（ratio/splits）与统计预览可用；count 模式不分层。
+- LLM：三种 provider、tools/多轮/结构化输出/并发/成本/失败样本可用；工具回填（模拟/真实沙箱）、Anthropic 强制 JSON 输出、三种 provider 流式与模型列表已接入。
+- Validator：表达式/JSON Schema/正则/Fluid 脚本、多规则、超时与 pass/reject 双端口可用；非任意代码脚本，无独立失败摘要面板。
+- Sampler：count/ratio/splits、多输出端口、三种模式分层与统计预览可用；切分内再混洗未做。
 - Cleaner：5 个布尔规则 + 正则规则可用；正则规则 UI 与清洗前后 diff 预览已接入；无坏行报告。
-- SFT Export：流式 + 原子替换 + 行透传 + 文件选择器 + 覆盖确认 + 字段白名单 + 安全追加 + 目标格式 + 按行数分片可用；已有输出预览弹窗；按比例拆片与 DPO/Pretrain 直出仍由数据工作台承担。
-- 执行：层内并行/暂停/重试、输出摘要、溢写/流式、检查点恢复可用；恢复已加 SHA256/Recipe 指纹校验，检查点无配额。
+- SFT Export：流式 + 原子替换 + 行透传 + 文件选择器 + 覆盖确认 + 字段白名单 + 安全追加 + 目标格式 + 按行数/比例分片可用；DPO/Pretrain 直出仍由数据工作台承担。
+- 执行：层内并行/暂停/重试、输出摘要、溢写/流式、检查点恢复可用；恢复已加 SHA256/Recipe 指纹校验，检查点有磁盘配额与启动清理。
 - 画布：核心交互、尺寸手柄、边动画、标签避让、Undo/Redo 菜单与属性撤销可用；逐帧性能未做 UI 级计时。
-- 设置：完整 Dark/Light 主题、网格吸附与内存定时刷新生效；其他设置变更仍不通知已创建的服务。
+- 设置：完整 Dark/Light 主题、网格吸附、内存定时刷新与设置变更通知生效；schema 迁移、恢复默认、日志筛选未做。
 
 **未实现（下一阶段工作池）**
 
-- 数据工作台 CSV 类型推断与列类型展示；视图索引的磁盘化与 10M 行实测。
-- LLM Responses/Anthropic 流式输出（OpenAI Chat 已支持）。
+- 视图索引的磁盘化与 10M 行筛选/排序实测。
 - Validator 失败样本独立 UI、任意代码沙箱规则。
-- Sampler count 模式分层、切分内再混洗选项。
-- Simulation 非 OpenAI 流式 delta、严格令牌桶限速、容器级隔离。
+- Sampler 切分内再混洗/保序选项、动态端口即时失效。
+- Simulation 非 OpenAI 流式 delta、严格令牌桶限速、容器级隔离、MCP 工具。
 - Query Source 随机/模型生成 query、query 去重与权重。
-- Tool Profile MCP 适配、共享工具库、LLM 请求侧复用。
+- Tool Profile MCP 适配、共享工具库/版本管理与鉴权。
 - Seed 多文件/目录、过滤/列映射、编码选项、HuggingFace/HTTP 数据源。
-- 10M 行实测与 CSV/Parquet 大规模基线按需运行（入口已提供）。
-- 单实例、命令行打开、文件关联、MSIX/Inno 脚本与诊断导出已完成；安装包未做本机安装验证。
-- 运行日志/执行状态本地化、Tool Profile MCP。
+- 10M 行质量/转换实测与 CSV/Parquet 1M 行质量基线（入口已提供）。
+- 安装包未做干净机器安装验证；默认未签名；依赖锁定因 Debug-only 依赖冲突未启用。
+- 运行日志/执行状态本地化、系统剪贴板、全局快捷键、分栏宽度持久化。
 
 ---
 
@@ -165,7 +164,7 @@
 | 结构化输出（JSON Schema） | [x] | OpenAI Chat/Responses `response_format`；Anthropic 强制 `structured_output` 工具；非法 JSON 计为失败 |
 | 并发调用 / token/成本统计 | [x] | `MaxConcurrency` 保序并发；token 与估算成本写日志 |
 | 失败样本单独输出 | [x] | `ContinueOnError` + `FailureOutputPath` 原子写 `{lineNumber,error,data}` |
-| 流式输出 / 模型列表 | [x] | `Streaming` 开启时 OpenAI Chat 走 SSE（累积 delta/tool_calls/usage，沿用超时重试）；模型下拉调用 OpenAI `/models`、Anthropic `/v1/models`；Responses/Anthropic 流式未做 |
+| 流式输出 / 模型列表 | [x] | `Streaming` 开启时 OpenAI Chat / Responses / Anthropic 均走 SSE（累积 content/delta/tool_calls/usage，沿用超时重试）；模型下拉调用 OpenAI `/models`、Anthropic `/v1/models` |
 
 ### 2.3 Expression（字段变换）
 
@@ -212,7 +211,7 @@
 | 多输出端口 / 多文件 | [x] | splits 每项一个输出端口；无 splits 时保留 `output` 端口 |
 | 专属属性面板 | [x] | Count / Ratio / Seed / Splits / 输出目录 / 分层字段 / 统计预览 |
 | 采样结果预览 / 统计 | [x] | 面板显示比例与预计行数；运行日志汇总各 split 实际行数 |
-| 分层 / 分组采样 | [部分] | ratio 与 splits 模式按顶层字段独立随机；count 模式不分层 |
+| 分层 / 分组采样 | [x] | ratio/splits 按顶层字段独立随机；count 按分组 reservoir + 最大余数配额分配，行数守恒且按源行号输出 |
 | 切分内再混洗 / 保序选项 | [ ] | 无 |
 
 ### 2.6 Tool Profile（工具配置）
@@ -294,7 +293,7 @@
 | 覆盖确认 / 追加模式 | [x] | 运行前确认覆盖；追加模式先复制临时副本，成功后原子替换 |
 | 输出预览 / 样本查看 | [x] | 统一样本预览弹窗与运行日志摘要 |
 | 字段白名单 / 目标格式选择 | [x] | 白名单校验 + 从样本读取顶层字段复选；目标格式 Auto/OpenAI/ShareGPT/Alpaca |
-| 按数量/比例拆分多文件 | [部分] | 支持按行数分片 `name.part001.jsonl`；比例拆分仍用前置 Sampler |
+| 按数量/比例拆分多文件 | [x] | 支持按行数分片 `name.part001.jsonl` 与 `name:ratio` 比例拆片；比例拆片写入输出路径所在目录 |
 | DPO / Pretrain 直出 | [ ] | 数据工作台批量转换支持，节点本身只写 JSONL |
 
 ### 2.11 工作流预设与界面本地化
@@ -350,13 +349,13 @@
 - [x] 画布基础交互：Block Sheet 拖放、可搜索添加菜单（`~` / 右键）、节点拖动、多选拖动、框选、端口连线、边选择/删除、中键平移、滚轮缩放、右键菜单、Mini-map 渲染、缩放百分比、可拖动分栏。
 - [x] 画布增强：网格背景与吸附（Alt 关闭）、鼠标中心缩放、Fit、拓扑自动布局、Mini-map 视口/点击、双击添加、复制携带连线、内联重命名、真实端口坐标、边 hover、增量拖拽。
 - [x] Settings 持久化：缓存目录/上限、网格设置、执行并行/重试/输出目录、主题选择、API Key DPAPI 加密保存。
-- [x] 工程化：滚动日志与全局异常、CI、win-x64 单文件发布、Headless UI 测试、MIT LICENSE、应用图标、主题变体。
+- [x] 工程化：滚动日志与全局异常、CI、nightly/release 工作流、依赖审计与 Dependabot、win-x64 单文件发布、Headless UI 测试、MIT LICENSE、应用图标、主题变体。
 - [x] 最近文件路径与 `CurrentFilePath` 状态栏接线；`TotalLines` 随执行进度更新；缩放百分比实时显示。
 
 ### 3.2 部分完成
 
 - [部分] 校验：已覆盖端口契约、必需输入、单输入、方向/类型、环与配置；缺少列号与问题分组（数据集校验已有错误码/路径）。
-- [x] 执行：层内并行/暂停/重试、输出摘要、节点间溢写/流式、节点级恢复、输出 SHA256/Recipe 指纹校验；检查点仍无配额。
+- [x] 执行：层内并行/暂停/重试、输出摘要、节点间溢写/流式、节点级恢复、输出 SHA256/Recipe 指纹校验、检查点磁盘配额与执行历史保留。
 - [x] 画布：端口坐标、缩放锚点/Fit/自动布局/Mini-map 点击/复制连线、Undo/Redo 菜单、节点尺寸手柄、边动画、标签避让与属性撤销已完成；逐帧性能未做 UI 级计时。
 - [x] 设置：网格吸附、完整 Dark/Light 主题、语言切换与内存定时刷新生效；设置变更经 `IAppSettingsService` 通知长生命周期服务（数据工作台重建读取器工厂、批量转换器与子服务）。
 - [x] 主题：Dark/Light 资源完整，视图无 `#RRGGBB` 硬编码颜色残留。
@@ -372,12 +371,14 @@
 - [x] 跨格式编辑保存。
 - [x] 消息/角色级表单编辑、匹配项导航、预览窗口分页。
 - [x] 数据工作台字段表格、全量筛选/排序与列宽持久化（视图期间禁用行编辑）。
-- [ ] CSV 类型推断与列类型展示；CSV/Parquet 1M 行质量基线；10M 行实测。
+- [x] CSV 类型推断与列类型展示（字段视图展示 integer/number/bool/date/json/string，不改写源文本）。
+- [ ] CSV/Parquet 1M 行质量基线；视图索引磁盘化与 10M 行筛选/排序实测。
 - [ ] Seed 节点内过滤/列映射/多文件/目录/HuggingFace/HTTP 源。
 - [x] Tool Profile 参数 Enum 与默认值编辑。
 - [x] 字段白名单与输入校验。
 - [x] 输出文件安全追加、目标格式选择（OpenAI/ShareGPT/Alpaca）、按行数分片。
-- [ ] SFT Export 按比例拆片与 DPO/Pretrain 直出。
+- [x] SFT Export 按比例拆片。
+- [ ] SFT Export DPO/Pretrain 直出。
 
 **执行与性能**
 
@@ -387,11 +388,11 @@
 - [x] 恢复输出 SHA256 与 Recipe 指纹校验。
 - [x] 同一 Recipe 内输出目标冲突检测（相同文件/目录、Sampler 分片展开）；跨运行并发写仍由文件系统约束。
 - [ ] 10M 行执行/质量/转换基线。
-- [ ] 执行历史批量清理与保留策略。
+- [x] 执行历史批量清理与保留策略。
 
 **节点能力**
 
-- [x] LLM 请求侧 tools、结构化输出、多轮上下文、并发、token/成本统计、失败样本、OpenAI Chat 流式输出与模型列表。
+- [x] LLM 请求侧 tools、结构化输出、多轮上下文、并发、token/成本统计、失败样本、三种 provider 流式输出与模型列表。
 - [x] Validator 受限代码规则、超时、多规则组合、失败样本预览、独立 pass/reject 端口。
 - [x] Sampler 多输出端口、分层/分组采样、统计预览。
 - [部分] Simulation Tools/Rules/Script 可视化编辑器、流式 delta、速率限制/价格预设已完成；容器级隔离未做。
@@ -409,7 +410,7 @@
 
 **发布与工程化**
 
-- [ ] 10M 性能报告与 CSV/Parquet 基线。
+- [ ] 10M 行质量/转换基线与 CSV/Parquet 1M 行质量基线。
 - [部分] MSIX/Inno 脚本、文件关联、单实例、命令行打开已完成；安装包未在干净机器实际安装验证。
 - [部分] README 截图与 6 个示例 Recipe 已完成；发布说明由 [CHANGELOG.md](CHANGELOG.md) 承担。
 - [部分] 崩溃报告导出与内容脱敏已完成；日志级别/来源筛选未做。
@@ -430,11 +431,11 @@
 | Expression | 是 | 模板、字段别名、样本 JSON、预览输出 | 无 |
 | Validator | 是 | 规则类型、规则/Schema、reject 开关与路径、Cleanup 规则 | 无（脚本仍为受限 Fluid） |
 | Sampler | 是 | Count、Ratio、Seed、Splits、输出目录 | 无 |
-| Tool Profile | 是 | 工具列表、参数 JSON、参数树、profile JSON 导入导出 | Enum/Default 未暴露 |
+| Tool Profile | 是 | 工具列表、参数 JSON、参数树（含 Enum/默认值）、profile JSON 导入导出 | 无 |
 | Query Source | 是 | Queries、Mode、Repeat、System Prompt | 无 |
 | Simulation | 是 | Provider、模式、模型、轮数、并发、温度、tokens、超时、重试、Endpoint、System/Final、失败样本、成本、沙箱、Tool Profile、Tools/Rules/Script | 无（容器隔离未做） |
 | Cleaner | 是 | 5 个布尔规则 + 正则规则 | 无（高级 JSONPath 未做） |
-| SFT Export | 是 | 输出路径、Browse、字段白名单与样本字段选择器、追加、目标格式、按行数分片 | 比例拆片、DPO/Pretrain 直出 |
+| SFT Export | 是 | 输出路径、Browse、字段白名单与样本字段选择器、追加、目标格式、按行数/比例分片 | DPO/Pretrain 直出 |
 
 ---
 
@@ -466,12 +467,13 @@
 | 29 | LLM 流式与模型列表 | OpenAI Chat SSE 流式（delta/tool_calls/usage + 重试）、模型列表服务与面板下拉/刷新 | 685 用例（677 通过 + 7 gated + 1 Explicit） |
 | 30 | 数据工作台视图 | 字段表格、全量字段筛选/排序、列宽持久化、散列行读取（Parquet 按 row group 批量） | 709 用例（701 通过 + 7 gated + 1 Explicit） |
 | 31 | 代码质量清理 | 删除未引用转换器与颜色键、NoWarn 55→7 审计、CA1068/CA1725/CA1806/CA1869/CA1310 修复 | 709 用例（701 通过 + 7 gated + 1 Explicit） |
+| 32 | 节点与发布收尾 | Recipe 校验错误码、CSV 类型推断、Sampler count 分层、SFT 比例拆片、Responses/Anthropic 流式、nightly/release/依赖审计 | 744 用例（736 通过 + 7 gated + 1 Explicit） |
 
 ---
 
-## 六、下一阶段规划（Round 13–16）
+## 六、历史阶段规划（Round 13–16，均已完成）
 
-> 排序原则：先解决会限制后续功能的数据规模与执行可靠性，再补用户直接可见的数据编辑与节点能力，最后做发布体验。
+> 本节保留建设期规划原文，便于追溯；当前剩余工作池见 [PLAN/TODO/02-Hardening/HANDOFF.md](TODO/02-Hardening/HANDOFF.md)。
 
 ### Round 13 — 执行与 IO 韧性（P0）
 

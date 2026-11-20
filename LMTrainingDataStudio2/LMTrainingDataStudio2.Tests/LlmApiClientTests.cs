@@ -109,24 +109,102 @@ public sealed class LlmApiClientTests
     }
 
     [Test]
-    public async Task Streaming_NonOpenAiChatProvider_UsesSingleResponse()
+    public async Task OpenAiResponses_Streaming_AccumulatesTextFunctionCallAndUsage()
     {
         string? body = null;
         var client = CreateClient((_, content) =>
         {
             body = content;
-            return JsonResponse(
-                HttpStatusCode.OK,
-                """{"content":[{"type":"text","text":"claude answer"}]}""");
+            return SseResponse(string.Join(
+                "\n\n",
+                """data: {"type":"response.output_item.added","output_index":0,"item":{"type":"function_call","id":"fc_1","call_id":"call_1","name":"python"}}""",
+                """data: {"type":"response.output_text.delta","output_index":0,"delta":"Hel"}""",
+                """data: {"type":"response.output_text.delta","output_index":0,"delta":"lo"}""",
+                """data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_1","delta":"{\"code\":"}""",
+                """data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_1","delta":"\"1\"}"}""",
+                """data: {"type":"response.completed","response":{"usage":{"input_tokens":7,"output_tokens":9}}}""",
+                "data: [DONE]",
+                string.Empty));
         });
 
         var result = await client.CompleteAsync(
-            "Hello",
+            new LlmCompletionRequest([new LlmChatTurn("user", "run")]),
+            CreateConfig(LlmProviderIds.OpenAiResponses) with { Streaming = true });
+
+        Assert.That(result.Content, Is.EqualTo("Hello"));
+        Assert.That(result.ToolCalls, Has.Count.EqualTo(1));
+        Assert.That(result.ToolCalls![0].Id, Is.EqualTo("call_1"));
+        Assert.That(result.ToolCalls[0].Name, Is.EqualTo("python"));
+        Assert.That(result.ToolCalls[0].ArgumentsJson, Is.EqualTo("""{"code":"1"}"""));
+        Assert.That(result.Usage!.PromptTokens, Is.EqualTo(7));
+        Assert.That(result.Usage.CompletionTokens, Is.EqualTo(9));
+
+        using var document = JsonDocument.Parse(body!);
+        Assert.That(document.RootElement.GetProperty("stream").GetBoolean(), Is.True);
+    }
+
+    [Test]
+    public async Task Anthropic_Streaming_AccumulatesTextToolUseAndUsage()
+    {
+        string? body = null;
+        var client = CreateClient((_, content) =>
+        {
+            body = content;
+            return SseResponse(string.Join(
+                "\n\n",
+                """data: {"type":"message_start","message":{"usage":{"input_tokens":5,"output_tokens":0}}}""",
+                """data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}""",
+                """data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hi"}}""",
+                """data: {"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"tool_1","name":"python","input":{}}}""",
+                """data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\"code\":"}}""",
+                """data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"\"print(1)\"}"}}""",
+                """data: {"type":"content_block_stop","index":1}""",
+                """data: {"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":9}}""",
+                """data: {"type":"message_stop"}""",
+                string.Empty));
+        });
+
+        var result = await client.CompleteAsync(
+            new LlmCompletionRequest([new LlmChatTurn("user", "run")]),
             CreateConfig(LlmProviderIds.Anthropic, "claude-sonnet-4-5") with { Streaming = true });
 
-        Assert.That(result, Is.EqualTo("claude answer"));
+        Assert.That(result.Content, Is.EqualTo("Hi"));
+        Assert.That(result.ToolCalls, Has.Count.EqualTo(1));
+        Assert.That(result.ToolCalls![0].Id, Is.EqualTo("tool_1"));
+        Assert.That(result.ToolCalls[0].Name, Is.EqualTo("python"));
+        Assert.That(result.ToolCalls[0].ArgumentsJson, Is.EqualTo("""{"code":"print(1)"}"""));
+        Assert.That(result.Usage!.PromptTokens, Is.EqualTo(5));
+        Assert.That(result.Usage.CompletionTokens, Is.EqualTo(9));
+
         using var document = JsonDocument.Parse(body!);
-        Assert.That(document.RootElement.TryGetProperty("stream", out _), Is.False);
+        Assert.That(document.RootElement.GetProperty("stream").GetBoolean(), Is.True);
+    }
+
+    [Test]
+    public async Task Anthropic_Streaming_StructuredOutputReturnsContentJson()
+    {
+        var client = CreateClient((_, _) =>
+            SseResponse(string.Join(
+                "\n\n",
+                """data: {"type":"message_start","message":{"usage":{"input_tokens":3,"output_tokens":0}}}""",
+                """data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"tool_1","name":"structured_output","input":{}}}""",
+                """data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"answer\":"}}""",
+                """data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"42}"}}""",
+                """data: {"type":"content_block_stop","index":0}""",
+                """data: {"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":4}}""",
+                """data: {"type":"message_stop"}""",
+                string.Empty)));
+
+        var result = await client.CompleteAsync(
+            new LlmCompletionRequest(
+                [new LlmChatTurn("user", "run")],
+                ResponseSchema: """{"type":"object"}"""),
+            CreateConfig(LlmProviderIds.Anthropic, "claude-sonnet-4-5") with { Streaming = true });
+
+        Assert.That(result.Content, Is.EqualTo("""{"answer":42}"""));
+        Assert.That(result.ToolCalls, Is.Null);
+        Assert.That(result.Usage!.PromptTokens, Is.EqualTo(3));
+        Assert.That(result.Usage.CompletionTokens, Is.EqualTo(4));
     }
 
     [Test]

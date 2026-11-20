@@ -3,7 +3,8 @@
 > **归档冻结（2026-11-17）**
 > - 本文件记录 Round 0–16 的建设期计划、验收标准与技术决策，已冻结，不再修改。
 > - 冻结基线：`895c08e feat(release): Round 16 发布与体验`
-> - 当前工作入口：[PLAN/TODO/01-Bugfix1/HANDOFF.md](../../TODO/01-Bugfix1/HANDOFF.md)
+> - 当前工作入口：[PLAN/TODO/02-Hardening/HANDOFF.md](../../TODO/02-Hardening/HANDOFF.md)
+> - 上一阶段归档：[PLAN/Done/02-Bugfix1/HANDOFF.md](../02-Bugfix1/HANDOFF.md)
 > - 后续修订只写入当前 HANDOFF；本文件仅作历史追溯。
 
 > 最后更新：2026-11-17（Round 16 发布与体验完成）

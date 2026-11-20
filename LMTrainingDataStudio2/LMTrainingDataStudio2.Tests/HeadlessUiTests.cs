@@ -251,6 +251,13 @@ public sealed class HeadlessUiTests
             Assert.That(buttonNames, Does.Contain("BrowseSimulationFailureButton"));
             Assert.That(buttonNames, Does.Contain("BrowseSamplerOutputButton"));
 
+            var textBoxNames = window.GetVisualDescendants()
+                .OfType<TextBox>()
+                .Select(box => box.Name)
+                .Where(name => !string.IsNullOrEmpty(name))
+                .ToArray();
+            Assert.That(textBoxNames, Does.Contain("SftExportSplitsBox"));
+
             var fieldLabels = window.GetVisualDescendants()
                 .OfType<CheckBox>()
                 .Select(box => box.Content as string)

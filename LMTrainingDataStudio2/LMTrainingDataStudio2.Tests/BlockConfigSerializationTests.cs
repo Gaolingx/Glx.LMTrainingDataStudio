@@ -334,7 +334,9 @@ public sealed class BlockConfigSerializationTests
             Fields: new[] { "messages", "tools" },
             Append: true,
             TargetFormat: DatasetFormat.ShareGPT,
-            SplitMaxRows: 250);
+            SplitMaxRows: 250,
+            Splits: new[] { "train:0.8", "valid:0.2" },
+            SplitSeed: 9);
 
         var loaded = (SftExportBlockConfig)RoundTrip(config);
 
@@ -344,6 +346,8 @@ public sealed class BlockConfigSerializationTests
         Assert.That(loaded.Append, Is.True);
         Assert.That(loaded.TargetFormat, Is.EqualTo(DatasetFormat.ShareGPT));
         Assert.That(loaded.SplitMaxRows, Is.EqualTo(250));
+        Assert.That(loaded.Splits, Is.EqualTo(config.Splits));
+        Assert.That(loaded.SplitSeed, Is.EqualTo(9));
     }
 
     [Test]

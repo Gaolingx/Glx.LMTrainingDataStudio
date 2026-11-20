@@ -1,4 +1,5 @@
 using LMTrainingDataStudio2.Models;
+using LMTrainingDataStudio2.Services.Executors;
 
 namespace LMTrainingDataStudio2.Services;
 
@@ -35,6 +36,29 @@ public static class RecipeOutputTargets
                 case ValidatorBlockConfig validator when !string.IsNullOrWhiteSpace(validator.RejectOutputPath):
                     targets.Add(new RecipeOutputTarget(
                         block.Id, block.Name, validator.RejectOutputPath, false));
+                    break;
+                case SftExportBlockConfig export when
+                    export.Splits is { Length: > 0 } &&
+                    !string.IsNullOrWhiteSpace(export.OutputPath):
+                    var splitDirectory = Path.GetDirectoryName(Path.GetFullPath(export.OutputPath));
+                    if (string.IsNullOrWhiteSpace(splitDirectory))
+                    {
+                        break;
+                    }
+
+                    targets.Add(new RecipeOutputTarget(block.Id, block.Name, splitDirectory, true));
+                    if (SamplerSplitPlan.TryParse(export.Splits, out var splitPlan, out _))
+                    {
+                        foreach (var split in splitPlan!.Specs)
+                        {
+                            targets.Add(new RecipeOutputTarget(
+                                block.Id,
+                                block.Name,
+                                Path.Combine(splitDirectory, $"{split.Name}.jsonl"),
+                                false));
+                        }
+                    }
+
                     break;
                 case SftExportBlockConfig export when !string.IsNullOrWhiteSpace(export.OutputPath):
                     targets.Add(new RecipeOutputTarget(block.Id, block.Name, export.OutputPath, false));

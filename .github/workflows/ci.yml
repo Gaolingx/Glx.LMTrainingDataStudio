@@ -1,5 +1,8 @@
 name: ci
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]
@@ -182,3 +185,40 @@ jobs:
           if (-not $version.StartsWith("0.0.0")) {
               throw "Published executable version '$version' does not match -Version 0.0.0."
           }
+
+  audit:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    needs: build-test
+    # Advisory until upstream Avalonia/SQLite native packages publish fixed versions.
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+          cache: true
+          cache-dependency-path: '**/*.csproj'
+
+      - name: Restore
+        run: dotnet restore LMTrainingDataStudio2/LMTrainingDataStudio2.slnx
+
+      - name: Scan vulnerable packages
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          dotnet list LMTrainingDataStudio2/LMTrainingDataStudio2.slnx package --vulnerable --include-transitive |
+              Tee-Object -FilePath artifacts/vulnerable-packages.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $report = Get-Content artifacts/vulnerable-packages.txt -Raw
+          "## Vulnerable packages`n`n$report" >> $env:GITHUB_STEP_SUMMARY
+
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulnerable-packages
+          path: artifacts/vulnerable-packages.txt
+          if-no-files-found: ignore

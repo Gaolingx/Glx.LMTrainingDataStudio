@@ -13,6 +13,7 @@ public sealed class ValidationIssueViewModel : INotifyPropertyChanged
     public ValidationIssueViewModel(ValidationIssue issue, Action<ValidationIssueViewModel> locate)
     {
         Severity = issue.Severity;
+        Code = issue.Code;
         Message = issue.Message;
         BlockId = issue.BlockId;
         LocateCommand = new RelayCommand(() => locate(this), () => BlockId is not null);
@@ -21,8 +22,11 @@ public sealed class ValidationIssueViewModel : INotifyPropertyChanged
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public ValidationSeverity Severity { get; }
+    public string? Code { get; }
     public string Message { get; }
     public string? BlockId { get; }
+
+    public bool HasCode => !string.IsNullOrWhiteSpace(Code);
 
     public string SeverityText => Severity switch
     {

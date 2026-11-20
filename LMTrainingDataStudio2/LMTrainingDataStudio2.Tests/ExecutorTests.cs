@@ -199,6 +199,58 @@ public sealed class ExecutorTests
     }
 
     [Test]
+    public async Task SamplerExecutor_Count_Stratified_IsDeterministicAndBalanced()
+    {
+        var block = CreateBlock(BlockType.Sampler, "sample",
+            new SamplerBlockConfig(
+                Count: 100,
+                Ratio: null,
+                Seed: 42,
+                Splits: Array.Empty<string>(),
+                StratifyField: "category"));
+        var input = Enumerable.Range(0, 1000)
+            .Select(i => new DatasetRow(i, $"{{\"category\":\"{(i % 2 == 0 ? "a" : "b")}\",\"i\":{i}}}"))
+            .ToArray();
+        var logs = new List<string>();
+
+        var executor = new SamplerBlockExecutor();
+        var first = await CollectAsync((await executor.ExecuteAsync(
+            CreateContext(block, input, logs), CancellationToken.None)).Output);
+        var second = await CollectAsync((await executor.ExecuteAsync(
+            CreateContext(block, input), CancellationToken.None)).Output);
+
+        Assert.That(first, Has.Count.EqualTo(100));
+        Assert.That(second.Select(row => row.Json), Is.EqualTo(first.Select(row => row.Json)));
+        Assert.That(first.Count(row => row.Json.Contains("\"category\":\"a\"", StringComparison.Ordinal)),
+            Is.EqualTo(50));
+        Assert.That(first.Count(row => row.Json.Contains("\"category\":\"b\"", StringComparison.Ordinal)),
+            Is.EqualTo(50));
+        Assert.That(first.Select(row => row.LineNumber), Is.Ordered);
+        Assert.That(logs.Any(log => log.Contains("stratified by 'category'", StringComparison.Ordinal)), Is.True);
+    }
+
+    [Test]
+    public async Task SamplerExecutor_Count_Stratified_ReturnsAllRowsWhenCountExceedsInput()
+    {
+        var block = CreateBlock(BlockType.Sampler, "sample",
+            new SamplerBlockConfig(
+                Count: 100,
+                Ratio: null,
+                Seed: 42,
+                Splits: Array.Empty<string>(),
+                StratifyField: "category"));
+        var input = Enumerable.Range(0, 3)
+            .Select(i => new DatasetRow(i, $"{{\"category\":\"g{i % 2}\",\"i\":{i}}}"))
+            .ToArray();
+
+        var executor = new SamplerBlockExecutor();
+        var rows = await CollectAsync((await executor.ExecuteAsync(
+            CreateContext(block, input), CancellationToken.None)).Output);
+
+        Assert.That(rows.Select(row => row.LineNumber), Is.EqualTo(new long[] { 0, 1, 2 }));
+    }
+
+    [Test]
     public async Task SamplerExecutor_Ratio_IsDeterministic()
     {
         var block = CreateBlock(BlockType.Sampler, "sample",

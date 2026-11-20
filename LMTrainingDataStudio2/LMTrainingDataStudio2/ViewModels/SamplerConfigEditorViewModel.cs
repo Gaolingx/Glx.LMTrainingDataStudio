@@ -175,10 +175,13 @@ public partial class SamplerConfigEditorViewModel : ObservableObject
             return;
         }
 
+        var modeSuffix = string.IsNullOrWhiteSpace(StratifyField)
+            ? string.Empty
+            : $" · stratified by {StratifyField.Trim()}";
         StatsPreview = _count is { } count
-            ? $"Sample {count:N0} row(s) (reservoir)"
+            ? $"Sample {count:N0} row(s) (reservoir){modeSuffix}"
             : _ratio is { } ratio
-                ? $"Sample {ratio:P1} (~{Math.Round(rows * ratio):N0} of {rows:N0})"
+                ? $"Sample {ratio:P1} (~{Math.Round(rows * ratio):N0} of {rows:N0}){modeSuffix}"
                 : "No sampling configured.";
     }
 

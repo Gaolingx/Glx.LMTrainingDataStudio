@@ -1126,6 +1126,26 @@
                            FontSize="10" Foreground="{DynamicResource TextFaintBrush}" TextWrapping="Wrap" />
 
                 <StackPanel Spacing="4">
+                    <TextBlock Text="{loc:Loc property.sft_export_ratio_splits}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
+                    <TextBox x:Name="SftExportSplitsBox"
+                             Text="{Binding SelectedBlock.SftExportEditor.SplitsText, Mode=TwoWay}"
+                             AcceptsReturn="True" TextWrapping="Wrap" Height="54"
+                             FontSize="11" Padding="8,6" Watermark="train:0.8, valid:0.2" />
+                    <TextBlock Text="{Binding SelectedBlock.SftExportEditor.SplitsError}"
+                               FontSize="10" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap"
+                               IsVisible="{Binding SelectedBlock.SftExportEditor.SplitsError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <TextBlock Text="{loc:Loc property.sft_export_ratio_splits_hint}"
+                               FontSize="10" Foreground="{DynamicResource TextFaintBrush}" TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="{loc:Loc property.sft_export_split_seed}"
+                                   FontSize="11" Foreground="{DynamicResource TextMutedBrush}"
+                                   VerticalAlignment="Center" />
+                        <NumericUpDown Value="{Binding SelectedBlock.SftExportEditor.SplitSeed, Mode=TwoWay}"
+                                       Minimum="0" Maximum="2147483647" Increment="1" FormatString="0" />
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel Spacing="4">
                     <TextBlock Text="{loc:Loc property.sft_export_fields}" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" />
                     <TextBox Text="{Binding SelectedBlock.SftExportEditor.FieldsText, Mode=TwoWay}"
                              FontSize="11" Padding="8,6" Watermark="messages, tools" />
@@ -1404,6 +1424,9 @@
                                            Foreground="{DynamicResource WarningBrush}" IsVisible="{Binding IsWarning}" />
                                 <TextBlock Text="{Binding SeverityText}" FontSize="9" FontWeight="SemiBold"
                                            Foreground="{DynamicResource TextDimBrush}" IsVisible="{Binding IsInfo}" />
+                                <TextBlock Text="{Binding Code}" FontSize="9"
+                                           Foreground="{DynamicResource TextDimBrush}"
+                                           IsVisible="{Binding HasCode}" />
                                 <TextBlock Text="{Binding Message}" FontSize="10"
                                            Foreground="{DynamicResource TextBrightBrush}" TextWrapping="Wrap" />
                             </StackPanel>

@@ -41,6 +41,60 @@ public sealed class SftExportFieldSelectorTests
     }
 
     [Test]
+    public void Editor_PushesRatioSplitsAndSeed()
+    {
+        var applied = new List<SftExportBlockConfig>();
+        var editor = new SftExportConfigEditorViewModel(
+            new SftExportBlockConfig("out/sft.jsonl"), applied.Add);
+
+        editor.SplitsText = "train:0.8\nvalid:0.2";
+        editor.SplitSeed = 7;
+
+        var config = applied[^1];
+        Assert.That(config.Splits, Is.EqualTo(new[] { "train:0.8", "valid:0.2" }));
+        Assert.That(config.SplitSeed, Is.EqualTo(7));
+        Assert.That(editor.SplitsError, Is.Null);
+    }
+
+    [Test]
+    public void Editor_FlagsInvalidRatioSplits()
+    {
+        var editor = new SftExportConfigEditorViewModel(
+            new SftExportBlockConfig("out/sft.jsonl"), _ => { });
+
+        editor.SplitsText = "train:0";
+
+        Assert.That(editor.SplitsError, Is.Not.Null);
+        Assert.That(editor.SplitsError, Does.Contain("train"));
+    }
+
+    [Test]
+    public void Editor_FlagsCountSplitInRatioMode()
+    {
+        var editor = new SftExportConfigEditorViewModel(
+            new SftExportBlockConfig("out/sft.jsonl"), _ => { });
+
+        editor.SplitsText = "train:100";
+
+        Assert.That(editor.SplitsError, Is.Not.Null);
+        Assert.That(editor.SplitsError, Does.Contain("name:ratio"));
+    }
+
+    [Test]
+    public void Editor_InitializesSplitsFromConfig()
+    {
+        var editor = new SftExportConfigEditorViewModel(
+            new SftExportBlockConfig(
+                "out/sft.jsonl",
+                Splits: new[] { "train:0.8", "valid:0.2" },
+                SplitSeed: 9),
+            _ => { });
+
+        Assert.That(editor.SplitsText, Is.EqualTo("train:0.8\nvalid:0.2"));
+        Assert.That(editor.SplitSeed, Is.EqualTo(9));
+    }
+
+    [Test]
     public void Editor_InitializesOptionsFromConfig()
     {
         var editor = new SftExportConfigEditorViewModel(

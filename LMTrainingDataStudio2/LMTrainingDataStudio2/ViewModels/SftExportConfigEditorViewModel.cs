@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using LMTrainingDataStudio2.Localization;
 using LMTrainingDataStudio2.Models;
 using LMTrainingDataStudio2.Services.Datasets;
+using LMTrainingDataStudio2.Services.Executors;
 
 namespace LMTrainingDataStudio2.ViewModels;
 
@@ -40,6 +41,15 @@ public partial class SftExportConfigEditorViewModel : ObservableObject
     [ObservableProperty]
     private int _splitMaxRows;
 
+    [ObservableProperty]
+    private string _splitsText;
+
+    [ObservableProperty]
+    private string? _splitsError;
+
+    [ObservableProperty]
+    private int _splitSeed;
+
     public SftExportConfigEditorViewModel(
         SftExportBlockConfig config,
         Action<SftExportBlockConfig> apply)
@@ -51,6 +61,11 @@ public partial class SftExportConfigEditorViewModel : ObservableObject
             : string.Empty;
         _append = config.Append;
         _splitMaxRows = Math.Max(0, config.SplitMaxRows);
+        _splitsText = config.Splits is { Length: > 0 }
+            ? string.Join("\n", config.Splits)
+            : string.Empty;
+        _splitSeed = config.SplitSeed;
+        ValidateSplits(_splitsText);
 
         TargetFormats = new[]
         {
@@ -74,6 +89,14 @@ public partial class SftExportConfigEditorViewModel : ObservableObject
     partial void OnSelectedTargetFormatChanged(SftTargetFormatOption value) => Push();
 
     partial void OnSplitMaxRowsChanged(int value) => Push();
+
+    partial void OnSplitSeedChanged(int value) => Push();
+
+    partial void OnSplitsTextChanged(string value)
+    {
+        ValidateSplits(value);
+        Push();
+    }
 
     partial void OnFieldsTextChanged(string value)
     {
@@ -230,12 +253,44 @@ public partial class SftExportConfigEditorViewModel : ObservableObject
             fields.Length > 0 ? fields : null,
             Append,
             SelectedTargetFormat?.Format ?? DatasetFormat.Auto,
-            Math.Max(0, SplitMaxRows)));
+            Math.Max(0, SplitMaxRows),
+            ParseSplits(SplitsText),
+            SplitSeed));
+    }
+
+    private void ValidateSplits(string? text)
+    {
+        var splits = ParseSplits(text);
+        if (splits is null)
+        {
+            SplitsError = null;
+            return;
+        }
+
+        if (!SamplerSplitPlan.TryParse(splits, out var plan, out var error))
+        {
+            SplitsError = string.Format(LocalizationService.L("property.sft_splits_invalid"), error);
+            return;
+        }
+
+        SplitsError = plan!.IsCountMode
+            ? string.Format(
+                LocalizationService.L("property.sft_splits_invalid"),
+                LocalizationService.L("property.sft_splits_count_not_supported"))
+            : null;
     }
 
     private static string[] ParseFields(string? text) =>
         (text ?? string.Empty).Split(
             ',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+
+    private static string[]? ParseSplits(string? text)
+    {
+        var splits = (text ?? string.Empty).Split(
+            ['\r', '\n', ','],
+            StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        return splits.Length > 0 ? splits : null;
+    }
 }
 
 /// <summary>Target output format option shown in the SFT export editor.</summary>

@@ -1,10 +1,10 @@
 # HANDOFF — 01-Bugfix1（全仓缺陷修复与门禁补齐）
 
-> 状态：进行中（Round 31）
+> 状态：已完成并归档（Round 32，2026-11-20）
 > 创建：2026-11-17
 > 基线：`895c08e feat(release): Round 16 发布与体验`
 > 上一阶段归档：[PLAN/Done/01-BuildALL/HANDOFF.md](../../Done/01-BuildALL/HANDOFF.md)
-> 扫描基线：`dotnet build` 0 警告；`dotnet test --list-tests` 563 个用例（556 通过 + 7 gated + 1 Explicit）。
+> 扫描基线：`dotnet build` 0 警告；Round 32 收尾基线为 `--list-tests` 744 个用例（736 通过 + 7 gated + 1 Explicit），覆盖率 77.55% / 85.07%。
 > 边界：本文件只记录 Round 17 及之后的修复/补齐工作；Round 0–16 的原始计划、验收标准与技术决策已冻结在归档文件中，不再回写。
 
 ---
@@ -401,17 +401,17 @@
 
 ### 6.1 总体验收（DoD）
 
-- [ ] `dotnet build` 0 警告、0 错误（分析器开启）。
-- [ ] `dotnet test` 全绿；gated 测试有明确运行记录。
-- [ ] 每个 P1 缺陷有回归测试或自动化检查。
-- [ ] 每个新增/修改的 core 逻辑有成功 + 失败/边界测试。
-- [ ] UI 入口真实可用，无占位按钮/空面板。
-- [ ] 长耗时操作可取消，UI 线程不阻塞。
-- [ ] 错误信息包含路径、行号、节点名/ID、失败原因。
-- [ ] 文件写入使用临时文件 + 原子替换，失败不破坏原文件。
-- [ ] 没有为未完成功能保留的静默 catch、空实现或死代码。
-- [ ] README / STATUS / HANDOFF 与代码一致。
-- [ ] 构建、测试、打包、安装至少各有一份可复现记录。
+- [x] `dotnet build` 0 警告、0 错误（分析器开启）。
+- [x] `dotnet test` 全绿；gated 测试有明确运行记录（nightly + 本机记录）。
+- [x] 每个 P1 缺陷有回归测试或自动化检查。
+- [x] 每个新增/修改的 core 逻辑有成功 + 失败/边界测试。
+- [ ] UI 入口真实可用，无占位按钮/空面板（仅 Headless 与手工抽查，未逐项点击）。
+- [x] 长耗时操作可取消，UI 线程不阻塞。
+- [ ] 错误信息包含路径、行号、节点名/ID、失败原因（节点级已覆盖，部分解析错误仍只有消息）。
+- [x] 文件写入使用临时文件 + 原子替换，失败不破坏原文件。
+- [x] 没有为未完成功能保留的静默 catch、空实现或死代码（Round 31 清理）。
+- [x] README / STATUS / HANDOFF 与代码一致（Round 32 同步）。
+- [ ] 构建、测试、打包、安装至少各有一份可复现记录（安装验证仍缺）。
 
 ### 6.2 分类验收
 
@@ -449,6 +449,7 @@
 | 2026-11-18 | Batch 15：web_fetch DNS 加固与设置通知 | `dotnet build -c Release`；`dotnet test -c Release`；`dotnet format --verify-no-changes` | 0 警告；630 通过 / 0 失败 / 7 跳过；格式通过 | 见第 17.3 节；`SandboxTests`、`AppSettingsServiceTests`、`DataWorkbenchViewModelTests`、`SettingsPanelTests` |
 | 2026-11-18 | Batch 16：诊断脱敏与目录 ACL | `dotnet build -c Release`；`dotnet test -c Release`；`dotnet format --verify-no-changes` | 0 警告；638 通过 / 0 失败 / 7 跳过；格式通过 | 见第 18.3 节；`DiagnosticSecurityTests` |
 | 2026-11-18 | Batch 18：输出写锁、溢写目录启动清理、CI 取消门禁 | `dotnet build -c Release`；`dotnet test -c Release`；`dotnet format --verify-no-changes`；`scripts/check-coverage.ps1` | 0 警告；661 通过 / 0 失败 / 7 跳过；覆盖率 76.46% / 84.9% | 见第 20.3 节 |
+| 2026-11-20 | Batch 22–24：Round 32 节点与发布收尾 | `dotnet build -c Release`；`dotnet test -c Release`；`dotnet format --verify-no-changes`；`scripts/check-coverage.ps1`；`publish-win-x64.ps1 -Version 0.0.0` | 0 警告；736 通过 / 0 失败 / 7 跳过；`--list-tests` 744；覆盖率 77.55% / 85.07%；发布冒烟通过 | 见第 24.3 节；新增校验 Code/CSV 推断/Sampler 分层/SFT 拆片/流式/CI 测试 |
 
 ---
 
@@ -469,7 +470,7 @@
 - [x] **[缺陷][P2] 设置页路径输入无选择器/可写性检查**：CacheDirectory、RunOutputDirectory、RunTempDirectory 只能手输（`Views/MainWindow.axaml:398,442,448`），无 Browse 与可写性检查。
 - [x] **[缺陷][P2] 数值设置无即时校验**：MaxCacheSizeMb、MaxParallelism、NodeRetryCount、SpillThresholdRows、GridSnapSize 均为 TextBox 直绑数值，非法输入无提示，只在 Apply 时 clamp（`ViewModels/MainWindowViewModel.cs:1345-1365`）。
 - [x] **[缺陷][P2] 数据工作台在途分页不可取消**：`OpenDatasetAsync`/`LoadPageAsync` 使用 `CancellationToken.None`（`ViewModels/DataWorkbenchViewModel.cs:234,325`），切换/关闭文件无法取消旧分页请求。
-- [ ] **[缺陷][P2] Recipe 校验问题无错误码**：`RecipeValidationService` 创建的 `ValidationIssue` 只有 Message/BlockId，未填 Code/Path（数据集校验已有错误码），问题列表无法稳定筛选/分组。
+- [x] **[缺陷][P2] Recipe 校验问题无错误码**：Round 32 为全部 `RecipeValidationService` 问题填充稳定 kebab-case Code（如 `block-name-duplicate`、`edge-duplicate`、`sft-export-splits-invalid`），属性面板问题行展示 Code；新增 `Validate_IssuesCarryStableCodes` 断言所有问题均有 Code。
 
 ### 7.2 测试缺口
 
@@ -478,13 +479,13 @@
 - [x] **[测试][P1] 打包脚本/清单无自动校验**：版本一致性、MSIX 必需资产、Inno 关联项、发布产物启动冒烟均未纳入测试或 CI。
 - [x] **[测试][P2] 本地化键无一致性测试**：zh-CN/en-US 的 key 集合、占位符与动态拼接 key（`node.*`、`dialog.*`）未自动比对；当前为人工核对 432/432。
 - [ ] **[测试][P2] 自动崩溃入口无测试**：仅覆盖 `CrashReportService.CreateReport` 与设置脱敏；AppDomain/TaskScheduler/UI 三个未处理异常入口未验证。
-- [ ] **[测试][P2] 中断恢复无逐字节/哈希比对**：现有测试只校验行数与内容。
+- [x] **[测试][P2] 中断恢复无逐字节/哈希比对**：Round 17 已加入输出 SHA256 与 Recipe 指纹校验（见 7.7）。
 - [ ] **[测试][P2] 格式转换边界测试不足**：DPO/Pretrain 往返、多轮 Alpaca、额外字段保留/丢弃策略、ShareGPT tool_call 解析失败未覆盖（现有为 Alpaca 基础转换 + DPO/Pretrain 基础矩阵）。
 - [ ] **[测试][P2] 索引缓存边界不足**：并发打开、非法指纹、超长行与容量清理后的读取行为覆盖较少。
 - [ ] **[测试][P2] 10 类节点编辑器无逐项验收**：Headless/手工只覆盖主窗口、画布、主题、高亮、SFT 字段白名单；其余节点面板未逐项点击。
 - [ ] **[测试][P2] 数据工作台大文件操作无手工验收**：跨页编辑/撤销/覆盖/另存/预览在 1M 行上的交互未逐项验证。
 - [x] **[测试][P2] 覆盖率无采集与门禁**：DoD 中 `Services/`+`Commands/` ≥70%、全仓 ≥60% 的目标未度量。
-- [ ] **[测试][P2] Gated 性能/真实 provider 测试未进入 CI**：仅手动通过环境变量运行，无 nightly/可选 job。
+- [x] **[测试][P2] Gated 性能/真实 provider 测试未进入 CI**：Round 32 新增 `.github/workflows/nightly.yml`（schedule + workflow_dispatch），按 `LMTDS_PERF_TESTS` 运行性能测试，并在手动触发时使用 Secrets 运行 provider 冒烟。
 - [ ] **[测试][P3] 画布逐帧性能未测**：500 节点布局有测试，但 resize、边动画、拖拽的 UI 帧级耗时未计时。
 - [ ] **[测试][P3] 无视觉回归基线**：截图由 Headless+Skia 一次性生成，未纳入常规测试，UI 改动的视觉回归无自动保障。
 
@@ -493,21 +494,21 @@
 - [x] **[CI][P1] 无格式门禁**：CI 未运行 `dotnet format --verify-no-changes` 或等价检查。
 - [x] **[CI][P1] 无覆盖率采集/上传/阈值**：与 7.2 的覆盖率目标对应。
 - [x] **[CI][P1] 无打包/安装冒烟**：CI 不构建 MSIX/Inno，也不验证发布产物可启动。
-- [ ] **[CI][P2] 无发布工作流**：无 tag → 构建 → 签名 → 发布（GitHub Release/安装包）的自动化。
-- [ ] **[CI][P2] 无 nightly/gated job**：性能与真实 provider 冒烟只能在开发机手动跑。
-- [ ] **[CI][P2] 无依赖安全扫描**：无 Dependabot、CodeQL 或 `dotnet list package --vulnerable`。
-- [ ] **[CI][P2] 依赖版本可重复性弱**：版本分散在两个 csproj，无 `Directory.Packages.props`、`packages.lock.json` 或 `RestoreLockedMode`。
+- [x] **[CI][P2] 无发布工作流**：Round 32 新增 `.github/workflows/release.yml`，tag `v*` 或手动触发，校验版本与 `Directory.Build.props` 一致，执行格式/构建/测试/发布/MSIX/Inno 并创建 GitHub Release；签名仍为可选外部步骤。
+- [x] **[CI][P2] 无 nightly/gated job**：Round 32 新增 `nightly.yml`，schedule + workflow_dispatch 运行性能与真实 provider 冒烟。
+- [x] **[CI][P2] 无依赖安全扫描**：Round 32 在 CI 增加 `dotnet list package --vulnerable --include-transitive` 审计 job（当前上游传递依赖有 High 级公告，暂为 advisory），并加入 `.github/dependabot.yml` 跟踪 NuGet 与 GitHub Actions。
+- [ ] **[CI][P2] 依赖版本可重复性弱**：尝试启用 `RestorePackagesWithLockFile` 后，Debug-only `Avalonia.Diagnostics` 导致 Debug/Release 锁文件依赖集不一致，锁定模式无法同时通过；本轮撤回锁文件，保留审计与 Dependabot。若后续移除配置相关包，可重新引入。
 - [x] **[CI][P2] 版本号未单一来源**：见 7.1；构建、MSIX、Inno、诊断包各自取值。
 - [ ] **[CI][P3] 无 PR 测试摘要/注解**：仅上传 TRX artifact，PR 页面看不到失败用例摘要。
 - [x] **[CI][P3] 无 concurrency/timeout/cache**：重复推送会并行跑完整流程，NuGet 未缓存。
 - [ ] **[CI][P3] 无 PR/Issue 模板与贡献指南**（低优先）。
 - [x] **[工程][P2] 分析器 `NoWarn` 清单较大**：Round 31 用 `-p:NoWarn=` 全量构建逐条审计，55 项缩减到 7 项并注明理由；CA1707 移入测试项目，CA1068/CA1725/CA1806/CA1869/CA1310 已改代码消除。
-- [ ] **[工程][P3] Release 仍引用 `Avalonia.Diagnostics`**：见 7.1。
+- [x] **[工程][P3] Release 仍引用 `Avalonia.Diagnostics`**：Round 17 已改为 `Condition="'$(Configuration)' == 'Debug'"`。
 - [ ] **[工程][P3] 无 BenchmarkDotNet 专项基准**：仅有 NUnit gated 大文件测试。
 
 ### 7.4 配置与设置
 
-- [ ] **[配置][P2] API Key 加密存储**：当前 `settings.json` 明文保存（诊断包会脱敏，但磁盘文件未加密）；可接入 DPAPI/凭据管理器。
+- [x] **[配置][P2] API Key 加密存储**：Round 24 已使用 Windows DPAPI（CurrentUser）加密落盘并迁移旧明文；见 7.10。
 - [x] **[设置][P2] 设置变更通知**：Round 25 新增 `IAppSettingsService` / `AppSettingsService`（`Current` + `Changed`），主窗口在 Apply 成功后发布变更；数据工作台订阅事件并重建读取器工厂、批量转换器与四个子服务。按需创建的服务（预览、索引缓存、每次运行执行器）在创建时读取 `Current`，因此始终使用最新设置。
 - [ ] **[设置][P2] Settings/Index Cache 无 schema 版本与迁移策略**：Recipe 有 schemaVersion，其余持久化没有。
 - [ ] **[设置][P2] 无“恢复默认设置”入口**。
@@ -531,7 +532,7 @@
 
 - [x] **[节点/P1] `tool_calls` 只记录不执行**：已加 `MaxToolRounds`（默认 0 保持只记录）与 `ToolMode`（模拟/真实沙箱）；工具结果作为 tool 消息回灌并再次调用模型，超轮次该行记失败，未知工具/执行错误以 JSON 错误回灌。输出完整 assistant/tool 轨迹；OpenAI Chat/Responses 与 Anthropic 均支持工具消息往返。
 - [x] **[节点/P2] Anthropic 无结构化输出约束**：`ResponseSchema` 在 Anthropic 下通过强制 `structured_output` 工具实现，响应 input 作为内容返回；同时配置 tools + schema + 工具回填时校验给出警告。
-- [x] **[节点/P2] LLM 节点无流式输出**：Round 29 新增 `LlmBlockConfig.Streaming`，OpenAI Chat 走 SSE（累积 content/tool_calls/usage，沿用超时与重试，重试从空累积器重启）；Responses/Anthropic 仍为一次性响应，面板已注明。
+- [x] **[节点/P2] LLM 节点无流式输出**：Round 29 新增 `LlmBlockConfig.Streaming`；Round 32 补齐 OpenAI Responses（文本/函数调用/usage 事件）与 Anthropic（text_delta/input_json_delta/message_delta）SSE，均沿用超时与重试，面板说明更新为三种 provider 均支持。
 - [x] **[节点/P2] 无模型列表/探测**：Round 29 新增 `LlmModelCatalog`（OpenAI `/models`、Anthropic `/v1/models`）与 LLM 面板模型下拉/刷新按钮；密钥与 Base URL 复用 `ILlmCredentials`，失败在面板内提示。
 - [ ] **[节点/P3] 编辑期无 Prompt 语法校验与渲染预览**：仅在执行期校验。
 - [ ] **[节点/P3] 多模态消息未支持**。
@@ -549,7 +550,7 @@
 
 #### Sampler
 
-- [ ] **[节点/P2] count 模式不支持分层**：分层仅对 ratio/splits 生效。
+- [x] **[节点/P2] count 模式不支持分层**：Round 32 为 count 模式增加按 `StratifyField` 分组的 reservoir，读取后按组大小用最大余数分配总数量，行数守恒并按源行号输出；抽签种子改为稳定的 FNV-1a 哈希。
 - [ ] **[节点/P2] 无切分内再混洗/保序选项**。
 - [ ] **[节点/P2] 端口动态变化后旧连线不即时失效**：指向已删除端口的边只在下次校验时报错。
 
@@ -583,7 +584,7 @@
 
 - [x] **[节点/P2] 无追加模式**：已支持安全追加（复制临时副本 → 追加 → 成功原子替换，失败保留原文件）。
 - [x] **[节点/P2] 无目标格式选择**：已支持 Auto/OpenAI/ShareGPT/Alpaca 转换；DPO/Pretrain 直出仍走数据工作台。
-- [部分] **[节点/P2] 无按数量/比例拆分多文件**：已支持按行数分片 `name.part001.jsonl`；比例拆分仍用前置 Sampler。
+- [x] **[节点/P2] 无按数量/比例拆分多文件**：已支持按行数分片 `name.part001.jsonl` 与 `name:ratio` 比例拆片；比例拆片复用 `SamplerSplitPlan`，输出目录取 OutputPath 所在目录，所有分片临时写完后再原子替换，并注册到输出目标锁。
 - [x] **[节点/P2] 无并发写同一目标文件的检测/提示**：Round 23 在 Recipe 校验中收集 SFT 输出、LLM/Simulation 失败样本、Validator reject 文件与 Sampler 分片文件，大小写不敏感地拒绝重复目标；同一 Sampler 输出目录也视为冲突。
 
 ### 7.6 数据工作台与数据治理
@@ -592,7 +593,7 @@
 - [x] **[数据/P2] 嵌套消息/角色级表单未做**：Round 22 新增 `messages` 结构化编辑器（角色/内容/tool_calls、增删与上下移），保留其余消息字段与 Raw JSON 兜底；其他嵌套结构仍按 JSON 文本编辑。
 - [x] **[数据/P2] 搜索匹配项导航未做**：只有命中高亮，没有上一处/下一处。
 - [x] **[数据/P2] 预览窗口固定 50 行**：`SamplePreviewService.DefaultMaxRows = 50`，无分页/全文搜索。
-- [ ] **[数据/P2] CSV 类型推断与列类型展示未做**。
+- [x] **[数据/P2] CSV 类型推断与列类型展示**：Round 32 新增 `CsvTypeInference`（integer/number/bool/date/json/string/empty），数据工作台打开 CSV 时按首屏最多 256 个值推断并在字段表头显示；仅展示，不改写源文本。
 - [x] **[数据/P3] 无列排序/筛选/列宽持久化**（191）：Round 30 新增字段表格视图、全量字段筛选/排序（含数值比较与正则）、列宽拖拽与按字段名持久化；视图激活期间禁用行编辑，搜索/校验跳转自动清除视图。
 - [ ] **[数据/P2] 多文件/目录数据源、HuggingFace/HTTP 未做**。
 - [ ] **[数据/P2] 字节级一致仅保证 LF JSONL**：CSV/Parquet 保存会重写整表。
@@ -1366,3 +1367,41 @@
 - CA1305/CA1822/CA1859/CA1861/CA1863 仍保留抑制：属风格/性能建议，修复需跨文件批量改动，未纳入本批次。
 - `async void` 边界、`Task.Run` 异常传播与大文件拆分（7.11 P3）未动。
 - Responses/Anthropic 流式输出；SFT 比例拆片与输出路径存在性提示（206）。
+
+## 24. Round 32 执行记录（2026-11-20）
+
+### 24.1 已完成项
+
+| 项 | 范围 | 提交 |
+| --- | --- | --- |
+| Batch 22 | Recipe 校验错误码、CSV 类型推断、Sampler count 分层、SFT 比例拆片 | 本次改动 |
+| Batch 23 | LLM Responses/Anthropic 流式输出 | 本次改动 |
+| Batch 24 | nightly/release/依赖审计工作流与 Dependabot | 本次改动 |
+
+### 24.2 具体改动
+
+- Recipe 校验：`RecipeValidationService` 的全部问题填充稳定 kebab-case `Code`（含 `AddError`/`AddWarning` 帮助方法），属性面板问题行显示 Code；新增全量 Code 断言。
+- CSV 类型推断：新增 `CsvTypeInference` 与 `DataWorkbenchViewModel` 首屏采样推断，字段表头展示 integer/number/bool/date/json/string；仅展示，不改变写回。
+- Sampler：count 模式按 `StratifyField` 分组 reservoir，按组大小使用最大余数分配总数，输出按源行号排序；分组随机种子改为稳定 FNV-1a，避免 `HashCode.Combine` 的进程随机化。
+- SFT Export：新增 `Splits`/`SplitSeed`，复用 `SamplerSplitPlan` 做比例拆片；所有分片先写临时文件，成功后统一原子替换，失败清理；`RecipeOutputTargets` 展开分片文件用于冲突校验与运行锁；面板新增比例拆片与种子编辑及本地化。
+- LLM：`Streaming` 扩展至 OpenAI Responses 与 Anthropic。Responses 处理 output item、文本 delta、函数参数 delta/done、completed usage；Anthropic 处理 message_start、content_block_start/delta/stop、message_delta、message_stop 与 structured_output；两者均沿用超时/重试。
+- CI/发布：新增 `nightly.yml`（性能与真实 provider gated）、`release.yml`（tag 版本校验、格式/构建/测试、发布/MSIX/Inno、GitHub Release）、`dependabot.yml`；CI 增加 `dotnet list package --vulnerable` 审计 job（当前传递依赖有上游 High 公告，暂为 advisory）。
+- 依赖锁定尝试：`RestorePackagesWithLockFile` 与 Debug-only `Avalonia.Diagnostics` 冲突，Debug/Release 锁文件依赖集不一致，已撤回并记录为未完成项。
+
+### 24.3 当前验证
+
+- `dotnet build -c Release`：0 警告，0 错误。
+- `dotnet test -c Release`：736 通过，0 失败，7 跳过；`--list-tests` 744 个用例（含 1 个 `[Explicit]`）。
+- `dotnet format --verify-no-changes`：通过。
+- 覆盖率（本地）：总行 77.55%，Services/Commands 行 85.07%。
+- 新增测试覆盖：校验 Code、CSV 推断、count 分层、SFT 比例拆片、成功/失败/冲突路径、三种 provider 流式、采样/分层/序列化与 Headless 面板。
+- `scripts/publish-win-x64.ps1 -Version 0.0.0` 发布冒烟通过。
+- 未执行：GitHub Actions 实际运行、MSIX/Inno 本机构建、干净机器安装与签名。
+
+### 24.4 本轮未做（保留至下一阶段）
+
+- Tool Profile MCP、共享工具库/鉴权、容器级隔离、严格令牌桶、Query 随机/模型生成。
+- 视图索引磁盘化与 10M 行筛选/排序、10M 质量/转换与 CSV/Parquet 1M 质量基线。
+- 安装包干净机器验证与签名；双进程单实例自动化；依赖锁定（受 Debug-only 依赖阻塞）。
+- 系统剪贴板、全局快捷键、分栏宽度持久化、节点分组/注释、运行日志本地化、CA1001/async void/大文件拆分。
+- 输出路径存在性提示（206）、SFT DPO/Pretrain 直出、Seed 多文件/HTTP/HuggingFace 源。

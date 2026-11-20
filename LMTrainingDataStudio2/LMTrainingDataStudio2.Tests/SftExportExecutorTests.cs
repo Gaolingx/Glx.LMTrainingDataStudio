@@ -150,6 +150,102 @@ public sealed class SftExportExecutorTests
     }
 
     [Test]
+    public async Task Export_RatioSplits_WriteAllFilesAndConserveRows()
+    {
+        var target = Path.Combine(_directory, "ratio-split.jsonl");
+        var rows = Enumerable.Range(1, 100).Select(index => $$"""{"n":{{index}}}""").ToArray();
+
+        await CollectAsync(ExecuteAsync(
+            new SftExportBlockConfig(
+                target,
+                Splits: new[] { "train:0.5", "valid:0.5" },
+                SplitSeed: 7),
+            RowsAsync(rows)));
+
+        Assert.That(File.Exists(target), Is.False);
+        var train = Path.Combine(_directory, "train.jsonl");
+        var valid = Path.Combine(_directory, "valid.jsonl");
+        Assert.That(File.Exists(train), Is.True);
+        Assert.That(File.Exists(valid), Is.True);
+        var trainCount = (await File.ReadAllLinesAsync(train)).Length;
+        var validCount = (await File.ReadAllLinesAsync(valid)).Length;
+        Assert.That(trainCount + validCount, Is.EqualTo(100));
+        Assert.That(trainCount, Is.InRange(30, 70));
+        Assert.That(validCount, Is.InRange(30, 70));
+    }
+
+    [Test]
+    public async Task Export_RatioSplits_WithNoRows_CreatesEmptyFiles()
+    {
+        var target = Path.Combine(_directory, "ratio-empty.jsonl");
+
+        await CollectAsync(ExecuteAsync(
+            new SftExportBlockConfig(
+                target,
+                Splits: new[] { "train:0.8", "valid:0.2" }),
+            RowsAsync()));
+
+        Assert.That(File.Exists(Path.Combine(_directory, "train.jsonl")), Is.True);
+        Assert.That(File.Exists(Path.Combine(_directory, "valid.jsonl")), Is.True);
+        Assert.That(await File.ReadAllLinesAsync(Path.Combine(_directory, "train.jsonl")), Is.Empty);
+    }
+
+    [Test]
+    public void Export_AppendWithRatioSplits_Throws()
+    {
+        var executor = new SftExportBlockExecutor();
+        var block = CreateBlock(new SftExportBlockConfig(
+            Path.Combine(_directory, "bad.jsonl"),
+            Append: true,
+            Splits: new[] { "train:0.5", "valid:0.5" }));
+
+        Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await executor.ExecuteAsync(CreateContext(block), CancellationToken.None));
+    }
+
+    [Test]
+    public void Export_RowSplitWithRatioSplits_Throws()
+    {
+        var executor = new SftExportBlockExecutor();
+        var block = CreateBlock(new SftExportBlockConfig(
+            Path.Combine(_directory, "bad.jsonl"),
+            SplitMaxRows: 100,
+            Splits: new[] { "train:0.5", "valid:0.5" }));
+
+        Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await executor.ExecuteAsync(CreateContext(block), CancellationToken.None));
+    }
+
+    [Test]
+    public void Export_RatioSplits_WithCountEntry_Throws()
+    {
+        var executor = new SftExportBlockExecutor();
+        var block = CreateBlock(new SftExportBlockConfig(
+            Path.Combine(_directory, "bad.jsonl"),
+            Splits: new[] { "train:100" }));
+
+        Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await executor.ExecuteAsync(CreateContext(block), CancellationToken.None));
+    }
+
+    [Test]
+    public void Export_RatioSplitFailure_LeavesNoTempOrPartialFiles()
+    {
+        var target = Path.Combine(_directory, "ratio-fail.jsonl");
+
+        Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await CollectAsync(ExecuteAsync(
+                new SftExportBlockConfig(
+                    target,
+                    Splits: new[] { "train:0.5", "valid:0.5" }),
+                FailingRowsAsync())));
+
+        Assert.That(Directory.GetFiles(_directory, "ratio-fail*"), Is.Empty);
+        Assert.That(File.Exists(Path.Combine(_directory, "train.jsonl")), Is.False);
+        Assert.That(File.Exists(Path.Combine(_directory, "valid.jsonl")), Is.False);
+    }
+
+    [Test]
     public void Export_SplitFailure_LeavesNoTempOrPartialFiles()
     {
         var target = Path.Combine(_directory, "split-fail.jsonl");

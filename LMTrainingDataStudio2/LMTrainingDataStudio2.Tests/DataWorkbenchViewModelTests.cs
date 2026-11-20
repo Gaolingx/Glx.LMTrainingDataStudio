@@ -93,6 +93,8 @@ public sealed class DataWorkbenchViewModelTests
         Assert.That(vm.TotalRows, Is.EqualTo(3));
         Assert.That(vm.Rows, Has.Count.EqualTo(3));
         Assert.That(vm.Rows[1].Preview, Does.Contain("\"text\": \"beta\""));
+        Assert.That(vm.Columns.Single(column => column.Name == "id").TypeText, Is.EqualTo("integer"));
+        Assert.That(vm.Columns.Single(column => column.Name == "text").TypeText, Is.EqualTo("string"));
     }
 
     [Test]

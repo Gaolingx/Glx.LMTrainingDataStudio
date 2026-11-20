@@ -27,6 +27,7 @@ public sealed class RecipeValidationService
             result.Issues.Add(new ValidationIssue
             {
                 Severity = ValidationSeverity.Warning,
+                Code = "recipe-empty",
                 Message = "Recipe has no blocks."
             });
             return result;
@@ -56,6 +57,7 @@ public sealed class RecipeValidationService
                 result.Issues.Add(new ValidationIssue
                 {
                     Severity = ValidationSeverity.Error,
+                    Code = "block-name-missing",
                     Message = $"Block '{block.DisplayName}' has no Jinja reference name.",
                     BlockId = block.Id
                 });
@@ -65,6 +67,7 @@ public sealed class RecipeValidationService
                 result.Issues.Add(new ValidationIssue
                 {
                     Severity = ValidationSeverity.Error,
+                    Code = "block-name-duplicate",
                     Message = $"Duplicate block name: '{block.Name}'.",
                     BlockId = block.Id
                 });
@@ -89,7 +92,7 @@ public sealed class RecipeValidationService
             if (block.InputPorts.Count > 0)
             {
                 AddError(result,
-                    $"Block '{block.Name}' ({block.Type}) must not have input ports.",
+                    "input-port-not-allowed", $"Block '{block.Name}' ({block.Type}) must not have input ports.",
                     block.Id);
             }
 
@@ -99,7 +102,7 @@ public sealed class RecipeValidationService
         if (block.InputPorts.Count == 0)
         {
             AddError(result,
-                $"Block '{block.Name}' ({block.Type}) requires an input port.",
+                "input-port-missing", $"Block '{block.Name}' ({block.Type}) requires an input port.",
                 block.Id);
             return;
         }
@@ -107,7 +110,7 @@ public sealed class RecipeValidationService
         if (block.InputPorts.Count > 1)
         {
             AddError(result,
-                $"Block '{block.Name}' ({block.Type}) supports at most one input port.",
+                "input-port-multiple", $"Block '{block.Name}' ({block.Type}) supports at most one input port.",
                 block.Id);
         }
 
@@ -122,7 +125,7 @@ public sealed class RecipeValidationService
             if (block.OutputPorts.Count > 0)
             {
                 AddError(result,
-                    $"Block '{block.Name}' ({block.Type}) must not have output ports.",
+                    "output-port-not-allowed", $"Block '{block.Name}' ({block.Type}) must not have output ports.",
                     block.Id);
             }
 
@@ -132,7 +135,7 @@ public sealed class RecipeValidationService
         if (block.OutputPorts.Count == 0)
         {
             AddError(result,
-                $"Block '{block.Name}' ({block.Type}) requires an output port.",
+                "output-port-missing", $"Block '{block.Name}' ({block.Type}) requires an output port.",
                 block.Id);
             return;
         }
@@ -140,7 +143,7 @@ public sealed class RecipeValidationService
         if (block.OutputPorts.Count > expected.Count)
         {
             AddError(result,
-                $"Block '{block.Name}' ({block.Type}) supports at most {expected.Count} output port(s); " +
+                "output-port-too-many", $"Block '{block.Name}' ({block.Type}) supports at most {expected.Count} output port(s); " +
                 $"found {block.OutputPorts.Count}.",
                 block.Id);
         }
@@ -161,14 +164,14 @@ public sealed class RecipeValidationService
             if (port.Direction != direction)
             {
                 AddError(result,
-                    $"Block '{block.Name}' port '{port.Name}' must be an {directionName} port.",
+                    "port-direction-invalid", $"Block '{block.Name}' port '{port.Name}' must be an {directionName} port.",
                     block.Id);
             }
 
             if (!port.DataType.Equals(dataType, StringComparison.OrdinalIgnoreCase))
             {
                 AddError(result,
-                    $"Block '{block.Name}' {directionName} port '{port.Name}' must have data type " +
+                    "port-data-type-mismatch", $"Block '{block.Name}' {directionName} port '{port.Name}' must have data type " +
                     $"'{dataType}'; got '{port.DataType}'.",
                     block.Id);
             }
@@ -190,7 +193,7 @@ public sealed class RecipeValidationService
             }
 
             AddError(result,
-                $"Block '{block.Name}' ({block.Type}) requires an incoming connection.",
+                "input-connection-missing", $"Block '{block.Name}' ({block.Type}) requires an incoming connection.",
                 block.Id);
         }
     }
@@ -214,37 +217,37 @@ public sealed class RecipeValidationService
             var sourceBlockExists = blocks.TryGetValue(edge.SourceBlockId, out var sourceBlock);
             if (!sourceBlockExists)
             {
-                AddError(result, $"Edge references non-existent source block: {edge.SourceBlockId}");
+                AddError(result, "edge-source-block-missing", $"Edge references non-existent source block: {edge.SourceBlockId}");
             }
 
             var targetBlockExists = blocks.TryGetValue(edge.TargetBlockId, out var targetBlock);
             if (!targetBlockExists)
             {
-                AddError(result, $"Edge references non-existent target block: {edge.TargetBlockId}");
+                AddError(result, "edge-target-block-missing", $"Edge references non-existent target block: {edge.TargetBlockId}");
             }
 
             var sourcePortExists = ports.TryGetValue(edge.SourcePortId, out var sourcePort);
             if (!sourcePortExists)
             {
-                AddError(result, $"Edge references non-existent source port: {edge.SourcePortId}");
+                AddError(result, "edge-source-port-missing", $"Edge references non-existent source port: {edge.SourcePortId}");
             }
 
             var targetPortExists = ports.TryGetValue(edge.TargetPortId, out var targetPort);
             if (!targetPortExists)
             {
-                AddError(result, $"Edge references non-existent target port: {edge.TargetPortId}");
+                AddError(result, "edge-target-port-missing", $"Edge references non-existent target port: {edge.TargetPortId}");
             }
 
             if (sourceBlockExists && sourcePortExists)
             {
                 if (sourcePort.Block.Id != sourceBlock!.Id)
                 {
-                    AddError(result, $"Source port '{edge.SourcePortId}' does not belong to block '{sourceBlock.Name}'.",
+                    AddError(result, "edge-port-owner-mismatch", $"Source port '{edge.SourcePortId}' does not belong to block '{sourceBlock.Name}'.",
                         sourceBlock.Id);
                 }
                 else if (sourcePort.Port.Direction != PortDirection.Output)
                 {
-                    AddError(result, $"Source port '{sourcePort.Port.Name}' on block '{sourceBlock.Name}' must be an output port.",
+                    AddError(result, "edge-source-port-not-output", $"Source port '{sourcePort.Port.Name}' on block '{sourceBlock.Name}' must be an output port.",
                         sourceBlock.Id);
                 }
             }
@@ -253,19 +256,19 @@ public sealed class RecipeValidationService
             {
                 if (targetPort.Block.Id != targetBlock!.Id)
                 {
-                    AddError(result, $"Target port '{edge.TargetPortId}' does not belong to block '{targetBlock.Name}'.",
+                    AddError(result, "edge-port-owner-mismatch", $"Target port '{edge.TargetPortId}' does not belong to block '{targetBlock.Name}'.",
                         targetBlock.Id);
                 }
                 else if (targetPort.Port.Direction != PortDirection.Input)
                 {
-                    AddError(result, $"Target port '{targetPort.Port.Name}' on block '{targetBlock.Name}' must be an input port.",
+                    AddError(result, "edge-target-port-not-input", $"Target port '{targetPort.Port.Name}' on block '{targetBlock.Name}' must be an input port.",
                         targetBlock.Id);
                 }
             }
 
             if (!seenEdges.Add((edge.SourceBlockId, edge.SourcePortId, edge.TargetBlockId, edge.TargetPortId)))
             {
-                AddError(result, $"Duplicate edge from '{edge.SourceBlockId}' to '{edge.TargetBlockId}'.",
+                AddError(result, "edge-duplicate", $"Duplicate edge from '{edge.SourceBlockId}' to '{edge.TargetBlockId}'.",
                     targetBlock?.Id);
             }
 
@@ -273,7 +276,7 @@ public sealed class RecipeValidationService
                 !ConnectionRules.ArePortTypesCompatible(sourcePort.Port.DataType, targetPort.Port.DataType))
             {
                 AddError(result,
-                    $"Port type mismatch: '{sourcePort.Port.DataType}' cannot connect to '{targetPort.Port.DataType}'.",
+                    "edge-port-type-mismatch", $"Port type mismatch: '{sourcePort.Port.DataType}' cannot connect to '{targetPort.Port.DataType}'.",
                     targetBlock?.Id);
             }
         }
@@ -285,7 +288,7 @@ public sealed class RecipeValidationService
             var block = blocks.GetValueOrDefault(fanIn.Key.TargetBlockId);
             var port = ports.TryGetValue(fanIn.Key.TargetPortId, out var entry) ? entry.Port : null;
             AddError(result,
-                $"Input port '{port?.Name ?? fanIn.Key.TargetPortId}' on block '{block?.Name ?? fanIn.Key.TargetBlockId}' " +
+                "edge-fan-in-multiple", $"Input port '{port?.Name ?? fanIn.Key.TargetPortId}' on block '{block?.Name ?? fanIn.Key.TargetBlockId}' " +
                 $"accepts only one incoming connection (found {fanIn.Count()}).",
                 block?.Id);
         }
@@ -309,6 +312,7 @@ public sealed class RecipeValidationService
             result.Issues.Add(new ValidationIssue
             {
                 Severity = ValidationSeverity.Warning,
+                Code = "block-isolated",
                 Message = $"Block '{block.Name}' is not connected to any edge.",
                 BlockId = block.Id
             });
@@ -331,7 +335,7 @@ public sealed class RecipeValidationService
                 if (!TargetsCollide(targets[left], targets[right])) continue;
 
                 AddError(result,
-                    $"Blocks '{targets[left].BlockName}' and '{targets[right].BlockName}' " +
+                    "output-target-overlap", $"Blocks '{targets[left].BlockName}' and '{targets[right].BlockName}' " +
                     $"write to overlapping output targets ('{targets[left].Path}' / '{targets[right].Path}').",
                     targets[right].BlockId);
             }
@@ -363,13 +367,68 @@ public sealed class RecipeValidationService
         }
     }
 
-    private static void AddError(ValidationResult result, string message, string? blockId = null) =>
+    private static void AddError(ValidationResult result, string code, string message, string? blockId = null) =>
         result.Issues.Add(new ValidationIssue
         {
             Severity = ValidationSeverity.Error,
+            Code = code,
             Message = message,
             BlockId = blockId
         });
+
+    private static void AddWarning(ValidationResult result, string code, string message, string? blockId = null) =>
+        result.Issues.Add(new ValidationIssue
+        {
+            Severity = ValidationSeverity.Warning,
+            Code = code,
+            Message = message,
+            BlockId = blockId
+        });
+
+    private static void ValidateSftSplits(
+        SftExportBlockConfig export,
+        RecipeBlock block,
+        ValidationResult result)
+    {
+        var splits = export.Splits?
+            .Where(split => !string.IsNullOrWhiteSpace(split))
+            .ToArray() ?? Array.Empty<string>();
+
+        if (splits.Length == 0)
+        {
+            return;
+        }
+
+        if (export.SplitMaxRows < 0)
+        {
+            AddWarning(result, "sft-export-split-size-invalid",
+                $"SFT export block '{block.Name}' split size cannot be negative.", block.Id);
+        }
+
+        if (export.SplitMaxRows > 0)
+        {
+            AddWarning(result, "sft-export-split-mode-conflict",
+                $"SFT export block '{block.Name}' cannot combine row-count splitting with ratio splits.",
+                block.Id);
+        }
+
+        if (export.Append)
+        {
+            AddWarning(result, "sft-export-append-ratio-split-conflict",
+                $"SFT export block '{block.Name}' cannot combine append mode with ratio splits.", block.Id);
+        }
+
+        if (!SamplerSplitPlan.TryParse(splits, out var plan, out var error))
+        {
+            AddWarning(result, "sft-export-splits-invalid",
+                $"SFT export block '{block.Name}' has invalid ratio splits: {error}", block.Id);
+        }
+        else if (plan!.IsCountMode)
+        {
+            AddWarning(result, "sft-export-splits-count-unsupported",
+                $"SFT export block '{block.Name}' ratio splits must use 'name:ratio' entries.", block.Id);
+        }
+    }
 
     private void ValidateCycles(Recipe recipe, ValidationResult result)
     {
@@ -413,6 +472,7 @@ public sealed class RecipeValidationService
             result.Issues.Add(new ValidationIssue
             {
                 Severity = ValidationSeverity.Error,
+                Code = "graph-cycle",
                 Message = "Recipe contains a cycle. DAG must be acyclic."
             });
         }
@@ -427,6 +487,7 @@ public sealed class RecipeValidationService
                 result.Issues.Add(new ValidationIssue
                 {
                     Severity = ValidationSeverity.Error,
+                    Code = "config-type-mismatch",
                     Message = $"Block '{block.Name}' is a {block.Type} node but uses {block.Config.GetType().Name}.",
                     BlockId = block.Id
                 });
@@ -439,6 +500,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "seed-source-missing",
                         Message = $"Seed block '{block.Name}' has no data source configured.",
                         BlockId = block.Id
                     });
@@ -448,6 +510,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "llm-model-alias-missing",
                         Message = $"LLM block '{block.Name}' has no model alias configured.",
                         BlockId = block.Id
                     });
@@ -457,6 +520,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "llm-provider-unknown",
                         Message = $"LLM block '{block.Name}' uses unknown provider '{llm.Provider}'. " +
                                   $"Supported: {LlmProviderIds.OpenAiChat}, {LlmProviderIds.OpenAiResponses}, {LlmProviderIds.Anthropic}.",
                         BlockId = block.Id
@@ -467,6 +531,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "llm-timeout-invalid",
                         Message = $"LLM block '{block.Name}' timeout must be greater than 0 seconds.",
                         BlockId = block.Id
                     });
@@ -476,6 +541,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "llm-max-retries-invalid",
                         Message = $"LLM block '{block.Name}' max retries must not be negative.",
                         BlockId = block.Id
                     });
@@ -485,6 +551,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "llm-max-concurrency-invalid",
                         Message = $"LLM block '{block.Name}' max concurrency must be at least 1.",
                         BlockId = block.Id
                     });
@@ -494,6 +561,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "llm-max-failure-samples-invalid",
                         Message = $"LLM block '{block.Name}' max failure samples must not be negative.",
                         BlockId = block.Id
                     });
@@ -505,6 +573,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "llm-response-schema-invalid",
                         Message = $"LLM block '{block.Name}' has an invalid response schema: {responseSchemaError}",
                         BlockId = block.Id
                     });
@@ -515,6 +584,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "expression-config-missing",
                         Message = $"Expression block '{block.Name}' has no template or field mapping configured.",
                         BlockId = block.Id
                     });
@@ -526,6 +596,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "expression-template-invalid",
                         Message = $"Expression block '{block.Name}' has an invalid template: " +
                                   TemplateRenderer.Validate(expression.Template).Error,
                         BlockId = block.Id
@@ -536,6 +607,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "validator-rule-missing",
                         Message = $"Validator block '{block.Name}' has no rule configured.",
                         BlockId = block.Id
                     });
@@ -545,6 +617,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "validator-timeout-invalid",
                         Message = $"Validator block '{block.Name}' timeout must not be negative.",
                         BlockId = block.Id
                     });
@@ -555,6 +628,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "validator-rule-kind-unknown",
                         Message = $"Validator block '{block.Name}' uses an unknown rule kind. " +
                                   "Supported: expression, schema, regex, script.",
                         BlockId = block.Id
@@ -567,6 +641,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "validator-regex-invalid",
                         Message = $"Validator block '{block.Name}' has an invalid regular expression.",
                         BlockId = block.Id
                     });
@@ -585,6 +660,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "validator-schema-invalid",
                         Message = $"Validator block '{block.Name}' has an invalid JSON Schema: {schemaError}",
                         BlockId = block.Id
                     });
@@ -598,18 +674,8 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "sampler-count-ratio-missing",
                         Message = $"Sampler block '{block.Name}' has neither count nor ratio configured.",
-                        BlockId = block.Id
-                    });
-                    break;
-
-                case SamplerBlockConfig sampler when
-                    !string.IsNullOrWhiteSpace(sampler.StratifyField) &&
-                    sampler.Splits is not { Length: > 0 }:
-                    result.Issues.Add(new ValidationIssue
-                    {
-                        Severity = ValidationSeverity.Warning,
-                        Message = $"Sampler block '{block.Name}' can only stratify when splits are configured.",
                         BlockId = block.Id
                     });
                     break;
@@ -618,6 +684,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "tool-profile-tools-missing",
                         Message = $"Tool profile block '{block.Name}' has no tools configured.",
                         BlockId = block.Id
                     });
@@ -629,6 +696,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "query-source-queries-missing",
                         Message = $"Query source block '{block.Name}' has no queries configured.",
                         BlockId = block.Id
                     });
@@ -640,6 +708,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "query-source-extension-unsupported",
                         Message = $"Query source block '{block.Name}' source must be .jsonl, .csv or .parquet.",
                         BlockId = block.Id
                     });
@@ -651,6 +720,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "query-source-template-variables-invalid",
                         Message = $"Query source block '{block.Name}' template variables must be a JSON object.",
                         BlockId = block.Id
                     });
@@ -661,6 +731,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "query-source-query-field-missing",
                         Message = $"Query source block '{block.Name}' query field must not be empty.",
                         BlockId = block.Id
                     });
@@ -670,6 +741,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "query-source-repeat-invalid",
                         Message = $"Query source block '{block.Name}' repeat must be at least 1; got {query.Repeat}.",
                         BlockId = block.Id
                     });
@@ -679,6 +751,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "simulation-model-alias-missing",
                         Message = $"Simulation block '{block.Name}' has no model alias configured.",
                         BlockId = block.Id
                     });
@@ -688,6 +761,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "simulation-provider-unknown",
                         Message = $"Simulation block '{block.Name}' uses unknown provider '{simulation.Provider}'.",
                         BlockId = block.Id
                     });
@@ -697,6 +771,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "simulation-max-rounds-invalid",
                         Message = $"Simulation block '{block.Name}' max rounds must be greater than 0.",
                         BlockId = block.Id
                     });
@@ -706,6 +781,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "simulation-timeout-invalid",
                         Message = $"Simulation block '{block.Name}' timeout must be greater than 0 seconds.",
                         BlockId = block.Id
                     });
@@ -715,6 +791,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "simulation-model-max-retries-invalid",
                         Message = $"Simulation block '{block.Name}' model max retries must not be negative.",
                         BlockId = block.Id
                     });
@@ -725,6 +802,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "simulation-tool-name-empty",
                         Message = $"Simulation block '{block.Name}' has a tool with an empty name.",
                         BlockId = block.Id
                     });
@@ -736,6 +814,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "simulation-tool-name-duplicate",
                         Message = $"Simulation block '{block.Name}' declares duplicate tool names.",
                         BlockId = block.Id
                     });
@@ -745,6 +824,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "simulation-tool-max-retries-invalid",
                         Message = $"Simulation block '{block.Name}' tool max retries must not be negative.",
                         BlockId = block.Id
                     });
@@ -754,6 +834,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "simulation-tool-timeout-invalid",
                         Message = $"Simulation block '{block.Name}' tool timeout must not be negative.",
                         BlockId = block.Id
                     });
@@ -763,6 +844,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "simulation-max-concurrency-invalid",
                         Message = $"Simulation block '{block.Name}' max concurrency must be at least 1.",
                         BlockId = block.Id
                     });
@@ -772,6 +854,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "simulation-max-failure-samples-invalid",
                         Message = $"Simulation block '{block.Name}' max failure samples must not be negative.",
                         BlockId = block.Id
                     });
@@ -783,6 +866,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "simulation-endpoint-invalid",
                         Message = $"Simulation block '{block.Name}' endpoint must be an absolute http(s) URL.",
                         BlockId = block.Id
                     });
@@ -793,6 +877,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "simulation-sandbox-limits-invalid",
                         Message = $"Simulation block '{block.Name}' has negative sandbox limits.",
                         BlockId = block.Id
                     });
@@ -802,6 +887,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "simulation-requests-per-minute-invalid",
                         Message = $"Simulation block '{block.Name}' requests per minute must not be negative.",
                         BlockId = block.Id
                     });
@@ -813,6 +899,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "simulation-stream-deltas-unsupported",
                         Message = $"Simulation block '{block.Name}' streams deltas only with the OpenAI Chat provider.",
                         BlockId = block.Id
                     });
@@ -825,6 +912,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "simulation-real-tool-unsupported",
                         Message = $"Simulation block '{block.Name}' has tools without a real sandbox executor: " +
                                   string.Join(", ", realTools
                                       .Where(tool => !RealSandboxTools.Contains(tool.Name))
@@ -837,6 +925,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "cleaner-rules-missing",
                         Message = $"Cleaner block '{block.Name}' has no cleanup rules enabled.",
                         BlockId = block.Id
                     });
@@ -846,6 +935,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "sft-export-output-path-missing",
                         Message = $"SFT export block '{block.Name}' has no output path configured.",
                         BlockId = block.Id
                     });
@@ -855,16 +945,22 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "sft-export-target-format-invalid",
                         Message = $"SFT export block '{block.Name}' cannot produce {export.TargetFormat} rows; " +
                                   "choose Auto, OpenAI, ShareGPT or Alpaca.",
                         BlockId = block.Id
                     });
                     break;
 
+                case SftExportBlockConfig export when export.Splits is { Length: > 0 }:
+                    ValidateSftSplits(export, block, result);
+                    break;
+
                 case SftExportBlockConfig export when export.SplitMaxRows < 0:
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "sft-export-split-size-invalid",
                         Message = $"SFT export block '{block.Name}' split size cannot be negative.",
                         BlockId = block.Id
                     });
@@ -874,6 +970,7 @@ public sealed class RecipeValidationService
                     result.Issues.Add(new ValidationIssue
                     {
                         Severity = ValidationSeverity.Warning,
+                        Code = "sft-export-append-split-conflict",
                         Message = $"SFT export block '{block.Name}' cannot combine append mode with file splitting.",
                         BlockId = block.Id
                     });
@@ -896,6 +993,7 @@ public sealed class RecipeValidationService
                 result.Issues.Add(new ValidationIssue
                 {
                     Severity = ValidationSeverity.Warning,
+                    Code = "llm-max-tool-rounds-invalid",
                     Message = $"LLM block '{block.Name}' max tool rounds must not be negative.",
                     BlockId = block.Id
                 });
@@ -912,6 +1010,7 @@ public sealed class RecipeValidationService
                 result.Issues.Add(new ValidationIssue
                 {
                     Severity = ValidationSeverity.Warning,
+                    Code = "llm-tool-profile-missing",
                     Message = $"LLM block '{block.Name}' enables tool rounds but has no tool profile configured.",
                     BlockId = block.Id
                 });
@@ -922,6 +1021,7 @@ public sealed class RecipeValidationService
                 result.Issues.Add(new ValidationIssue
                 {
                     Severity = ValidationSeverity.Warning,
+                    Code = "llm-anthropic-structured-output-conflict",
                     Message = $"LLM block '{block.Name}' uses Anthropic structured output, which forces the " +
                               "'structured_output' tool and prevents tool rounds from running.",
                     BlockId = block.Id
@@ -946,6 +1046,7 @@ public sealed class RecipeValidationService
                 result.Issues.Add(new ValidationIssue
                 {
                     Severity = ValidationSeverity.Warning,
+                    Code = "tool-profile-reference-unknown",
                     Message = $"Block '{block.Name}' references unknown tool profile '{reference}'.",
                     BlockId = block.Id
                 });
@@ -955,6 +1056,7 @@ public sealed class RecipeValidationService
                 result.Issues.Add(new ValidationIssue
                 {
                     Severity = ValidationSeverity.Warning,
+                    Code = "tool-profile-reference-empty",
                     Message = $"Block '{block.Name}' references tool profile '{reference}', which has no tools.",
                     BlockId = block.Id
                 });
@@ -967,6 +1069,7 @@ public sealed class RecipeValidationService
                 result.Issues.Add(new ValidationIssue
                 {
                     Severity = ValidationSeverity.Warning,
+                    Code = "tool-profile-real-tool-unsupported",
                     Message = $"Simulation block '{block.Name}' tool profile '{reference}' exposes " +
                               $"'{unsupported}', which has no real sandbox executor.",
                     BlockId = block.Id
@@ -985,6 +1088,7 @@ public sealed class RecipeValidationService
             result.Issues.Add(new ValidationIssue
             {
                 Severity = ValidationSeverity.Warning,
+                Code = "sampler-splits-output-missing",
                 Message = $"Sampler block '{block.Name}' has splits but no output directory.",
                 BlockId = block.Id
             });
@@ -994,6 +1098,7 @@ public sealed class RecipeValidationService
             result.Issues.Add(new ValidationIssue
             {
                 Severity = ValidationSeverity.Warning,
+                Code = "sampler-splits-invalid",
                 Message = $"Sampler block '{block.Name}' has invalid splits: {error}",
                 BlockId = block.Id
             });
@@ -1004,6 +1109,7 @@ public sealed class RecipeValidationService
             result.Issues.Add(new ValidationIssue
             {
                 Severity = ValidationSeverity.Warning,
+                Code = "sampler-splits-count-ratio-ignored",
                 Message = $"Sampler block '{block.Name}' ignores count/ratio while splits are configured.",
                 BlockId = block.Id
             });

@@ -65,9 +65,18 @@ public sealed class LlmApiClient : ILlmClient
         var provider = LlmProviderIds.Normalize(config.Provider)
             ?? throw new InvalidOperationException($"LLM provider '{config.Provider}' is not supported.");
 
-        if (config.Streaming && provider == LlmProviderIds.OpenAiChat)
+        if (config.Streaming)
         {
-            return await CompleteOpenAiChatStreamAsync(request, config, cancellationToken);
+            return provider switch
+            {
+                LlmProviderIds.OpenAiChat => await CompleteOpenAiChatStreamAsync(
+                    request, config, cancellationToken),
+                LlmProviderIds.OpenAiResponses => await CompleteOpenAiResponsesStreamAsync(
+                    request, config, cancellationToken),
+                LlmProviderIds.Anthropic => await CompleteAnthropicStreamAsync(
+                    request, config, cancellationToken),
+                _ => throw new InvalidOperationException($"LLM provider '{provider}' is not implemented.")
+            };
         }
 
         return provider switch
@@ -279,19 +288,24 @@ public sealed class LlmApiClient : ILlmClient
             }
         }
 
-        List<LlmToolCall>? calls = null;
-        if (toolCalls.Count > 0)
+        return new LlmCompletionResult(content.ToString(), BuildStreamingToolCalls(toolCalls), usage);
+    }
+
+    private static List<LlmToolCall>? BuildStreamingToolCalls(
+        Dictionary<int, StreamingToolCall> toolCalls)
+    {
+        if (toolCalls.Count == 0)
         {
-            calls = toolCalls
-                .OrderBy(pair => pair.Key)
-                .Select(pair => new LlmToolCall(
-                    pair.Value.Id ?? $"call_{pair.Key}",
-                    pair.Value.Name ?? string.Empty,
-                    pair.Value.Arguments.Length == 0 ? "{}" : pair.Value.Arguments.ToString()))
-                .ToList();
+            return null;
         }
 
-        return new LlmCompletionResult(content.ToString(), calls, usage);
+        return toolCalls
+            .OrderBy(pair => pair.Key)
+            .Select(pair => new LlmToolCall(
+                pair.Value.Id ?? $"call_{pair.Key}",
+                pair.Value.Name ?? string.Empty,
+                pair.Value.Arguments.Length == 0 ? "{}" : pair.Value.Arguments.ToString()))
+            .ToList();
     }
 
     private sealed class StreamingToolCall
@@ -410,6 +424,324 @@ public sealed class LlmApiClient : ILlmClient
             string.Concat(text),
             toolCalls.Count == 0 ? null : toolCalls,
             ParseUsage(root, "input_tokens", "output_tokens"));
+    }
+
+    private async Task<LlmCompletionResult> CompleteOpenAiResponsesStreamAsync(
+        LlmCompletionRequest request, LlmBlockConfig config, CancellationToken ct)
+    {
+        var apiKey = RequireApiKey(LlmProviderIds.OpenAiResponses, "OPENAI_API_KEY");
+        var baseUrl = ResolveBaseUrl(config, LlmProviderIds.OpenAiResponses, DefaultOpenAiBaseUrl);
+        var instructions = string.Join(
+            "\n\n",
+            request.Messages
+                .Where(message => message.Role is "system" or "developer")
+                .Select(message => message.Content)
+                .Where(content => !string.IsNullOrWhiteSpace(content)));
+        var input = BuildOpenAiResponsesInput(request.Messages);
+        var tools = request.Tools?.Select(tool => new
+        {
+            type = "function",
+            name = tool.Function.Name,
+            description = tool.Function.Description,
+            parameters = tool.Function.Parameters
+        }).ToArray();
+        var format = string.IsNullOrWhiteSpace(request.ResponseSchema)
+            ? null
+            : new
+            {
+                type = "json_schema",
+                name = "response",
+                strict = true,
+                schema = ParseSchema(request.ResponseSchema!)
+            };
+        var payload = new
+        {
+            model = config.ModelAlias,
+            instructions = string.IsNullOrWhiteSpace(instructions) ? null : instructions,
+            input,
+            temperature = config.Temperature,
+            max_output_tokens = config.MaxTokens,
+            tools,
+            text = format is null ? null : new { format },
+            stream = true
+        };
+
+        return await SendStreamingWithRetryAsync(
+            () =>
+            {
+                var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/responses")
+                {
+                    Content = JsonContent.Create(payload, options: JsonOptions)
+                };
+                httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+                return httpRequest;
+            },
+            ReadOpenAiResponsesStreamAsync,
+            "OpenAI responses streaming completion",
+            config,
+            ct);
+    }
+
+    private static async Task<LlmCompletionResult> ReadOpenAiResponsesStreamAsync(
+        HttpResponseMessage response, CancellationToken ct)
+    {
+        await using var stream = await response.Content.ReadAsStreamAsync(ct);
+        using var reader = new StreamReader(stream, Encoding.UTF8);
+        var content = new StringBuilder();
+        var toolCalls = new Dictionary<int, StreamingToolCall>();
+        LlmTokenUsage? usage = null;
+        string? failure = null;
+
+        while (await reader.ReadLineAsync(ct) is { } line)
+        {
+            if (!line.StartsWith("data:", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var data = line[5..].Trim();
+            if (data.Length == 0)
+            {
+                continue;
+            }
+
+            if (data == "[DONE]")
+            {
+                break;
+            }
+
+            using var document = JsonDocument.Parse(data);
+            var root = document.RootElement;
+            var type = root.TryGetProperty("type", out var typeElement)
+                ? typeElement.GetString()
+                : null;
+
+            switch (type)
+            {
+                case "response.output_item.added":
+                case "response.output_item.done":
+                    AppendResponsesFunctionCall(root, toolCalls);
+                    break;
+
+                case "response.output_text.delta":
+                    if (root.TryGetProperty("delta", out var delta) &&
+                        delta.ValueKind == JsonValueKind.String)
+                    {
+                        content.Append(delta.GetString());
+                    }
+
+                    break;
+
+                case "response.output_text.done":
+                    if (content.Length == 0 &&
+                        root.TryGetProperty("text", out var doneText) &&
+                        doneText.ValueKind == JsonValueKind.String)
+                    {
+                        content.Append(doneText.GetString());
+                    }
+
+                    break;
+
+                case "response.function_call_arguments.delta":
+                    AppendResponsesArgumentsDelta(root, toolCalls);
+                    break;
+
+                case "response.function_call_arguments.done":
+                    ApplyResponsesArguments(root, toolCalls);
+                    break;
+
+                case "response.completed":
+                case "response.incomplete":
+                    if (root.TryGetProperty("response", out var completed))
+                    {
+                        usage = ParseUsage(completed, "input_tokens", "output_tokens") ?? usage;
+                        AppendResponsesFinalOutput(completed, content, toolCalls);
+                    }
+
+                    usage = ParseUsage(root, "input_tokens", "output_tokens") ?? usage;
+                    break;
+
+                case "response.failed":
+                    failure = ReadErrorMessage(root) ?? "OpenAI Responses stream failed.";
+                    break;
+
+                case "error":
+                    failure = ReadErrorMessage(root) ?? "OpenAI Responses stream returned an error.";
+                    break;
+            }
+        }
+
+        if (failure is not null)
+        {
+            throw new InvalidOperationException(failure);
+        }
+
+        var calls = BuildStreamingToolCalls(toolCalls);
+        if (content.Length == 0 && calls is null)
+        {
+            throw new InvalidOperationException("OpenAI Responses API returned no output text.");
+        }
+
+        return new LlmCompletionResult(content.ToString(), calls, usage);
+    }
+
+    private static void AppendResponsesFunctionCall(
+        JsonElement root, Dictionary<int, StreamingToolCall> toolCalls)
+    {
+        if (!root.TryGetProperty("item", out var item) ||
+            !item.TryGetProperty("type", out var itemType) ||
+            itemType.GetString() != "function_call")
+        {
+            return;
+        }
+
+        var index = ReadOutputIndex(root);
+        if (!toolCalls.TryGetValue(index, out var builder))
+        {
+            builder = new StreamingToolCall();
+            toolCalls[index] = builder;
+        }
+
+        if (item.TryGetProperty("call_id", out var callId) && callId.ValueKind == JsonValueKind.String)
+        {
+            builder.Id = callId.GetString();
+        }
+        else if (item.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.String)
+        {
+            builder.Id ??= id.GetString();
+        }
+
+        if (item.TryGetProperty("name", out var name) && name.ValueKind == JsonValueKind.String)
+        {
+            builder.Name = name.GetString();
+        }
+
+        if (builder.Arguments.Length == 0 &&
+            item.TryGetProperty("arguments", out var arguments) &&
+            arguments.ValueKind == JsonValueKind.String)
+        {
+            builder.Arguments.Append(arguments.GetString());
+        }
+    }
+
+    private static void AppendResponsesArgumentsDelta(
+        JsonElement root, Dictionary<int, StreamingToolCall> toolCalls)
+    {
+        if (!root.TryGetProperty("delta", out var delta) || delta.ValueKind != JsonValueKind.String)
+        {
+            return;
+        }
+
+        var index = ReadOutputIndex(root);
+        if (!toolCalls.TryGetValue(index, out var builder))
+        {
+            builder = new StreamingToolCall();
+            toolCalls[index] = builder;
+        }
+
+        builder.Arguments.Append(delta.GetString());
+    }
+
+    private static void ApplyResponsesArguments(
+        JsonElement root, Dictionary<int, StreamingToolCall> toolCalls)
+    {
+        if (!root.TryGetProperty("arguments", out var arguments) ||
+            arguments.ValueKind != JsonValueKind.String)
+        {
+            return;
+        }
+
+        var index = ReadOutputIndex(root);
+        if (!toolCalls.TryGetValue(index, out var builder))
+        {
+            builder = new StreamingToolCall();
+            toolCalls[index] = builder;
+        }
+
+        builder.Arguments.Clear();
+        builder.Arguments.Append(arguments.GetString());
+    }
+
+    private static void AppendResponsesFinalOutput(
+        JsonElement response,
+        StringBuilder content,
+        Dictionary<int, StreamingToolCall> toolCalls)
+    {
+        if (!response.TryGetProperty("output", out var output) ||
+            output.ValueKind != JsonValueKind.Array)
+        {
+            return;
+        }
+
+        var fallbackIndex = 0;
+        foreach (var item in output.EnumerateArray())
+        {
+            var type = item.TryGetProperty("type", out var typeElement)
+                ? typeElement.GetString()
+                : null;
+            if (type == "function_call")
+            {
+                if (!toolCalls.ContainsKey(fallbackIndex) && toolCalls.Count == 0)
+                {
+                    var builder = new StreamingToolCall
+                    {
+                        Id = item.TryGetProperty("call_id", out var callId)
+                            ? callId.GetString()
+                            : null,
+                        Name = item.TryGetProperty("name", out var name) ? name.GetString() : null
+                    };
+                    if (item.TryGetProperty("arguments", out var arguments) &&
+                        arguments.ValueKind == JsonValueKind.String)
+                    {
+                        builder.Arguments.Append(arguments.GetString());
+                    }
+
+                    toolCalls[fallbackIndex] = builder;
+                }
+
+                continue;
+            }
+
+            if (content.Length > 0 ||
+                !item.TryGetProperty("content", out var parts) ||
+                parts.ValueKind != JsonValueKind.Array)
+            {
+                continue;
+            }
+
+            foreach (var part in parts.EnumerateArray())
+            {
+                if (part.TryGetProperty("text", out var text) &&
+                    text.ValueKind == JsonValueKind.String)
+                {
+                    content.Append(text.GetString());
+                }
+            }
+        }
+    }
+
+    private static int ReadOutputIndex(JsonElement root) =>
+        root.TryGetProperty("output_index", out var index) && index.TryGetInt32(out var parsed)
+            ? parsed
+            : 0;
+
+    private static string? ReadErrorMessage(JsonElement root)
+    {
+        if (root.TryGetProperty("message", out var message) &&
+            message.ValueKind == JsonValueKind.String)
+        {
+            return message.GetString();
+        }
+
+        if (root.TryGetProperty("error", out var error) &&
+            error.ValueKind == JsonValueKind.Object &&
+            error.TryGetProperty("message", out var nested) &&
+            nested.ValueKind == JsonValueKind.String)
+        {
+            return nested.GetString();
+        }
+
+        return null;
     }
 
     private const string AnthropicStructuredOutputTool = "structured_output";
@@ -531,6 +863,301 @@ public sealed class LlmApiClient : ILlmClient
             content ?? string.Empty,
             toolCalls.Count == 0 ? null : toolCalls,
             ParseUsage(root, "input_tokens", "output_tokens"));
+    }
+
+    private async Task<LlmCompletionResult> CompleteAnthropicStreamAsync(
+        LlmCompletionRequest request, LlmBlockConfig config, CancellationToken ct)
+    {
+        var apiKey = RequireApiKey(LlmProviderIds.Anthropic, "ANTHROPIC_API_KEY");
+        var baseUrl = ResolveBaseUrl(config, LlmProviderIds.Anthropic, DefaultAnthropicBaseUrl);
+        var systemText = string.Join(
+            "\n\n",
+            request.Messages
+                .Where(message => message.Role is "system" or "developer")
+                .Select(message => message.Content)
+                .Where(content => !string.IsNullOrWhiteSpace(content)));
+        var messages = BuildAnthropicMessages(request.Messages);
+        var tools = request.Tools?.Select(tool => (object)new
+        {
+            name = tool.Function.Name,
+            description = tool.Function.Description,
+            input_schema = tool.Function.Parameters ?? new Dictionary<string, object>
+            {
+                ["type"] = "object",
+                ["properties"] = new Dictionary<string, object>()
+            }
+        }).ToList() ?? new List<object>();
+
+        object? toolChoice = null;
+        if (!string.IsNullOrWhiteSpace(request.ResponseSchema))
+        {
+            tools.Add(new
+            {
+                name = AnthropicStructuredOutputTool,
+                description = "Return the answer as one JSON object that matches the response schema.",
+                input_schema = ParseSchema(request.ResponseSchema!)
+            });
+            toolChoice = new { type = "tool", name = AnthropicStructuredOutputTool };
+        }
+
+        var payload = new
+        {
+            model = config.ModelAlias,
+            max_tokens = config.MaxTokens,
+            temperature = config.Temperature,
+            system = string.IsNullOrWhiteSpace(systemText) ? null : systemText,
+            messages,
+            tools = tools.Count > 0 ? tools : null,
+            tool_choice = toolChoice,
+            stream = true
+        };
+
+        return await SendStreamingWithRetryAsync(
+            () =>
+            {
+                var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/v1/messages")
+                {
+                    Content = JsonContent.Create(payload, options: JsonOptions)
+                };
+                httpRequest.Headers.Add("x-api-key", apiKey);
+                httpRequest.Headers.Add("anthropic-version", "2023-06-01");
+                return httpRequest;
+            },
+            ReadAnthropicStreamAsync,
+            "Anthropic streaming message",
+            config,
+            ct);
+    }
+
+    private static async Task<LlmCompletionResult> ReadAnthropicStreamAsync(
+        HttpResponseMessage response, CancellationToken ct)
+    {
+        await using var stream = await response.Content.ReadAsStreamAsync(ct);
+        using var reader = new StreamReader(stream, Encoding.UTF8);
+        var text = new StringBuilder();
+        var blocks = new Dictionary<int, AnthropicStreamBlock>();
+        var toolCalls = new List<LlmToolCall>();
+        string? structuredOutput = null;
+        string? stopReason = null;
+        var promptTokens = 0L;
+        var completionTokens = 0L;
+        var hasUsage = false;
+
+        while (await reader.ReadLineAsync(ct) is { } line)
+        {
+            if (!line.StartsWith("data:", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var data = line[5..].Trim();
+            if (data.Length == 0)
+            {
+                continue;
+            }
+
+            if (data == "[DONE]")
+            {
+                break;
+            }
+
+            using var document = JsonDocument.Parse(data);
+            var root = document.RootElement;
+            var type = root.TryGetProperty("type", out var typeElement)
+                ? typeElement.GetString()
+                : null;
+
+            switch (type)
+            {
+                case "message_start":
+                    if (root.TryGetProperty("message", out var message))
+                    {
+                        MergeAnthropicUsage(
+                            message, ref promptTokens, ref completionTokens, ref hasUsage);
+                    }
+
+                    break;
+
+                case "content_block_start":
+                    StartAnthropicBlock(root, blocks, text);
+                    break;
+
+                case "content_block_delta":
+                    AppendAnthropicDelta(root, blocks, text);
+                    break;
+
+                case "content_block_stop":
+                    StopAnthropicBlock(root, blocks, toolCalls, ref structuredOutput);
+                    break;
+
+                case "message_delta":
+                    if (root.TryGetProperty("delta", out var delta) &&
+                        delta.TryGetProperty("stop_reason", out var reason) &&
+                        reason.ValueKind == JsonValueKind.String)
+                    {
+                        stopReason = reason.GetString();
+                    }
+
+                    MergeAnthropicUsage(root, ref promptTokens, ref completionTokens, ref hasUsage);
+                    break;
+
+                case "message_stop":
+                    goto done;
+
+                case "error":
+                    throw new InvalidOperationException(
+                        ReadErrorMessage(root) ?? "Anthropic stream returned an error.");
+            }
+        }
+
+    done:
+        var content = structuredOutput ?? (text.Length == 0 ? null : text.ToString());
+        if (content is null && toolCalls.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"Anthropic Messages API returned no text content (stop_reason: {stopReason ?? "none"}).");
+        }
+
+        LlmTokenUsage? usage = hasUsage ? new LlmTokenUsage(promptTokens, completionTokens) : null;
+        return new LlmCompletionResult(content ?? string.Empty, toolCalls.Count == 0 ? null : toolCalls, usage);
+    }
+
+    private static void StartAnthropicBlock(
+        JsonElement root,
+        Dictionary<int, AnthropicStreamBlock> blocks,
+        StringBuilder text)
+    {
+        if (!root.TryGetProperty("index", out var indexElement) ||
+            !indexElement.TryGetInt32(out var index) ||
+            !root.TryGetProperty("content_block", out var contentBlock))
+        {
+            return;
+        }
+
+        var block = new AnthropicStreamBlock();
+        blocks[index] = block;
+
+        var type = contentBlock.TryGetProperty("type", out var typeElement)
+            ? typeElement.GetString()
+            : null;
+        if (type == "text")
+        {
+            if (contentBlock.TryGetProperty("text", out var value) &&
+                value.ValueKind == JsonValueKind.String)
+            {
+                text.Append(value.GetString());
+            }
+
+            return;
+        }
+
+        if (type != "tool_use")
+        {
+            return;
+        }
+
+        block.Id = contentBlock.TryGetProperty("id", out var id) ? id.GetString() : null;
+        block.Name = contentBlock.TryGetProperty("name", out var name) ? name.GetString() : null;
+        block.InitialInput = contentBlock.TryGetProperty("input", out var input)
+            ? input.GetRawText()
+            : null;
+    }
+
+    private static void AppendAnthropicDelta(
+        JsonElement root,
+        Dictionary<int, AnthropicStreamBlock> blocks,
+        StringBuilder text)
+    {
+        if (!root.TryGetProperty("index", out var indexElement) ||
+            !indexElement.TryGetInt32(out var index) ||
+            !root.TryGetProperty("delta", out var delta))
+        {
+            return;
+        }
+
+        var type = delta.TryGetProperty("type", out var typeElement)
+            ? typeElement.GetString()
+            : null;
+        switch (type)
+        {
+            case "text_delta":
+                if (delta.TryGetProperty("text", out var value) &&
+                    value.ValueKind == JsonValueKind.String)
+                {
+                    text.Append(value.GetString());
+                }
+
+                break;
+
+            case "input_json_delta":
+                if (delta.TryGetProperty("partial_json", out var partial) &&
+                    partial.ValueKind == JsonValueKind.String &&
+                    blocks.TryGetValue(index, out var block))
+                {
+                    block.Arguments.Append(partial.GetString());
+                }
+
+                break;
+        }
+    }
+
+    private static void StopAnthropicBlock(
+        JsonElement root,
+        Dictionary<int, AnthropicStreamBlock> blocks,
+        List<LlmToolCall> toolCalls,
+        ref string? structuredOutput)
+    {
+        if (!root.TryGetProperty("index", out var indexElement) ||
+            !indexElement.TryGetInt32(out var index) ||
+            !blocks.Remove(index, out var block) ||
+            block.Name is null)
+        {
+            return;
+        }
+
+        var arguments = block.Arguments.Length > 0
+            ? block.Arguments.ToString()
+            : block.InitialInput ?? "{}";
+        if (string.Equals(block.Name, AnthropicStructuredOutputTool, StringComparison.Ordinal))
+        {
+            structuredOutput = arguments;
+            return;
+        }
+
+        toolCalls.Add(new LlmToolCall(block.Id ?? $"call_{index}", block.Name, arguments));
+    }
+
+    private static void MergeAnthropicUsage(
+        JsonElement element,
+        ref long promptTokens,
+        ref long completionTokens,
+        ref bool hasUsage)
+    {
+        var usage = ParseUsage(element, "input_tokens", "output_tokens");
+        if (usage is null)
+        {
+            return;
+        }
+
+        if (usage.PromptTokens > 0)
+        {
+            promptTokens = usage.PromptTokens;
+        }
+
+        if (usage.CompletionTokens > 0)
+        {
+            completionTokens = usage.CompletionTokens;
+        }
+
+        hasUsage = true;
+    }
+
+    private sealed class AnthropicStreamBlock
+    {
+        public string? Id { get; set; }
+        public string? Name { get; set; }
+        public string? InitialInput { get; set; }
+        public StringBuilder Arguments { get; } = new();
     }
 
     private static List<AnthropicOutboundMessage> BuildAnthropicMessages(

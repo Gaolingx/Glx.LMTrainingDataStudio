@@ -1,6 +1,35 @@
 # Changelog
 
-本文件记录用户可见变更与工程化修复。完整未完成清单见 [PLAN/TODO/01-Bugfix1/HANDOFF.md](PLAN/TODO/01-Bugfix1/HANDOFF.md)。
+本文件记录用户可见变更与工程化修复。当前工作池见 [PLAN/TODO/02-Hardening/HANDOFF.md](PLAN/TODO/02-Hardening/HANDOFF.md)；Round 17–32 已归档到 [PLAN/Done/02-Bugfix1/HANDOFF.md](PLAN/Done/02-Bugfix1/HANDOFF.md)。
+
+## [Unreleased] — 2026-11-20（Round 32 / 节点与发布收尾）
+
+### Added
+
+- Recipe 校验问题统一填充稳定错误码，属性面板问题行显示 Code；覆盖节点名、端口、边、环、配置与输出目标冲突。
+- 数据工作台为 CSV 字段推断展示类型（integer/number/bool/date/json/string）；仅展示，不改写源文本。
+- Sampler count 模式支持按 `StratifyField` 分层：分组 reservoir + 最大余数配额，行数守恒并按源行号输出。
+- SFT Export 支持 `name:ratio` 比例拆片与拆片种子；分片临时写入后统一原子替换，并纳入输出目标锁。
+- LLM 节点流式输出扩展至 OpenAI Responses 与 Anthropic（文本、工具调用参数、usage、structured_output）。
+- 新增 nightly（性能/真实 provider gated）、release（tag 发布）与依赖漏洞审计工作流；新增 Dependabot 配置。
+
+### Changed
+
+- LLM 面板流式说明改为三种 provider 均支持。
+- SFT Export 面板新增比例拆片、拆片种子与错误提示（zh-CN/en-US）。
+- 示例 Recipe 重新生成，补入 `splitSeed` 默认字段。
+
+### Tests
+
+- `--list-tests`：744 个用例；`dotnet test`：736 通过 / 0 失败 / 7 跳过（另 1 个 `[Explicit]`）。
+- 覆盖率：总行 77.55%，Services/Commands 85.07%。
+- 新增校验 Code、CSV 推断、count 分层、SFT 拆片成功/失败/冲突、三种 provider 流式、CI 工作流一致性与 Headless 控件测试。
+
+### Known Issues
+
+- CI 依赖审计当前报告上游传递依赖 High 公告（Snappier、SQLitePCLRaw、Tmds.DBus.Protocol），job 暂为 advisory。
+- 依赖锁定未启用：Debug-only `Avalonia.Diagnostics` 导致 Debug/Release 锁文件依赖集冲突。
+- 安装包干净机器验证、签名、双进程单实例与 10M 行质量/转换基线仍未完成，见 [PLAN/TODO/02-Hardening/HANDOFF.md](PLAN/TODO/02-Hardening/HANDOFF.md)。
 
 ## [Unreleased] — 2026-11-18（Round 31 / 代码质量清理）
 

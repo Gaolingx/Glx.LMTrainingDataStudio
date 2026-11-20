@@ -11,28 +11,85 @@ internal sealed class SftExportWriter : IAsyncDisposable
 {
     private readonly string _fullPath;
     private readonly int _splitMaxRows;
+    private readonly SamplerSplitPlan? _splitPlan;
+    private readonly Random? _splitRandom;
     private readonly List<PartTarget> _parts = new();
+    private readonly List<SplitTarget> _splitTargets = new();
     private StreamWriter? _writer;
     private int _rowsInPart;
+    private long _splitRowIndex;
     private bool _needsLeadingNewline;
+    private bool _splitWritersDisposed;
     private bool _committed;
     private bool _disposed;
 
-    private SftExportWriter(string fullPath, int splitMaxRows)
+    private SftExportWriter(
+        string fullPath,
+        int splitMaxRows,
+        SamplerSplitPlan? splitPlan = null,
+        Random? splitRandom = null)
     {
         _fullPath = fullPath;
         _splitMaxRows = splitMaxRows;
+        _splitPlan = splitPlan;
+        _splitRandom = splitRandom;
     }
 
-    public IReadOnlyList<string> PartPaths => _parts.Select(part => part.FinalPath).ToArray();
+    public IReadOnlyList<string> PartPaths => _splitPlan is not null
+        ? _splitTargets.Select(part => part.FinalPath).ToArray()
+        : _parts.Select(part => part.FinalPath).ToArray();
 
-    public static SftExportWriter Create(string path, bool append, int splitMaxRows)
+    public static SftExportWriter Create(
+        string path,
+        bool append,
+        int splitMaxRows,
+        string[]? splits = null,
+        int splitSeed = 42)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
         if (splitMaxRows < 0)
         {
             throw new InvalidOperationException("SFT export split size cannot be negative.");
+        }
+
+        var ratioSplits = splits?
+            .Where(split => !string.IsNullOrWhiteSpace(split))
+            .ToArray() ?? Array.Empty<string>();
+
+        if (ratioSplits.Length > 0)
+        {
+            if (append)
+            {
+                throw new InvalidOperationException(
+                    "SFT export cannot combine append mode with ratio splits.");
+            }
+
+            if (splitMaxRows > 0)
+            {
+                throw new InvalidOperationException(
+                    "SFT export cannot combine row-count splitting with ratio splits.");
+            }
+
+            if (!SamplerSplitPlan.TryParse(ratioSplits, out var plan, out var error))
+            {
+                throw new InvalidOperationException($"SFT export has invalid ratio splits: {error}");
+            }
+
+            if (plan!.IsCountMode || plan.Specs.Any(spec => spec.IsCount))
+            {
+                throw new InvalidOperationException(
+                    "SFT export ratio splits must use 'name:ratio' entries.");
+            }
+
+            var directory = Path.GetDirectoryName(Path.GetFullPath(path))!;
+            var writer = new SftExportWriter(
+                Path.GetFullPath(path),
+                splitMaxRows: 0,
+                plan,
+                new Random(splitSeed));
+            writer.OpenSplits(directory);
+            return writer;
         }
 
         if (append && splitMaxRows > 0)
@@ -43,22 +100,29 @@ internal sealed class SftExportWriter : IAsyncDisposable
         var fullPath = Path.GetFullPath(path);
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
 
-        var writer = new SftExportWriter(fullPath, splitMaxRows);
+        var singleWriter = new SftExportWriter(fullPath, splitMaxRows);
         if (splitMaxRows > 0)
         {
-            writer.OpenPart(index: 0);
+            singleWriter.OpenPart(index: 0);
         }
         else
         {
-            writer.OpenSingle(append);
+            singleWriter.OpenSingle(append);
         }
 
-        return writer;
+        return singleWriter;
     }
 
     public Task WriteAsync(string line, CancellationToken cancellationToken)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_splitPlan is not null)
+        {
+            var split = _splitPlan.Assign(_splitRowIndex++, _splitRandom!);
+            return _splitTargets[split].Writer.WriteLineAsync(line.AsMemory(), cancellationToken);
+        }
+
         if (_writer is null)
         {
             throw new InvalidOperationException("The SFT export writer is not open.");
@@ -90,6 +154,24 @@ internal sealed class SftExportWriter : IAsyncDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         cancellationToken.ThrowIfCancellationRequested();
 
+        if (_splitPlan is not null)
+        {
+            foreach (var target in _splitTargets)
+            {
+                await target.Writer.FlushAsync(cancellationToken);
+            }
+
+            await DisposeSplitWritersAsync();
+
+            foreach (var target in _splitTargets)
+            {
+                File.Move(target.TempPath, target.FinalPath, overwrite: true);
+            }
+
+            _committed = true;
+            return;
+        }
+
         if (_writer is not null)
         {
             await _writer.FlushAsync(cancellationToken);
@@ -111,10 +193,16 @@ internal sealed class SftExportWriter : IAsyncDisposable
         _disposed = true;
 
         await CloseWriterAsync();
+        await DisposeSplitWritersAsync();
 
         if (_committed) return;
 
         foreach (var part in _parts)
+        {
+            TryDelete(part.TempPath);
+        }
+
+        foreach (var part in _splitTargets)
         {
             TryDelete(part.TempPath);
         }
@@ -148,6 +236,32 @@ internal sealed class SftExportWriter : IAsyncDisposable
         _rowsInPart = 0;
     }
 
+    private void OpenSplits(string directory)
+    {
+        Directory.CreateDirectory(directory);
+        try
+        {
+            foreach (var spec in _splitPlan!.Specs)
+            {
+                var finalPath = Path.Combine(directory, $"{spec.Name}.jsonl");
+                var tempPath = finalPath + ".tmp";
+                var writer = CreateWriter(tempPath, FileMode.Create);
+                _splitTargets.Add(new SplitTarget(finalPath, tempPath, writer));
+            }
+        }
+        catch
+        {
+            foreach (var target in _splitTargets)
+            {
+                target.Writer.Dispose();
+                TryDelete(target.TempPath);
+            }
+
+            _splitTargets.Clear();
+            throw;
+        }
+    }
+
     private static StreamWriter CreateWriter(string path, FileMode mode) =>
         new(
             new FileStream(path, mode, FileAccess.Write, FileShare.None, 64 * 1024, useAsync: true),
@@ -159,6 +273,17 @@ internal sealed class SftExportWriter : IAsyncDisposable
 
         await _writer.DisposeAsync();
         _writer = null;
+    }
+
+    private async Task DisposeSplitWritersAsync()
+    {
+        if (_splitWritersDisposed) return;
+        _splitWritersDisposed = true;
+
+        foreach (var target in _splitTargets)
+        {
+            await target.Writer.DisposeAsync();
+        }
     }
 
     internal static string BuildPartPath(string fullPath, int partNumber)
@@ -212,4 +337,6 @@ internal sealed class SftExportWriter : IAsyncDisposable
     }
 
     private sealed record PartTarget(string FinalPath, string TempPath);
+
+    private sealed record SplitTarget(string FinalPath, string TempPath, StreamWriter Writer);
 }

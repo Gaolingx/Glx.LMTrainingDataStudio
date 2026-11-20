@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Text.Json;
 using System.Threading.Channels;
 using LMTrainingDataStudio2.Models;
@@ -7,8 +8,8 @@ namespace LMTrainingDataStudio2.Services.Executors;
 
 /// <summary>
 /// Deterministic sampler with reservoir sampling for count, Bernoulli sampling for ratio,
-/// and multi-file deterministic splits. Splits also expose one output port per split name
-/// and can be stratified by a top-level field.
+/// and multi-file deterministic splits. Count, ratio and splits can be stratified by a
+/// top-level field.
 /// </summary>
 public sealed class SamplerBlockExecutor : IBlockExecutor
 {
@@ -207,7 +208,7 @@ public sealed class SamplerBlockExecutor : IBlockExecutor
         var group = ReadGroupValue(row.Json, config.StratifyField!);
         if (!groupRandoms.TryGetValue(group, out var random))
         {
-            random = new Random(HashCode.Combine(config.Seed, StringComparer.Ordinal.GetHashCode(group)));
+            random = new Random(StableGroupSeed(config.Seed, group));
             groupRandoms[group] = random;
         }
 
@@ -249,6 +250,16 @@ public sealed class SamplerBlockExecutor : IBlockExecutor
 
         if (config.Count is { } count)
         {
+            if (!string.IsNullOrWhiteSpace(config.StratifyField))
+            {
+                await foreach (var row in SampleStratifiedAsync(context, config, count, ct))
+                {
+                    yield return row;
+                }
+
+                yield break;
+            }
+
             var reservoir = new List<DatasetRow>((int)Math.Min(count, int.MaxValue));
             var seen = 0L;
 
@@ -259,7 +270,7 @@ public sealed class SamplerBlockExecutor : IBlockExecutor
                 {
                     reservoir.Add(row);
                 }
-                else
+                else if (count > 0)
                 {
                     var slot = random.NextInt64(seen);
                     if (slot < count)
@@ -294,5 +305,159 @@ public sealed class SamplerBlockExecutor : IBlockExecutor
 
             context.RowsProcessed?.Report(index);
         }
+    }
+
+    private static async IAsyncEnumerable<DatasetRow> SampleStratifiedAsync(
+        BlockExecutionContext context,
+        SamplerBlockConfig config,
+        long count,
+        [EnumeratorCancellation] CancellationToken ct)
+    {
+        var groups = new Dictionary<string, StratifiedGroup>(StringComparer.Ordinal);
+        var seen = 0L;
+
+        await foreach (var row in context.Input!.WithCancellation(ct))
+        {
+            seen++;
+            var group = ReadGroupValue(row.Json, config.StratifyField!);
+            if (!groups.TryGetValue(group, out var state))
+            {
+                state = new StratifiedGroup(new Random(StableGroupSeed(config.Seed, group)));
+                groups.Add(group, state);
+            }
+
+            state.Seen++;
+            if (state.Reservoir.Count < count)
+            {
+                state.Reservoir.Add(row);
+            }
+            else if (count > 0)
+            {
+                var slot = state.Random.NextInt64(state.Seen);
+                if (slot < count)
+                {
+                    state.Reservoir[(int)slot] = row;
+                }
+            }
+
+            context.RowsProcessed?.Report(seen);
+        }
+
+        if (count <= 0 || seen == 0)
+        {
+            yield break;
+        }
+
+        var quotas = AllocateCountQuotas(groups, count, seen);
+        var selected = new List<DatasetRow>();
+        foreach (var (group, state) in groups)
+        {
+            var take = (int)Math.Min(quotas[group], state.Reservoir.Count);
+            for (var index = 0; index < take; index++)
+            {
+                selected.Add(state.Reservoir[index]);
+            }
+        }
+
+        selected.Sort((left, right) => left.LineNumber.CompareTo(right.LineNumber));
+        foreach (var row in selected)
+        {
+            yield return row;
+        }
+
+        context.Log(
+            $"Sampled {selected.Count:N0} row(s) from {groups.Count:N0} group(s) " +
+            $"(stratified by '{config.StratifyField}', seed {config.Seed}).");
+    }
+
+    private static Dictionary<string, long> AllocateCountQuotas(
+        Dictionary<string, StratifiedGroup> groups,
+        long count,
+        long seen)
+    {
+        var quotas = new Dictionary<string, long>(groups.Count, StringComparer.Ordinal);
+        var allocated = 0L;
+
+        foreach (var (group, state) in groups)
+        {
+            var exact = count >= seen ? state.Seen : (double)count * state.Seen / seen;
+            var quota = (long)Math.Floor(exact);
+            if (quota > state.Seen)
+            {
+                quota = state.Seen;
+            }
+
+            quotas[group] = quota;
+            allocated += quota;
+        }
+
+        var remaining = Math.Min(count, seen) - allocated;
+        if (remaining <= 0)
+        {
+            return quotas;
+        }
+
+        var ordered = groups
+            .Select(pair => new
+            {
+                pair.Key,
+                Fraction = (count >= seen ? 0 : (double)count * pair.Value.Seen / seen)
+                           - Math.Floor((count >= seen ? 0 : (double)count * pair.Value.Seen / seen))
+            })
+            .OrderByDescending(entry => entry.Fraction)
+            .ThenBy(entry => entry.Key, StringComparer.Ordinal)
+            .Select(entry => entry.Key)
+            .ToArray();
+
+        while (remaining > 0)
+        {
+            var assigned = false;
+            foreach (var group in ordered)
+            {
+                if (remaining <= 0)
+                {
+                    break;
+                }
+
+                if (quotas[group] >= groups[group].Seen)
+                {
+                    continue;
+                }
+
+                quotas[group]++;
+                remaining--;
+                assigned = true;
+            }
+
+            if (!assigned)
+            {
+                break;
+            }
+        }
+
+        return quotas;
+    }
+
+    private static int StableGroupSeed(int seed, string group)
+    {
+        unchecked
+        {
+            var hash = 2166136261u;
+            foreach (var value in Encoding.UTF8.GetBytes(group))
+            {
+                hash ^= value;
+                hash *= 16777619u;
+            }
+
+            hash ^= (uint)seed;
+            return (int)(hash & 0x7FFFFFFF);
+        }
+    }
+
+    private sealed class StratifiedGroup(Random random)
+    {
+        public Random Random { get; } = random;
+        public long Seen { get; set; }
+        public List<DatasetRow> Reservoir { get; } = new();
     }
 }

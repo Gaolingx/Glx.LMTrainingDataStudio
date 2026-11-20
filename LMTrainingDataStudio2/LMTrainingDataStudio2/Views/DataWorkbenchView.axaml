@@ -559,13 +559,19 @@
                                                         HorizontalAlignment="Stretch"
                                                         HorizontalContentAlignment="Left"
                                                         Padding="6,2">
-                                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
+                                                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="4">
                                                         <TextBlock Text="{Binding Name}" FontSize="10"
                                                                    FontWeight="SemiBold"
                                                                    Foreground="{DynamicResource TextPrimaryBrush}"
                                                                    TextTrimming="CharacterEllipsis"
                                                                    VerticalAlignment="Center" />
                                                         <TextBlock Grid.Column="1"
+                                                                   Text="{Binding TypeText}"
+                                                                   FontSize="8"
+                                                                   Foreground="{DynamicResource TextDimBrush}"
+                                                                   VerticalAlignment="Center"
+                                                                   IsVisible="{Binding HasType}" />
+                                                        <TextBlock Grid.Column="2"
                                                                    Text="{Binding SortIndicator}"
                                                                    FontSize="8"
                                                                    Foreground="{DynamicResource AccentBrush}"

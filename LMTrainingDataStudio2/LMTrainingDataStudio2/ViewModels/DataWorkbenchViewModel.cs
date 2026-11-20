@@ -45,6 +45,7 @@ public partial class DataWorkbenchViewModel : ObservableObject
     private DatasetEditSession? _editSession;
     private bool _fieldsStructureDirty;
     private bool _messagesStructureDirty;
+    private bool _csvTypeHintsApplied;
 
     private const string NewRowTemplate = """{"text":""}""";
 
@@ -377,6 +378,7 @@ public partial class DataWorkbenchViewModel : ObservableObject
             SourceTotalRows = openedRows;
             TotalRows = openedRows;
             Columns.Clear();
+            _csvTypeHintsApplied = false;
             SelectedFilterColumn = null;
             FilterValue = string.Empty;
             FilterCaseSensitive = false;
@@ -529,6 +531,7 @@ public partial class DataWorkbenchViewModel : ObservableObject
             }
 
             var prepared = PreparePageRows(pageRows);
+            ApplyCsvTypeHints(prepared);
             Rows.Clear();
             foreach (var item in prepared)
             {
@@ -871,6 +874,39 @@ public partial class DataWorkbenchViewModel : ObservableObject
 
         SelectedFilterColumn ??= Columns.FirstOrDefault();
         ApplyFilterCommand.NotifyCanExecuteChanged();
+    }
+
+    private void ApplyCsvTypeHints(IReadOnlyList<PreparedRow> rows)
+    {
+        if (_csvTypeHintsApplied || _sourceFileType != DataFileType.Csv || rows.Count == 0)
+        {
+            return;
+        }
+
+        var samples = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        foreach (var row in rows)
+        {
+            foreach (var field in row.Fields)
+            {
+                if (!samples.TryGetValue(field.Name, out var values))
+                {
+                    values = new List<string>();
+                    samples[field.Name] = values;
+                }
+
+                values.Add(field.Text);
+            }
+        }
+
+        foreach (var column in Columns)
+        {
+            if (samples.TryGetValue(column.Name, out var values))
+            {
+                column.TypeText = CsvTypeInference.Infer(values);
+            }
+        }
+
+        _csvTypeHintsApplied = true;
     }
 
     private double GetSavedColumnWidth(string name) =>
@@ -1892,6 +1928,12 @@ public sealed partial class DatasetColumnViewModel : ObservableObject
     }
 
     public string Name { get; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasType))]
+    private string _typeText = string.Empty;
+
+    public bool HasType => !string.IsNullOrEmpty(TypeText);
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SortIndicator))]

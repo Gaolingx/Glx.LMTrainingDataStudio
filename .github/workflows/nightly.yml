@@ -1,0 +1,111 @@
+name: nightly
+
+permissions:
+  contents: read
+
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+    inputs:
+      perfRows:
+        description: Rows for JSONL/CSV/Parquet performance tests
+        required: true
+        default: '1000000'
+      pipelineRows:
+        description: Rows for the Seed -> Expression -> SFT Export pipeline
+        required: true
+        default: '1000000'
+      runProviderSmoke:
+        description: Run real-provider smoke tests (requires repository secrets)
+        type: boolean
+        default: false
+
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  LMTDS_CANCEL_BUDGET_MS: '5000'
+
+jobs:
+  perf:
+    runs-on: windows-latest
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+          cache: true
+          cache-dependency-path: '**/*.csproj'
+
+      - name: Restore
+        run: dotnet restore LMTrainingDataStudio2/LMTrainingDataStudio2.slnx
+
+      - name: Build
+        run: dotnet build LMTrainingDataStudio2/LMTrainingDataStudio2.slnx -c Release --no-restore
+
+      - name: Performance tests
+        env:
+          LMTDS_PERF_TESTS: '1'
+          LMTDS_PERF_ROWS: ${{ inputs.perfRows || '1000000' }}
+          LMTDS_PERF_PIPELINE_ROWS: ${{ inputs.pipelineRows || '1000000' }}
+        run: >
+          dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx
+          -c Release --no-build
+          --filter "FullyQualifiedName~DatasetPerformanceTests|FullyQualifiedName~PipelinePerformanceTests"
+          --logger "trx;LogFileName=perf-results.trx"
+          --results-directory artifacts/perf-results
+
+      - name: Upload performance results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-perf-results
+          path: artifacts/perf-results
+          if-no-files-found: ignore
+
+  provider-smoke:
+    if: github.event_name == 'workflow_dispatch' && inputs.runProviderSmoke
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+          cache: true
+          cache-dependency-path: '**/*.csproj'
+
+      - name: Restore
+        run: dotnet restore LMTrainingDataStudio2/LMTrainingDataStudio2.slnx
+
+      - name: Build
+        run: dotnet build LMTrainingDataStudio2/LMTrainingDataStudio2.slnx -c Release --no-restore
+
+      - name: Provider smoke tests
+        env:
+          LMTDS_PROVIDER_SMOKE_KEY: ${{ secrets.LMTDS_PROVIDER_SMOKE_KEY }}
+          LMTDS_PROVIDER_SMOKE_BASE_URL: ${{ secrets.LMTDS_PROVIDER_SMOKE_BASE_URL }}
+          LMTDS_PROVIDER_SMOKE_MODEL: ${{ secrets.LMTDS_PROVIDER_SMOKE_MODEL }}
+        run: >
+          dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx
+          -c Release --no-build
+          --filter "FullyQualifiedName~ProviderSmokeTests"
+          --logger "trx;LogFileName=provider-results.trx"
+          --results-directory artifacts/provider-results
+
+      - name: Upload provider results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-provider-results
+          path: artifacts/provider-results
+          if-no-files-found: ignore

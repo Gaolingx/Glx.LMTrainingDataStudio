@@ -19,6 +19,23 @@ public sealed class RecipeValidationServiceTests
     }
 
     [Test]
+    public void Validate_IssuesCarryStableCodes()
+    {
+        var duplicateResult = _service.Validate(new Recipe
+        {
+            Blocks =
+            {
+                CreateBlock("b1", BlockType.Validator, "dup"),
+                CreateBlock("b2", BlockType.Validator, "dup")
+            }
+        });
+
+        Assert.That(duplicateResult.Issues.Any(issue =>
+            issue.Code == "block-name-duplicate"), Is.True);
+        Assert.That(duplicateResult.Issues.All(issue => !string.IsNullOrWhiteSpace(issue.Code)), Is.True);
+    }
+
+    [Test]
     public void Validate_ValidGraph_IsValidWithoutIssues()
     {
         var recipe = new Recipe();
@@ -289,11 +306,17 @@ public sealed class RecipeValidationServiceTests
     {
         var recipe = new Recipe();
         recipe.Blocks.Add(CreateBlock("s1", BlockType.Sampler, "sample",
-            new SamplerBlockConfig(Count: 100, Ratio: null, Seed: 42, Splits: Array.Empty<string>())));
+            new SamplerBlockConfig(
+                Count: 100,
+                Ratio: null,
+                Seed: 42,
+                Splits: Array.Empty<string>(),
+                StratifyField: "category")));
 
         var result = _service.Validate(recipe);
 
         Assert.That(result.Issues.Any(i => i.Message.Contains("neither count nor ratio")), Is.False);
+        Assert.That(result.Issues.Any(i => i.Message.Contains("can only stratify")), Is.False);
     }
 
     [Test]
@@ -572,6 +595,96 @@ public sealed class RecipeValidationServiceTests
 
         Assert.That(result.Issues.Any(i =>
             i.Severity == ValidationSeverity.Warning && i.Message.Contains("split size cannot be negative")), Is.True);
+    }
+
+    [Test]
+    public void Validate_SftExportWithValidRatioSplits_HasNoSplitWarning()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("export", BlockType.SftExport, "export",
+            new SftExportBlockConfig(
+                "out/sft.jsonl",
+                Splits: new[] { "train:0.8", "valid:0.2" })));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i => i.Message.Contains("ratio splits")), Is.False);
+    }
+
+    [Test]
+    public void Validate_SftExportWithInvalidRatioSplits_ReportsWarning()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("export", BlockType.SftExport, "export",
+            new SftExportBlockConfig("out/sft.jsonl", Splits: new[] { "train:0" })));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Code == "sft-export-splits-invalid" && i.Message.Contains("invalid ratio splits")), Is.True);
+    }
+
+    [Test]
+    public void Validate_SftExportWithAppendAndRatioSplits_ReportsWarning()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("export", BlockType.SftExport, "export",
+            new SftExportBlockConfig(
+                "out/sft.jsonl",
+                Append: true,
+                Splits: new[] { "train:0.8", "valid:0.2" })));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Code == "sft-export-append-ratio-split-conflict"), Is.True);
+    }
+
+    [Test]
+    public void Validate_SftExportWithRowSplitAndRatioSplits_ReportsWarning()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("export", BlockType.SftExport, "export",
+            new SftExportBlockConfig(
+                "out/sft.jsonl",
+                SplitMaxRows: 10,
+                Splits: new[] { "train:0.8", "valid:0.2" })));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Code == "sft-export-split-mode-conflict"), Is.True);
+    }
+
+    [Test]
+    public void Validate_SftExportWithCountSplit_ReportsWarning()
+    {
+        var recipe = new Recipe();
+        recipe.Blocks.Add(CreateBlock("export", BlockType.SftExport, "export",
+            new SftExportBlockConfig("out/sft.jsonl", Splits: new[] { "train:100" })));
+
+        var result = _service.Validate(recipe);
+
+        Assert.That(result.Issues.Any(i =>
+            i.Code == "sft-export-splits-count-unsupported"), Is.True);
+    }
+
+    [Test]
+    public void Validate_SftExportWithRatioSplits_RegistersSplitFilesAsTargets()
+    {
+        var recipe = new Recipe();
+        var export = CreateBlock("export", BlockType.SftExport, "export",
+            new SftExportBlockConfig(
+                Path.Combine(Path.GetTempPath(), "lmtds-split", "sft.jsonl"),
+                Splits: new[] { "train:0.8", "valid:0.2" }));
+        recipe.Blocks.Add(export);
+
+        var targets = RecipeOutputTargets.Collect(recipe);
+
+        Assert.That(targets.Any(target =>
+            target.Path.EndsWith(Path.Combine("lmtds-split", "train.jsonl"), StringComparison.Ordinal)), Is.True);
+        Assert.That(targets.Any(target =>
+            target.Path.EndsWith(Path.Combine("lmtds-split", "valid.jsonl"), StringComparison.Ordinal)), Is.True);
     }
 
     [Test]

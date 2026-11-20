@@ -57,6 +57,37 @@ public sealed class SftExportBlockExecutor : IBlockExecutor
                 $"SFT export block '{blockName}' split size cannot be negative.");
         }
 
+        var ratioSplits = config.Splits?
+            .Where(split => !string.IsNullOrWhiteSpace(split))
+            .ToArray() ?? Array.Empty<string>();
+
+        if (ratioSplits.Length > 0)
+        {
+            if (config.Append)
+            {
+                throw new InvalidOperationException(
+                    $"SFT export block '{blockName}' cannot combine append mode with ratio splits.");
+            }
+
+            if (config.SplitMaxRows > 0)
+            {
+                throw new InvalidOperationException(
+                    $"SFT export block '{blockName}' cannot combine row-count splitting with ratio splits.");
+            }
+
+            if (!SamplerSplitPlan.TryParse(ratioSplits, out var plan, out var error))
+            {
+                throw new InvalidOperationException(
+                    $"SFT export block '{blockName}' has invalid ratio splits: {error}");
+            }
+
+            if (plan!.IsCountMode)
+            {
+                throw new InvalidOperationException(
+                    $"SFT export block '{blockName}' ratio splits must use 'name:ratio' entries.");
+            }
+        }
+
         if (config.Append && config.SplitMaxRows > 0)
         {
             throw new InvalidOperationException(
@@ -76,7 +107,11 @@ public sealed class SftExportBlockExecutor : IBlockExecutor
         [EnumeratorCancellation] CancellationToken ct)
     {
         await using var writer = SftExportWriter.Create(
-            config.OutputPath, config.Append, config.SplitMaxRows);
+            config.OutputPath,
+            config.Append,
+            config.SplitMaxRows,
+            config.Splits,
+            config.SplitSeed);
 
         var index = 0L;
         string? preview = null;
@@ -102,7 +137,10 @@ public sealed class SftExportBlockExecutor : IBlockExecutor
             ? string.Empty
             : $" (format: {config.TargetFormat})";
         var appendNote = config.Append ? " [append]" : string.Empty;
-        context.Log($"Exported {index} row(s) to {destination}{fieldNote}{formatNote}{appendNote}.");
+        var splitNote = config.Splits is { Length: > 0 }
+            ? $" [ratio splits: {string.Join(", ", config.Splits.Where(split => !string.IsNullOrWhiteSpace(split)))}]"
+            : string.Empty;
+        context.Log($"Exported {index} row(s) to {destination}{fieldNote}{formatNote}{appendNote}{splitNote}.");
         context.Log(preview is null ? "Preview: no rows exported." : $"Preview: {preview}");
     }
 
