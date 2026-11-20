@@ -73,7 +73,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results-${{ matrix.configuration }}
           path: artifacts/test-results
@@ -114,7 +114,7 @@ jobs:
 
       - name: Upload coverage
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: LMTrainingDataStudio2/LMTrainingDataStudio2.Tests/artifacts/coverage
@@ -217,7 +217,7 @@ jobs:
 
       - name: Upload audit report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: vulnerable-packages
           path: artifacts/vulnerable-packages.txt
