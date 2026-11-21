@@ -5,7 +5,7 @@
 >
 > 图例：`[x]` 已完成并有测试/验证；`[部分]` 可用但有明确缺口；`[ ]` 未实现。
 >
-> 说明：本文件是“已做/未做”的主清单；与 README 冲突时以本文件为准。本轮文档同步修正了几处旧描述：LLM Prompt 已使用 Fluid 模板；SFT Export 节点按行透传，不主动裁剪字段；README 画布“未实现”段落已过期。
+> 说明：本文件是“已做/未做”的主清单；与 README 冲突时以本文件为准。执行顺序以当前 [02-Hardening HANDOFF](TODO/02-Hardening/HANDOFF.md) 为准；本文件 §1.2 只表示缺口严重度，不代表排期顺序。本轮文档同步修正了几处旧描述：LLM Prompt 已使用 Fluid 模板；SFT Export 节点按行透传，不主动裁剪字段；README 画布“未实现”段落已过期。
 
 ---
 
@@ -46,7 +46,7 @@
 - 工作流预设：6 个基础流水线可从 File → New from Preset 或节点库一键加载，加载遵守脏文档确认。
 - 自定义预设：当前 Recipe 可保存为预设；支持导入外部预设（分配新本地 ID）与删除；单文件存于 `%APPDATA%\LMTrainingDataStudio\presets`，坏文件跳过并告警。
 - 节点说明：10 类节点具备本地化名称、简介、详细说明与端口摘要；属性面板 Node Guide 与画布悬停提示复用同一份目录。
-- 界面本地化：zh-CN / en-US 资源化静态 UI（约 260 个键），设置面板切换语言后即时刷新；运行日志/执行状态仍为英文技术文本。
+- 界面本地化：zh-CN / en-US 资源化静态 UI（507 个键），设置面板切换语言后即时刷新；运行日志/执行状态仍为英文技术文本。
 - 多输出端口：Validator `pass`/`reject`、Sampler 按 splits 动态端口；Runner 按端口缓冲、检查点与恢复，旧单端口 Recipe 回落主端口。
 - LLM 请求侧 tools、多行 `messages`、`response_format` JSON Schema、并发与保序、token/成本日志、失败样本 JSONL；OpenAI Chat / Responses / Anthropic 均支持 SSE 流式输出（累积 content/delta/tool_calls/usage），流式失败沿用超时与重试；LLM 面板可按 provider 拉取模型列表并选择。
 - Validator 多规则组合、expression/schema/regex/script、规则超时、取反与 pass/reject 双端口。
@@ -63,7 +63,7 @@
 - 工程化：滚动日志与全局异常、GitHub Actions CI、nightly/release 工作流、依赖漏洞审计与 Dependabot、win-x64 单文件发布脚本、Headless UI 测试、MIT LICENSE、应用图标。
 - 744 个自动化测试：736 个常规通过 + 7 个 gated（2 个真实 provider 冒烟 + 5 个性能 gated）+ 1 个 Explicit 示例生成。
 
-### 1.2 当前最大缺口（按优先级）
+### 1.2 当前最大缺口（按缺口严重度，非执行顺序）
 
 1. **节点扩展残余**：Tool Profile MCP（stdio/HTTP）、共享工具库与鉴权；Query Source 随机/模型生成与去重/权重；Simulation 容器级隔离、严格令牌桶与非 OpenAI 流式（Simulation 侧）；Validator 独立失败摘要与任意代码沙箱。
 2. **数据规模残余**：视图索引最多 100 万行且常驻内存，10M 行筛选/排序未做磁盘索引与实测；CSV/Parquet 1M 行质量基线、10M 行质量/转换基线未实测；Seed 多文件/目录/HuggingFace/HTTP 源与节点内过滤/列映射未做。
@@ -165,6 +165,7 @@
 | 并发调用 / token/成本统计 | [x] | `MaxConcurrency` 保序并发；token 与估算成本写日志 |
 | 失败样本单独输出 | [x] | `ContinueOnError` + `FailureOutputPath` 原子写 `{lineNumber,error,data}` |
 | 流式输出 / 模型列表 | [x] | `Streaming` 开启时 OpenAI Chat / Responses / Anthropic 均走 SSE（累积 content/delta/tool_calls/usage，沿用超时重试）；模型下拉调用 OpenAI `/models`、Anthropic `/v1/models` |
+| 多模态消息 | [ ] | 当前仅支持文本 `content`；图片/音频消息未支持 |
 
 ### 2.3 Expression（字段变换）
 
@@ -309,7 +310,7 @@
 | 节点说明目录 | [x] | `BlockCatalog` 统一提供名称/简介/详细说明/端口摘要 |
 | 属性面板 Node Guide | [x] | 选中节点后展示说明与输入/输出端口 |
 | 画布节点悬停提示 | [x] | 显示同一份节点简介 |
-| zh-CN / en-US 资源化 | [x] | 约 230 个静态 UI 键；`{loc:Loc key}` 绑定切换即时刷新 |
+| zh-CN / en-US 资源化 | [x] | 507 个静态 UI 键；`{loc:Loc key}` 绑定切换即时刷新 |
 | 语言设置持久化 | [x] | `system` / `zh-CN` / `en-US`；非法值回退并告警 |
 | 运行日志/执行状态本地化 | [ ] | 保留英文技术文本 |
 
@@ -360,7 +361,7 @@
 - [x] 设置：网格吸附、完整 Dark/Light 主题、语言切换与内存定时刷新生效；设置变更经 `IAppSettingsService` 通知长生命周期服务（数据工作台重建读取器工厂、批量转换器与子服务）。
 - [x] 主题：Dark/Light 资源完整，视图无 `#RRGGBB` 硬编码颜色残留。
 
-### 3.3 未实现（按领域）
+### 3.3 分领域状态明细（含已完成与未完成）
 
 **数据与数据工作台**
 
@@ -412,7 +413,7 @@
 
 - [ ] 10M 行质量/转换基线与 CSV/Parquet 1M 行质量基线。
 - [部分] MSIX/Inno 脚本、文件关联、单实例、命令行打开已完成；安装包未在干净机器实际安装验证。
-- [部分] README 截图与 6 个示例 Recipe 已完成；发布说明由 [CHANGELOG.md](CHANGELOG.md) 承担。
+- [部分] README 截图与 6 个示例 Recipe 已完成；发布说明由 [CHANGELOG.md](../CHANGELOG.md) 承担。
 - [部分] 崩溃报告导出与内容脱敏已完成；日志级别/来源筛选未做。
 - [x] API Key 使用 Windows DPAPI 加密保存，旧明文加载时自动迁移；非 Windows 只使用环境变量。
 - [x] 诊断包全文脱敏（日志、summary、执行摘要）与 Windows 设置/日志/崩溃目录 ACL 收紧。
@@ -439,7 +440,7 @@
 
 ---
 
-## 五、已完成轮次（Round 8–23）
+## 五、已完成轮次（Round 8–32）
 
 | Round | 主题 | 关键交付 | 结果 |
 | --- | --- | --- | --- |

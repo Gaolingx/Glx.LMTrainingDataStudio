@@ -1,11 +1,12 @@
-# HANDOFF — 01-Bugfix1（全仓缺陷修复与门禁补齐）
+# HANDOFF — 02-Bugfix1（全仓缺陷修复与门禁补齐）
 
-> 状态：已完成并归档（Round 32，2026-11-20）
+> 状态：已完成并归档（Round 32，2026-11-20）；DoD 有 3 项例外，已转交 [02-Hardening HANDOFF](../../TODO/02-Hardening/HANDOFF.md)。
 > 创建：2026-11-17
 > 基线：`895c08e feat(release): Round 16 发布与体验`
 > 上一阶段归档：[PLAN/Done/01-BuildALL/HANDOFF.md](../../Done/01-BuildALL/HANDOFF.md)
 > 扫描基线：`dotnet build` 0 警告；Round 32 收尾基线为 `--list-tests` 744 个用例（736 通过 + 7 gated + 1 Explicit），覆盖率 77.55% / 85.07%。
 > 边界：本文件只记录 Round 17 及之后的修复/补齐工作；Round 0–16 的原始计划、验收标准与技术决策已冻结在归档文件中，不再回写。
+> 历史快照：文中测试数与本地化键数为归档时值；当前值以 [STATUS.md](../../STATUS.md) 为准。
 
 ---
 
@@ -29,7 +30,7 @@
 - [x] 建立当前基线：`dotnet build` 0 警告；`dotnet test --list-tests` 513 个用例（505 通过 + 7 gated + 1 Explicit）。
 - [x] 将建设期 TODO 归档并冻结到 [PLAN/Done/01-BuildALL/HANDOFF.md](../../Done/01-BuildALL/HANDOFF.md)。
 - [x] 建立本 HANDOFF，形成 167 项未完成工作池，按 P1/P2/P3 与领域分类；二次扫描后增补至 205 项。
-- [x] 2026-11-17 二次全仓扫描复核：`dotnet test --list-tests` 返回 513 个用例且构建成功；生产代码无遗留 `TODO` / `FIXME` / `NotImplementedException`；zh-CN / en-US 资源键各 432 个；确认 7.x 清单与代码一致，并新增 8.3 的 38 项增补。
+- [x] 2026-11-17 二次全仓扫描复核：`dotnet test --list-tests` 返回 513 个用例且构建成功；生产代码无遗留 `TODO` / `FIXME` / `NotImplementedException`；zh-CN / en-US 资源键各 432 个（归档时值；当前 507）；确认 7.x 清单与代码一致，并新增 8.3 的 38 项增补。
 - [x] 确认以下高优先级问题（本轮尚未修复）：
   - `.recipe` 文件关联与命令行解析不一致：`Program.cs:62` 只接受 `.json`，但 MSIX/Inno 注册 `.recipe`。
   - `.recipe` 不在打开/保存文件选择器中：过滤器只有 `*.json`。
@@ -401,6 +402,8 @@
 
 ### 6.1 总体验收（DoD）
 
+> 归档说明：下列 3 项未在归档时闭合，已作为例外转交 02-Hardening（UI 逐项人工验收、错误上下文、干净机器安装记录），不作为本阶段“已完成”的依据。
+
 - [x] `dotnet build` 0 警告、0 错误（分析器开启）。
 - [x] `dotnet test` 全绿；gated 测试有明确运行记录（nightly + 本机记录）。
 - [x] 每个 P1 缺陷有回归测试或自动化检查。
@@ -477,7 +480,7 @@
 - [x] **[测试][P1] `SingleInstanceService` 无任何自动化测试**：双进程端到端、管道超时、外部路径转发、脏文档确认均未覆盖。
 - [x] **[测试][P1] 命令行/文件关联无测试**：`.json` 与 `.recipe` 参数解析、启动恢复、第二次实例转发无测试。
 - [x] **[测试][P1] 打包脚本/清单无自动校验**：版本一致性、MSIX 必需资产、Inno 关联项、发布产物启动冒烟均未纳入测试或 CI。
-- [x] **[测试][P2] 本地化键无一致性测试**：zh-CN/en-US 的 key 集合、占位符与动态拼接 key（`node.*`、`dialog.*`）未自动比对；当前为人工核对 432/432。
+- [x] **[测试][P2] 本地化键一致性测试**：`LocalizationConsistencyTests` 自动比对 zh-CN/en-US key 集合、非空值与占位符，并校验静态引用键存在性（当前 507/507）；动态拼接 key（`node.*`、`dialog.*`）仍无覆盖。
 - [ ] **[测试][P2] 自动崩溃入口无测试**：仅覆盖 `CrashReportService.CreateReport` 与设置脱敏；AppDomain/TaskScheduler/UI 三个未处理异常入口未验证。
 - [x] **[测试][P2] 中断恢复无逐字节/哈希比对**：Round 17 已加入输出 SHA256 与 Recipe 指纹校验（见 7.7）。
 - [ ] **[测试][P2] 格式转换边界测试不足**：DPO/Pretrain 往返、多轮 Alpaca、额外字段保留/丢弃策略、ShareGPT tool_call 解析失败未覆盖（现有为 Alpaca 基础转换 + DPO/Pretrain 基础矩阵）。
@@ -701,7 +704,7 @@
 | 用例枚举 | `dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx --list-tests` | 513 个用例，命令退出码 0；505 常规 + 5 性能 gated + 2 provider gated + 1 Explicit |
 | 完整测试 | `dotnet test LMTrainingDataStudio2/LMTrainingDataStudio2.slnx --no-build` | 505 通过，0 失败，7 跳过（5 性能 + 2 provider）；`WriteExamples` 为 `[Explicit]` 未计入运行总数 |
 | 遗留标记 | 全仓 grep `TODO` / `FIXME` / `HACK` / `NotImplementedException` | 生产代码 0 处；仅保留有意的 `NotSupportedException` 分支（不支持的类型/转换器/标记扩展） |
-| 本地化键 | `Localization/*.json` | zh-CN 432、en-US 432；`LocalizationTests` 覆盖服务行为、节点目录与预设，但无键集合/占位符一致性测试 |
+| 本地化键 | `Localization/*.json` | 归档时 zh-CN 432、en-US 432（当前 507/507）；`LocalizationConsistencyTests` 自动比对 key 集合、非空值与占位符；动态拼接 key（`node.*`、`dialog.*`）无覆盖 |
 | 主题硬编码 | `.axaml` 中 `#RRGGBB` / 命名颜色 | 除 `Themes/Colors.axaml` 外仅剩 `Transparent`；Round 16 的“完整浅色主题”实际已完成，STATUS/README 仍有过期描述 |
 | 测试数据 | `git status --short` | 工作区无未提交改动（本文件修改前） |
 | 示例 | `examples/*.recipe.json` | 6 个示例文件存在；生成测试 `ExampleRecipeTests.WriteExamples` 为 `[Explicit]`，CI 不校验示例是否漂移 |

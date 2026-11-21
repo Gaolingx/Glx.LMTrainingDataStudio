@@ -2,6 +2,8 @@
 
 本文件记录用户可见变更与工程化修复。当前工作池见 [PLAN/TODO/02-Hardening/HANDOFF.md](PLAN/TODO/02-Hardening/HANDOFF.md)；Round 17–32 已归档到 [PLAN/Done/02-Bugfix1/HANDOFF.md](PLAN/Done/02-Bugfix1/HANDOFF.md)。
 
+> 版本说明：当前构建版本为 `1.0.0`，但尚未正式发布；以下条目均为未发布变更，发布时统一归档到 `[1.0.0] - <日期>`。
+
 ## [Unreleased] — 2026-11-20（Round 32 / 节点与发布收尾）
 
 ### Added

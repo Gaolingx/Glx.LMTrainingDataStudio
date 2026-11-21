@@ -4,8 +4,9 @@
 > - 本文件记录 Round 0–16 的建设期计划、验收标准与技术决策，已冻结，不再修改。
 > - 冻结基线：`895c08e feat(release): Round 16 发布与体验`
 > - 当前工作入口：[PLAN/TODO/02-Hardening/HANDOFF.md](../../TODO/02-Hardening/HANDOFF.md)
-> - 上一阶段归档：[PLAN/Done/02-Bugfix1/HANDOFF.md](../02-Bugfix1/HANDOFF.md)
+> - 后续阶段归档：[PLAN/Done/02-Bugfix1/HANDOFF.md](../02-Bugfix1/HANDOFF.md)
 > - 后续修订只写入当前 HANDOFF；本文件仅作历史追溯。
+> - 文中测试数、本地化键数与覆盖率均为归档时快照；当前值以 [STATUS.md](../../STATUS.md) 为准。
 
 > 最后更新：2026-11-17（Round 16 发布与体验完成）
 > 当前基线：.NET 9 / Avalonia 11.3 / NUnit 4；505 常规测试 + 7 gated；构建 0 警告（分析器开启）
@@ -30,7 +31,7 @@
 
 - [x] 本地化框架：`LocalizationService` + `{loc:Loc key}` 标记扩展，中英文资源内嵌于程序集，语言切换时所有本地化绑定原地刷新。
 - [x] 语言设置：`AppSettings.Language` 支持 `system` / `zh-CN` / `en-US`，设置面板提供语言选择并持久化；`SettingsStore` 对非法语言回退并给出警告。
-- [x] 静态 UI 本地化：MainWindow、属性面板、节点库、Data 工作台、Executions、消息对话框的标签、按钮、提示与水印全部资源化（约 230 个键）。
+- [x] 静态 UI 本地化：MainWindow、属性面板、节点库、Data 工作台、Executions、消息对话框的标签、按钮、提示与水印全部资源化（归档时约 230 个键；当前 507）。
 - [x] 节点说明：新增 `BlockCatalog`，为 10 类节点提供名称、一句话简介、详细说明与端口摘要；属性面板显示 Node Guide，画布节点悬停显示简介。
 - [x] 工作流预设：新增 `RecipePresetCatalog` 与 6 个基础流水线（LLM 批量生成、OAI 轨迹清洗、字段映射、校验与切分、模拟 Agent 轨迹、真实工具调用），支持 File → New from Preset 与节点库点击加载。
 - [x] 自定义预设：`RecipePresetStore` 按预设单文件持久化到 `%APPDATA%\LMTrainingDataStudio\presets`；支持保存当前 Recipe、导入外部预设（分配新本地 ID）与删除；原子写入、坏文件跳过并告警。

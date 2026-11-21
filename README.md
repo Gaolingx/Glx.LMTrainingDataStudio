@@ -4,6 +4,8 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 
 项目目标是为 JSONL / CSV / Parquet 等常见训练数据格式提供专业级 GUI：支持大文件流式处理、数据格式互转、DAG Recipe 编排、可视化 Tool Schema 编辑、异步执行、实时进度与结果预览。
 
+> 文档边界：功能状态与缺口以 [PLAN/STATUS.md](PLAN/STATUS.md) 为准；执行顺序以 [当前 HANDOFF](PLAN/TODO/02-Hardening/HANDOFF.md) 为准。本 README 只保留用户入口与使用说明。
+
 ![Editor dark theme](docs/screenshots/editor-dark.png)
 
 ![Editor light theme](docs/screenshots/editor-light.png)
@@ -57,7 +59,7 @@ LLM Training Data Studio 是一个基于 **C# / Avalonia** 的桌面端训练数
 - 中英文界面本地化（zh-CN / en-US，可在设置中切换），节点库、属性面板与画布悬停提示包含完整节点说明
 - 通用 Block Config JSON 编辑器，可直接配置所有节点类型
 
-> 注意：当前仍是开发版。**Tool Profile MCP 适配、容器级隔离、Query Source 随机/模型生成尚未实现**；应用默认启动空白 Recipe，可通过 File → New from Sample 加载 4 节点示例，或恢复上次打开的文件。
+> 注意：当前仍是开发版（版本号 1.0.0，尚未正式发布）。**Tool Profile MCP 适配、容器级隔离、Query Source 随机/模型生成尚未实现**；应用默认启动空白 Recipe，可通过 File → New from Sample 加载 4 节点示例，或恢复上次打开的文件。
 >
 > - 完整功能清单与节点能力矩阵：[PLAN/STATUS.md](PLAN/STATUS.md)
 > - 当前阶段计划与验收标准：[PLAN/TODO/02-Hardening/HANDOFF.md](PLAN/TODO/02-Hardening/HANDOFF.md)
@@ -534,6 +536,8 @@ powershell -ExecutionPolicy Bypass -File scripts/package-inno.ps1 -Version 1.2.3
 
 版本默认读取 `Directory.Build.props`；MSIX 会自动补齐为四段版本。输出为 `LLMTrainingDataStudio-<version>.msix` 与 `LMTrainingDataStudio-Setup-<version>.exe`。MSIX 清单位于 `packaging/msix/AppxManifest.xml`，Inno 脚本位于 `packaging/inno/LMTrainingDataStudio.iss`。
 
+> `release.yml` 默认产出未签名的 MSIX/Inno；签名需在本地脚本传入证书，或后续接入 CI Secrets / Azure Trusted Signing。干净机器安装前需确认包签名与证书 Subject/Publisher 策略。
+
 ### 命令行打开与单实例
 
 ```powershell
@@ -664,7 +668,7 @@ dotnet run --project .\LMTrainingDataStudio2\LMTrainingDataStudio2.csproj
 - [x] JSONL / CSV / Parquet 流式读取与分页预览
 - [x] 大文件随机行跳转
 - [x] 数据增删查改（逐行插入/复制/删除/恢复、行 JSON 编辑、撤销/重做、另存/覆盖）
-- [x] 10M 行与 CSV/Parquet 大规模基线
+- [ ] 10M 行质量/转换基线；CSV/Parquet 1M 行质量基线（入口已提供）
 - [x] 搜索命中高亮、校验问题级别/错误码筛选
 - [x] 统一样本/输出预览弹窗（SFT / Validator reject / Simulation 失败样本 / Cleaner diff）
 - [x] 去重、混洗、切分文件
